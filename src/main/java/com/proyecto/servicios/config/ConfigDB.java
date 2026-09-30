@@ -27,7 +27,8 @@ import java.util.Map;
         basePackages = {
                 "com.proyecto.servicios.repositorys.sf",
                 "com.proyecto.servicios.repositorys.gestopago",
-                "com.proyecto.servicios.repositorys.productos"
+                "com.proyecto.servicios.repositorys.productos",
+                "com.proyecto.servicios.repositorys.onboarding"
         },
         transactionManagerRef = "sfTransactionManager",
         entityManagerFactoryRef = "sfEntityManagerFactory"
@@ -83,7 +84,8 @@ public class ConfigDB {
         entityManager.setPackagesToScan(
                 "com.proyecto.servicios.entity.sf",
                 "com.proyecto.servicios.entity.gestopago",
-                "com.proyecto.servicios.entity.productos"
+                "com.proyecto.servicios.entity.productos",
+                "com.proyecto.servicios.entity.onboarding"
         );
 
         entityManager.setPersistenceUnitName("sfDatasource");
@@ -96,7 +98,7 @@ public class ConfigDB {
 
         properties.put(
                 "hibernate.hbm2ddl.auto",
-                "none"
+                "update"
         );
 
         properties.put(
