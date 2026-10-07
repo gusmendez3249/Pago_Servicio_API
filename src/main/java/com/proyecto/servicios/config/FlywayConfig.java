@@ -30,6 +30,7 @@ public class FlywayConfig {
                 .locations(locations)
                 .table(historyTable)
                 .schemas(schema)
+                .outOfOrder(true)
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
                 .load();

@@ -13,8 +13,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.scheduling.annotation.Scheduled;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -114,5 +117,22 @@ public class AuthService {
         // Actualizar actividad
         usuario.setUltimaActividad(LocalDateTime.now());
         usuarioLoginRepository.save(usuario);
+    }
+
+    @Transactional
+    @Scheduled(fixedRate = 60000)
+    public void cerrarSesionesInactivasAutomaticamente() {
+        List<UsuarioLoginEntity> usuariosActivos = usuarioLoginRepository.findByIsLoggedInTrue();
+        LocalDateTime ahora = LocalDateTime.now();
+        for (UsuarioLoginEntity u : usuariosActivos) {
+            if (u.getUltimaActividad() != null) {
+                long minutos = Duration.between(u.getUltimaActividad(), ahora).toMinutes();
+                if (minutos >= INACTIVIDAD_MINUTOS_MAX) {
+                    u.setIsLoggedIn(false);
+                    usuarioLoginRepository.save(u);
+                    log.info("Sesión inactiva cerrada automáticamente en segundo plano para usuario: {} (Inactivo {} min)", u.getUsername(), minutos);
+                }
+            }
+        }
     }
 }

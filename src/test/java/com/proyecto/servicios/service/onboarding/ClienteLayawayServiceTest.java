@@ -39,6 +39,9 @@ class ClienteLayawayServiceTest {
     @Mock
     private PasswordEncoderUtil passwordEncoderUtil;
 
+    @Mock
+    private CatNacionalidadRepository catNacionalidadRepository;
+
     @InjectMocks
     private ClienteLayawayService clienteLayawayService;
 
@@ -60,7 +63,7 @@ class ClienteLayawayServiceTest {
 
         DatosContactoDto dc = DatosContactoDto.builder()
                 .correo("juan.perez@email.com")
-                .telefonoMovil("5512345678")
+                .telefonoMovil(5512345678L)
                 .build();
 
         DomicilioDto dom = DomicilioDto.builder()
@@ -97,6 +100,7 @@ class ClienteLayawayServiceTest {
 
     @Test
     void procesarOperacion_Bandera1_InsertarCorrectamente() {
+        when(catNacionalidadRepository.existsByNombreIgnoreCaseAndActivoTrue(any())).thenReturn(true);
         when(clienteRepository.existsByCurp(any())).thenReturn(false);
         when(clienteRepository.existsByRfc(any())).thenReturn(false);
         when(clienteRepository.existsByCorreo(any())).thenReturn(false);
@@ -154,5 +158,47 @@ class ClienteLayawayServiceTest {
         assertFalse(response.getActivo());
         assertEquals("INACTIVA", response.getEstatusCuenta());
         verify(clienteRepository, times(1)).save(clienteExistente);
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_ConClienteIdInvalido_LanzaBadRequest() {
+        requestInsertar.setClienteId(10L); // Postura B: bandera 1 solo admite null o 0
+
+        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+                clienteLayawayService.procesarOperacion(requestInsertar)
+        );
+
+        assertEquals(400, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("clienteId debe ser nulo o 0"));
+    }
+
+    @Test
+    void procesarOperacion_Bandera2_ConClienteIdInvalido_LanzaBadRequest() {
+        LayawayClienteRequest requestActualizar = LayawayClienteRequest.builder()
+                .bandera(2)
+                .clienteId(-1L) // ID menor o igual a 0 no permitido
+                .build();
+
+        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+                clienteLayawayService.procesarOperacion(requestActualizar)
+        );
+
+        assertEquals(400, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("mayor a 0"));
+    }
+
+    @Test
+    void procesarOperacion_Bandera3_ConClienteIdInvalido_LanzaBadRequest() {
+        LayawayClienteRequest requestBaja = LayawayClienteRequest.builder()
+                .bandera(3)
+                .clienteId(0L) // ID 0 no permitido en baja
+                .build();
+
+        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+                clienteLayawayService.procesarOperacion(requestBaja)
+        );
+
+        assertEquals(400, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("mayor a 0"));
     }
 }

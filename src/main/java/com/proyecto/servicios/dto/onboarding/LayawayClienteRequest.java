@@ -1,6 +1,9 @@
 package com.proyecto.servicios.dto.onboarding;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,9 +16,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LayawayClienteRequest {
 
+    @Schema(description = "Bandera de operación (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica)", example = "1")
     @NotNull(message = "La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica)")
+    @Min(value = 1, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar) o 3 (Eliminar)")
+    @Max(value = 3, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar) o 3 (Eliminar)")
     private Integer bandera;
 
+    @Schema(description = "ID de cliente (obligatorio para banderas 2 y 3)", example = "1")
     private Long clienteId;
 
     @Valid
@@ -33,3 +40,4 @@ public class LayawayClienteRequest {
     @Valid
     private LoginCredencialesDto loginCredenciales;
 }
+

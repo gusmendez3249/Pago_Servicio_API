@@ -8,6 +8,10 @@ import java.time.Period;
 
 public class MayorDeEdadValidator implements ConstraintValidator<MayorDeEdad, LocalDate> {
 
+    private static final int EDAD_MINIMA = 18;
+    // Evita fechas absurdas como 0001-01-01 o 1500-01-01 que sí serían "mayores de edad"
+    private static final int EDAD_MAXIMA = 120;
+
     @Override
     public boolean isValid(LocalDate fechaNacimiento, ConstraintValidatorContext context) {
         if (fechaNacimiento == null) {
@@ -19,6 +23,8 @@ public class MayorDeEdadValidator implements ConstraintValidator<MayorDeEdad, Lo
             return false;
         }
 
-        return Period.between(fechaNacimiento, hoy).getYears() >= 18;
+        int edad = Period.between(fechaNacimiento, hoy).getYears();
+        return edad >= EDAD_MINIMA && edad <= EDAD_MAXIMA;
     }
 }
+

@@ -59,11 +59,12 @@ public class ConfigDB {
         config.setPassword(password);
         config.setDriverClassName("org.postgresql.Driver");
 
-        config.setMaximumPoolSize(10);
+        // Configurables desde application.properties para ajustar ante pruebas de carga (JMeter)
+        config.setMaximumPoolSize(env.getProperty("app.datasource.max-pool-size", Integer.class, 20));
         config.setMaxLifetime(1800000);
-        config.setConnectionTimeout(5000);
+        config.setConnectionTimeout(env.getProperty("app.datasource.connection-timeout-ms", Long.class, 3000L));
         config.setValidationTimeout(5000);
-        config.setMinimumIdle(2);
+        config.setMinimumIdle(env.getProperty("app.datasource.min-idle", Integer.class, 5));
         config.setConnectionTestQuery("SELECT 1");
         config.setPoolName("sfDatasource");
 

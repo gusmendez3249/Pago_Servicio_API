@@ -27,6 +27,7 @@ public class ClienteLayawayService {
     private final DomicilioRepository domicilioRepository;
     private final CuentaRepository cuentaRepository;
     private final UsuarioLoginRepository usuarioLoginRepository;
+    private final CatNacionalidadRepository catNacionalidadRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
 
     @Transactional
@@ -51,6 +52,11 @@ public class ClienteLayawayService {
         InformacionLaboralDto infoLab = request.getInformacionLaboral();
         LoginCredencialesDto loginDto = request.getLoginCredenciales();
 
+        // Validación estricta Postura B: Para bandera = 1 (Insertar), clienteId debe ser null o 0
+        if (request.getClienteId() != null && request.getClienteId() != 0) {
+            throw new OnboardingException("Para la operación INSERTAR (bandera = 1), el clienteId debe ser nulo o 0. No se permite enviar un ID preexistente o arbitrario.", HttpStatus.BAD_REQUEST, 400);
+        }
+
         if (dp == null || dc == null || dom == null || infoLab == null) {
             throw new OnboardingException("Los datos personales, de contacto, domicilio e información laboral son obligatorios para la creación.", HttpStatus.BAD_REQUEST, 400);
         }
@@ -59,6 +65,9 @@ public class ClienteLayawayService {
         if (dp.getFechaNacimiento() == null || Period.between(dp.getFechaNacimiento(), LocalDate.now()).getYears() < 18) {
             throw new OnboardingException("El cliente debe ser mayor de edad (18 años o más).", HttpStatus.BAD_REQUEST, 400);
         }
+
+        // 1.1 Validar catálogo de nacionalidad en la base de datos
+        validarNacionalidadEnBD(dp.getNacionalidad());
 
         // 2. Validar Unicidad de CURP, RFC, Correo
         if (clienteRepository.existsByCurp(dp.getCurp().trim().toUpperCase())) {
@@ -101,12 +110,12 @@ public class ClienteLayawayService {
                 .fechaNacimiento(dp.getFechaNacimiento())
                 .curp(dp.getCurp().trim().toUpperCase())
                 .rfc(dp.getRfc().trim().toUpperCase())
-                .sexo(dp.getSexo())
-                .nacionalidad(dp.getNacionalidad())
-                .estadoCivil(dp.getEstadoCivil())
+                .sexo(dp.getSexo().trim().toUpperCase())
+                .nacionalidad(dp.getNacionalidad().trim().toUpperCase())
+                .estadoCivil(dp.getEstadoCivil().trim().toUpperCase())
                 .correo(dc.getCorreo().trim().toLowerCase())
-                .telefonoMovil(dc.getTelefonoMovil())
-                .telefonoAlt(dc.getTelefonoAlt())
+                .telefonoMovil(String.valueOf(dc.getTelefonoMovil()))
+                .telefonoAlt(dc.getTelefonoAlt() != null ? String.valueOf(dc.getTelefonoAlt()) : null)
                 .ocupacion(infoLab.getOcupacion())
                 .empresa(infoLab.getEmpresa())
                 .ingresoMensual(infoLab.getIngresoMensual())
@@ -166,8 +175,8 @@ public class ClienteLayawayService {
     }
 
     private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request) {
-        if (request.getClienteId() == null) {
-            throw new OnboardingException("El clienteId es obligatorio para la operación ACTUALIZAR (bandera = 2).", HttpStatus.BAD_REQUEST, 400);
+        if (request.getClienteId() == null || request.getClienteId() <= 0) {
+            throw new OnboardingException("El clienteId debe ser un identificador numérico válido mayor a 0 para la operación ACTUALIZAR (bandera = 2).", HttpStatus.BAD_REQUEST, 400);
         }
 
         ClienteEntity cliente = clienteRepository.findById(request.getClienteId())
@@ -190,9 +199,12 @@ public class ClienteLayawayService {
                 }
                 cliente.setFechaNacimiento(dp.getFechaNacimiento());
             }
-            if (dp.getSexo() != null) cliente.setSexo(dp.getSexo());
-            if (dp.getNacionalidad() != null) cliente.setNacionalidad(dp.getNacionalidad());
-            if (dp.getEstadoCivil() != null) cliente.setEstadoCivil(dp.getEstadoCivil());
+            if (dp.getSexo() != null) cliente.setSexo(dp.getSexo().trim().toUpperCase());
+            if (dp.getNacionalidad() != null) {
+                validarNacionalidadEnBD(dp.getNacionalidad());
+                cliente.setNacionalidad(dp.getNacionalidad().trim().toUpperCase());
+            }
+            if (dp.getEstadoCivil() != null) cliente.setEstadoCivil(dp.getEstadoCivil().trim().toUpperCase());
             if (dp.getDatosBiometricos() != null) cliente.setDatosBiometricos(dp.getDatosBiometricos());
 
             // NOTA: Intencionalmente NO se actualizan CURP ni RFC para proteger la inmutabilidad de negocio.
@@ -208,8 +220,8 @@ public class ClienteLayawayService {
                 }
                 cliente.setCorreo(dc.getCorreo().trim().toLowerCase());
             }
-            if (dc.getTelefonoMovil() != null) cliente.setTelefonoMovil(dc.getTelefonoMovil());
-            if (dc.getTelefonoAlt() != null) cliente.setTelefonoAlt(dc.getTelefonoAlt());
+            if (dc.getTelefonoMovil() != null) cliente.setTelefonoMovil(String.valueOf(dc.getTelefonoMovil()));
+            if (dc.getTelefonoAlt() != null) cliente.setTelefonoAlt(String.valueOf(dc.getTelefonoAlt()));
         }
 
         // Actualizar domicilio
@@ -265,8 +277,8 @@ public class ClienteLayawayService {
     }
 
     private LayawayClienteResponse darDeBajaCliente(LayawayClienteRequest request) {
-        if (request.getClienteId() == null) {
-            throw new OnboardingException("El clienteId es obligatorio para la operación ELIMINAR / BAJA LÓGICA (bandera = 3).", HttpStatus.BAD_REQUEST, 400);
+        if (request.getClienteId() == null || request.getClienteId() <= 0) {
+            throw new OnboardingException("El clienteId debe ser un identificador numérico válido mayor a 0 para la operación ELIMINAR / BAJA LÓGICA (bandera = 3).", HttpStatus.BAD_REQUEST, 400);
         }
 
         ClienteEntity cliente = clienteRepository.findById(request.getClienteId())
@@ -322,4 +334,17 @@ public class ClienteLayawayService {
         } while (cuentaRepository.existsByNumeroCuenta(numeroCuenta));
         return numeroCuenta;
     }
+
+    private void validarNacionalidadEnBD(String nacionalidad) {
+        if (nacionalidad == null || nacionalidad.trim().isEmpty()) {
+            throw new OnboardingException("La nacionalidad es obligatoria.", HttpStatus.BAD_REQUEST, 400);
+        }
+        String nacInput = nacionalidad.trim();
+        boolean existe = catNacionalidadRepository.existsByNombreIgnoreCaseAndActivoTrue(nacInput) ||
+                         catNacionalidadRepository.existsByClaveIgnoreCaseAndActivoTrue(nacInput);
+        if (!existe) {
+            throw new OnboardingException("La nacionalidad '" + nacInput + "' no es válida. No existe en el catálogo registrado de la base de datos (cat_nacionalidad).", HttpStatus.NOT_FOUND, 404);
+        }
+    }
+
 }
