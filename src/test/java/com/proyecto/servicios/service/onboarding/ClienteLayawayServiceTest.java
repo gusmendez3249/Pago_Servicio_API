@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -19,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +45,10 @@ class ClienteLayawayServiceTest {
 
     @Mock
     private CatNacionalidadRepository catNacionalidadRepository;
+
+    // TransactionTemplate real sobre un gestor de transacciones simulado: ejecuta el callback tal cual
+    @Spy
+    private TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class));
 
     @InjectMocks
     private ClienteLayawayService clienteLayawayService;
@@ -100,7 +108,7 @@ class ClienteLayawayServiceTest {
 
     @Test
     void procesarOperacion_Bandera1_InsertarCorrectamente() {
-        when(catNacionalidadRepository.existsByNombreIgnoreCaseAndActivoTrue(any())).thenReturn(true);
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
         when(clienteRepository.existsByCurp(any())).thenReturn(false);
         when(clienteRepository.existsByRfc(any())).thenReturn(false);
         when(clienteRepository.existsByCorreo(any())).thenReturn(false);
@@ -201,4 +209,93 @@ class ClienteLayawayServiceTest {
         assertEquals(400, exception.getCodigo());
         assertTrue(exception.getMessage().contains("mayor a 0"));
     }
+
+    @Test
+    void procesarOperacion_Bandera1_SinPassword_NoAsignaPasswordPorDefecto() {
+        requestInsertar.getLoginCredenciales().setPassword(null);
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        clienteLayawayService.procesarOperacion(requestInsertar);
+
+        verify(passwordEncoderUtil).encode(null);
+        verify(passwordEncoderUtil, never()).encode("DefaultPassword123!");
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_NacionalidadEnMinusculasOClave_Lanza404() {
+        // Catálogo estricto: solo el nombre exacto "MEXICANA"; "mex"/"MEX"/"Mexicana" no existen como nombre
+        for (String variante : new String[]{"MEX", "Mexicana", "mexicana"}) {
+            requestInsertar.getDatosPersonales().setNacionalidad(variante);
+            when(catNacionalidadRepository.existsByNombreAndActivoTrue(variante)).thenReturn(false);
+
+            OnboardingException exception = assertThrows(OnboardingException.class, () ->
+                    clienteLayawayService.procesarOperacion(requestInsertar)
+            );
+            assertEquals(404, exception.getCodigo(), variante);
+        }
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_NumeroCuentaSiempreDe12Digitos() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        for (int i = 0; i < 200; i++) {
+            LayawayClienteResponse response = clienteLayawayService.procesarOperacion(requestInsertar);
+            assertTrue(response.getNumeroCuenta().matches("^\\d{12}$"), response.getNumeroCuenta());
+        }
+    }
+
+    @Test
+    void procesarOperacion_Bandera2_CambiarCurp_LanzaBadRequest() {
+        ClienteEntity existente = ClienteEntity.builder()
+                .id(7L).curp("OTRA950515HDFRMN09").rfc("PERJ9505151A2").activo(true).build();
+        when(clienteRepository.findById(7L)).thenReturn(Optional.of(existente));
+
+        LayawayClienteRequest requestActualizar = LayawayClienteRequest.builder()
+                .bandera(2)
+                .clienteId(7L)
+                .datosPersonales(requestInsertar.getDatosPersonales())
+                .build();
+
+        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+                clienteLayawayService.procesarOperacion(requestActualizar)
+        );
+
+        assertEquals(400, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("CURP no puede modificarse"));
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_NacionalidadFueraDeCatalogoOInactiva_Lanza404SinGuardar() {
+        // existsByNombreAndActivoTrue solo considera registros activos: una nacionalidad inexistente
+        // o dada de baja en cat_nacionalidad devuelve false
+        requestInsertar.getDatosPersonales().setNacionalidad("MARCIANA");
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MARCIANA")).thenReturn(false);
+
+        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+                clienteLayawayService.procesarOperacion(requestInsertar)
+        );
+
+        assertEquals(404, exception.getCodigo());
+        verify(clienteRepository, never()).save(any());
+        verify(cuentaRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_ValoresDeCatalogoSeGuardanExactos() {
+        requestInsertar.getDatosPersonales().setSexo("FEMENINO");
+        requestInsertar.getDatosPersonales().setEstadoCivil("UNION LIBRE");
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        clienteLayawayService.procesarOperacion(requestInsertar);
+
+        verify(clienteRepository).save(argThat(c -> "FEMENINO".equals(c.getSexo())
+                && "UNION LIBRE".equals(c.getEstadoCivil()) && "MEXICANA".equals(c.getNacionalidad())));
+    }
+
 }

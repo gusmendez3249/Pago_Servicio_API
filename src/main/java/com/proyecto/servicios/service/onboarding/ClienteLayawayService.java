@@ -9,14 +9,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.List;
-import java.util.Random;
+import java.security.SecureRandom;
 
 @Slf4j
 @Service
@@ -29,8 +29,16 @@ public class ClienteLayawayService {
     private final UsuarioLoginRepository usuarioLoginRepository;
     private final CatNacionalidadRepository catNacionalidadRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    /**
+     * Cada operación corre en su propia transacción (TransactionTemplate) en lugar de @Transactional
+     * sobre todo el método: el hash PBKDF2 de la contraseña es costoso a propósito y debe calcularse
+     * ANTES de abrir la transacción, para no retener una conexión del pool mientras tanto
+     * (bajo carga con JMeter eso agotaba el pool y producía respuestas 503).
+     */
     public LayawayClienteResponse procesarOperacion(LayawayClienteRequest request) {
         Integer bandera = request.getBandera();
         if (bandera == null) {
@@ -38,14 +46,18 @@ public class ClienteLayawayService {
         }
 
         return switch (bandera) {
-            case 1 -> registrarCliente(request);
-            case 2 -> actualizarCliente(request);
-            case 3 -> darDeBajaCliente(request);
+            case 1 -> {
+                LoginCredencialesDto login = request.getLoginCredenciales();
+                String passwordHash = login != null ? passwordEncoderUtil.encode(login.getPassword()) : null;
+                yield transactionTemplate.execute(status -> registrarCliente(request, passwordHash));
+            }
+            case 2 -> transactionTemplate.execute(status -> actualizarCliente(request));
+            case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
             default -> throw new OnboardingException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar) o 3 (Eliminar).", HttpStatus.BAD_REQUEST, 400);
         };
     }
 
-    private LayawayClienteResponse registrarCliente(LayawayClienteRequest request) {
+    private LayawayClienteResponse registrarCliente(LayawayClienteRequest request, String passwordHash) {
         DatosPersonalesDto dp = request.getDatosPersonales();
         DatosContactoDto dc = request.getDatosContacto();
         DomicilioDto dom = request.getDomicilio();
@@ -66,7 +78,7 @@ public class ClienteLayawayService {
             throw new OnboardingException("El cliente debe ser mayor de edad (18 años o más).", HttpStatus.BAD_REQUEST, 400);
         }
 
-        // 1.1 Validar catálogo de nacionalidad en la base de datos
+        // 1.1 Validar catálogo de nacionalidad en la base de datos (coincidencia exacta)
         validarNacionalidadEnBD(dp.getNacionalidad());
 
         // 2. Validar Unicidad de CURP, RFC, Correo
@@ -90,34 +102,35 @@ public class ClienteLayawayService {
 
         // 3. Crear Domicilio
         DomicilioEntity domicilioEntity = DomicilioEntity.builder()
-                .calle(dom.getCalle())
-                .numeroExterior(dom.getNumeroExterior())
-                .numeroInterior(dom.getNumeroInterior())
-                .colonia(dom.getColonia())
-                .municipio(dom.getMunicipio())
-                .estado(dom.getEstado())
+                .calle(limpiar(dom.getCalle()))
+                .numeroExterior(limpiar(dom.getNumeroExterior()))
+                .numeroInterior(limpiar(dom.getNumeroInterior()))
+                .colonia(limpiar(dom.getColonia()))
+                .municipio(limpiar(dom.getMunicipio()))
+                .estado(limpiar(dom.getEstado()))
                 .codigoPostal(dom.getCodigoPostal())
-                .pais(dom.getPais() != null ? dom.getPais() : "México")
+                .pais(dom.getPais() != null ? limpiar(dom.getPais()) : "México")
                 .build();
         domicilioRepository.save(domicilioEntity);
 
         // 4. Crear Cliente
         ClienteEntity clienteEntity = ClienteEntity.builder()
-                .nombre(dp.getNombre())
-                .segundoNombre(dp.getSegundoNombre())
-                .apellidoPaterno(dp.getApellidoPaterno())
-                .apellidoMaterno(dp.getApellidoMaterno())
+                .nombre(limpiar(dp.getNombre()))
+                .segundoNombre(limpiar(dp.getSegundoNombre()))
+                .apellidoPaterno(limpiar(dp.getApellidoPaterno()))
+                .apellidoMaterno(limpiar(dp.getApellidoMaterno()))
                 .fechaNacimiento(dp.getFechaNacimiento())
                 .curp(dp.getCurp().trim().toUpperCase())
                 .rfc(dp.getRfc().trim().toUpperCase())
-                .sexo(dp.getSexo().trim().toUpperCase())
-                .nacionalidad(dp.getNacionalidad().trim().toUpperCase())
-                .estadoCivil(dp.getEstadoCivil().trim().toUpperCase())
+                // Valores de catálogo ya validados como exactos: se guardan tal cual se recibieron
+                .sexo(dp.getSexo())
+                .nacionalidad(dp.getNacionalidad())
+                .estadoCivil(dp.getEstadoCivil())
                 .correo(dc.getCorreo().trim().toLowerCase())
                 .telefonoMovil(String.valueOf(dc.getTelefonoMovil()))
                 .telefonoAlt(dc.getTelefonoAlt() != null ? String.valueOf(dc.getTelefonoAlt()) : null)
-                .ocupacion(infoLab.getOcupacion())
-                .empresa(infoLab.getEmpresa())
+                .ocupacion(limpiar(infoLab.getOcupacion()))
+                .empresa(limpiar(infoLab.getEmpresa()))
                 .ingresoMensual(infoLab.getIngresoMensual())
                 .datosBiometricos(dp.getDatosBiometricos() != null ? dp.getDatosBiometricos() : (loginDto != null ? loginDto.getFaceIdBiometrico() : null))
                 .activo(true)
@@ -139,13 +152,14 @@ public class ClienteLayawayService {
                 .build();
         cuentaRepository.save(cuentaEntity);
 
-        // 6. Crear Registro de Login Cifrado
-        String rawPassword = (loginDto != null && loginDto.getPassword() != null) ? loginDto.getPassword() : "DefaultPassword123!";
+        // 6. Crear Registro de Login Cifrado (el hash se calculó antes de abrir la transacción).
+        // Sin contraseña enviada NO se asigna una por defecto (sería conocida por todos): el hash queda nulo
+        // y el acceso por contraseña permanece deshabilitado; solo podrá entrar por Face ID si lo registró.
         Long faceId = (loginDto != null && loginDto.getFaceIdBiometrico() != null) ? loginDto.getFaceIdBiometrico() : dp.getDatosBiometricos();
 
         UsuarioLoginEntity usuarioLogin = UsuarioLoginEntity.builder()
                 .username(username)
-                .passwordHash(passwordEncoderUtil.encode(rawPassword))
+                .passwordHash(passwordHash)
                 .faceIdBiometrico(faceId)
                 .isLoggedIn(false)
                 .cliente(clienteEntity)
@@ -189,22 +203,29 @@ public class ClienteLayawayService {
         // Actualizar datos personales (PRESERVANDO INMUTABILIDAD DE CURP Y RFC)
         if (request.getDatosPersonales() != null) {
             DatosPersonalesDto dp = request.getDatosPersonales();
-            if (dp.getNombre() != null) cliente.setNombre(dp.getNombre());
-            if (dp.getSegundoNombre() != null) cliente.setSegundoNombre(dp.getSegundoNombre());
-            if (dp.getApellidoPaterno() != null) cliente.setApellidoPaterno(dp.getApellidoPaterno());
-            if (dp.getApellidoMaterno() != null) cliente.setApellidoMaterno(dp.getApellidoMaterno());
+            // CURP y RFC no son modificables: si se envían deben coincidir con los registrados
+            if (dp.getCurp() != null && !dp.getCurp().trim().equalsIgnoreCase(cliente.getCurp())) {
+                throw new OnboardingException("La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.", HttpStatus.BAD_REQUEST, 400);
+            }
+            if (dp.getRfc() != null && !dp.getRfc().trim().equalsIgnoreCase(cliente.getRfc())) {
+                throw new OnboardingException("El RFC no puede modificarse. Envíe el RFC registrado o omita el campo.", HttpStatus.BAD_REQUEST, 400);
+            }
+            if (dp.getNombre() != null) cliente.setNombre(limpiar(dp.getNombre()));
+            if (dp.getSegundoNombre() != null) cliente.setSegundoNombre(limpiar(dp.getSegundoNombre()));
+            if (dp.getApellidoPaterno() != null) cliente.setApellidoPaterno(limpiar(dp.getApellidoPaterno()));
+            if (dp.getApellidoMaterno() != null) cliente.setApellidoMaterno(limpiar(dp.getApellidoMaterno()));
             if (dp.getFechaNacimiento() != null) {
                 if (Period.between(dp.getFechaNacimiento(), LocalDate.now()).getYears() < 18) {
                     throw new OnboardingException("El cliente debe ser mayor de edad (18 años o más).", HttpStatus.BAD_REQUEST, 400);
                 }
                 cliente.setFechaNacimiento(dp.getFechaNacimiento());
             }
-            if (dp.getSexo() != null) cliente.setSexo(dp.getSexo().trim().toUpperCase());
+            if (dp.getSexo() != null) cliente.setSexo(dp.getSexo());
             if (dp.getNacionalidad() != null) {
                 validarNacionalidadEnBD(dp.getNacionalidad());
-                cliente.setNacionalidad(dp.getNacionalidad().trim().toUpperCase());
+                cliente.setNacionalidad(dp.getNacionalidad());
             }
-            if (dp.getEstadoCivil() != null) cliente.setEstadoCivil(dp.getEstadoCivil().trim().toUpperCase());
+            if (dp.getEstadoCivil() != null) cliente.setEstadoCivil(dp.getEstadoCivil());
             if (dp.getDatosBiometricos() != null) cliente.setDatosBiometricos(dp.getDatosBiometricos());
 
             // NOTA: Intencionalmente NO se actualizan CURP ni RFC para proteger la inmutabilidad de negocio.
@@ -232,21 +253,21 @@ public class ClienteLayawayService {
                 d = new DomicilioEntity();
                 cliente.setDomicilio(d);
             }
-            if (dom.getCalle() != null) d.setCalle(dom.getCalle());
-            if (dom.getNumeroExterior() != null) d.setNumeroExterior(dom.getNumeroExterior());
-            if (dom.getNumeroInterior() != null) d.setNumeroInterior(dom.getNumeroInterior());
-            if (dom.getColonia() != null) d.setColonia(dom.getColonia());
-            if (dom.getMunicipio() != null) d.setMunicipio(dom.getMunicipio());
-            if (dom.getEstado() != null) d.setEstado(dom.getEstado());
+            if (dom.getCalle() != null) d.setCalle(limpiar(dom.getCalle()));
+            if (dom.getNumeroExterior() != null) d.setNumeroExterior(limpiar(dom.getNumeroExterior()));
+            if (dom.getNumeroInterior() != null) d.setNumeroInterior(limpiar(dom.getNumeroInterior()));
+            if (dom.getColonia() != null) d.setColonia(limpiar(dom.getColonia()));
+            if (dom.getMunicipio() != null) d.setMunicipio(limpiar(dom.getMunicipio()));
+            if (dom.getEstado() != null) d.setEstado(limpiar(dom.getEstado()));
             if (dom.getCodigoPostal() != null) d.setCodigoPostal(dom.getCodigoPostal());
-            if (dom.getPais() != null) d.setPais(dom.getPais());
+            if (dom.getPais() != null) d.setPais(limpiar(dom.getPais()));
         }
 
         // Actualizar información laboral
         if (request.getInformacionLaboral() != null) {
             InformacionLaboralDto info = request.getInformacionLaboral();
-            if (info.getOcupacion() != null) cliente.setOcupacion(info.getOcupacion());
-            if (info.getEmpresa() != null) cliente.setEmpresa(info.getEmpresa());
+            if (info.getOcupacion() != null) cliente.setOcupacion(limpiar(info.getOcupacion()));
+            if (info.getEmpresa() != null) cliente.setEmpresa(limpiar(info.getEmpresa()));
             if (info.getIngresoMensual() != null) cliente.setIngresoMensual(info.getIngresoMensual());
         }
 
@@ -326,25 +347,36 @@ public class ClienteLayawayService {
     }
 
     private String generarNumeroCuentaUnico() {
-        Random random = new Random();
+        // SecureRandom: java.util.Random es predecible y permitiría adivinar números de cuenta.
+        // 300000000000 + [0, 699999999999] mantiene siempre 12 dígitos; el UNIQUE de BD garantiza la unicidad final.
         String numeroCuenta;
         do {
-            long number = 300000000000L + (long)(random.nextDouble() * 899999999999L);
+            long number = 300_000_000_000L + (long) (RANDOM.nextDouble() * 699_999_999_999L);
             numeroCuenta = String.valueOf(number);
         } while (cuentaRepository.existsByNumeroCuenta(numeroCuenta));
         return numeroCuenta;
     }
 
+    /**
+     * Catálogo estricto: la nacionalidad debe coincidir EXACTAMENTE (mayúsculas incluidas) con el nombre
+     * de un registro activo de cat_nacionalidad. No se aceptan claves ("MEX") ni variantes ("mexicana").
+     */
     private void validarNacionalidadEnBD(String nacionalidad) {
-        if (nacionalidad == null || nacionalidad.trim().isEmpty()) {
+        if (nacionalidad == null || nacionalidad.isEmpty()) {
             throw new OnboardingException("La nacionalidad es obligatoria.", HttpStatus.BAD_REQUEST, 400);
         }
-        String nacInput = nacionalidad.trim();
-        boolean existe = catNacionalidadRepository.existsByNombreIgnoreCaseAndActivoTrue(nacInput) ||
-                         catNacionalidadRepository.existsByClaveIgnoreCaseAndActivoTrue(nacInput);
-        if (!existe) {
-            throw new OnboardingException("La nacionalidad '" + nacInput + "' no es válida. No existe en el catálogo registrado de la base de datos (cat_nacionalidad).", HttpStatus.NOT_FOUND, 404);
+        if (!catNacionalidadRepository.existsByNombreAndActivoTrue(nacionalidad)) {
+            throw new OnboardingException("La nacionalidad '" + nacionalidad + "' no es válida. Debe ser exactamente uno de los nombres activos del catálogo cat_nacionalidad (consulte GET /api/v1/cat/nacionalidades).", HttpStatus.NOT_FOUND, 404);
         }
+    }
+
+    /** Recorta espacios y convierte cadenas vacías en null (ej. segundo nombre o número interior ""). */
+    private static String limpiar(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String limpio = valor.trim();
+        return limpio.isEmpty() ? null : limpio;
     }
 
 }

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +23,9 @@ public class DatosContactoDto {
     @NotBlank(message = "El correo electrónico es obligatorio")
     @Email(message = "El correo electrónico debe tener un formato válido")
     @Size(max = 100, message = "El correo electrónico no puede superar los 100 caracteres")
+    // @Email por sí solo acepta "a@b" (sin dominio de nivel superior); se exige usuario@dominio.tld
+    @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$",
+            message = "El correo electrónico debe tener un formato válido (usuario@dominio.com)")
     private String correo;
 
     @Schema(description = "Número entero de teléfono móvil (10 dígitos)", example = "4181234567")

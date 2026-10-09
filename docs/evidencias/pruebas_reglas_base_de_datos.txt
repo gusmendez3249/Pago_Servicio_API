@@ -1,0 +1,28 @@
+PRUEBAS DE REGLAS DE NEGOCIO EN LA BASE DE DATOS
+Fecha: 2026-10-09 · PostgreSQL local · BD vacía creada con docs/base_de_datos/script_creacion_bd.sql
+
+Objetivo: comprobar que la base de datos rechaza por sí misma los datos inválidos aunque
+se intente insertar o modificar directamente por SQL (sin pasar por el API).
+
+Ejecución del script de creación .................................. SCRIPT OK
+
+#  Operación (SQL directo)                                   Esperado   Resultado
+-- --------------------------------------------------------- ---------- ------------------------------------------------------------
+1  Alta de domicilio + cliente válido                        OK         OK
+2  Alta de cuenta válida (12 dígitos)                         OK         OK
+3  UPDATE sexo = 'masculino'                                  Rechazo    ERROR: viola la restricción check «chk_cliente_sexo»
+4  UPDATE nacionalidad = 'mexicana'                           Rechazo    ERROR: viola la llave foránea «fk_cliente_nacionalidad»
+5  UPDATE estado_civil = 'SOLTERA'                            Rechazo    ERROR: viola la restricción check «chk_cliente_estado_civ»
+6  UPDATE fecha_nacimiento = hoy - 100 días (menor de edad)   Rechazo    ERROR: El cliente debe ser mayor de edad (fecha_nacimiento=2026-07-01)
+7  UPDATE saldo = -1                                          Rechazo    ERROR: viola la restricción check «chk_cuenta_saldo»
+8  UPDATE numero_cuenta = '1234567890123' (13 dígitos)        Rechazo    ERROR: el valor es demasiado largo para el tipo character varying(12)
+9  DELETE FROM tb_cliente (borrado físico)                    Rechazo    ERROR: violates RESTRICT setting of foreign key constraint «fk_cuenta_cliente»
+10 UPDATE tb_cliente SET activo = false (baja lógica)         OK         OK
+11 Estatus de la cuenta tras la baja                          INACTIVA   INACTIVA (trigger trg_cliente_baja)
+12 UPDATE tb_cuenta SET estatus = 'ACTIVA' (cliente inactivo) Rechazo    ERROR: Solo los clientes activos pueden tener cuentas activas (cliente_id=1)
+
+Resultado: 12 de 12 casos con el comportamiento esperado.
+
+Además, la migración Flyway V9 se aplicó sin errores sobre una base con datos históricos
+(623 cuentas, 132 de ellas con número de 13 dígitos generado por la versión anterior),
+normalizando nacionalidades y estados civiles previos.

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,11 +24,13 @@ public class InformacionLaboralDto {
     @Schema(description = "Ocupación o puesto de trabajo", example = "Desarrollador Software")
     @NotBlank(message = "La ocupación es obligatoria")
     @Size(max = 100, message = "La ocupación no puede superar los 100 caracteres")
+    @Pattern(regexp = DomicilioDto.TEXTO_SEGURO, message = "La ocupación contiene caracteres no permitidos (control, < o >)")
     private String ocupacion;
 
     @Schema(description = "Nombre de la empresa empleadora", example = "Tech Corp")
     @NotBlank(message = "La empresa es obligatoria")
     @Size(max = 100, message = "La empresa no puede superar los 100 caracteres")
+    @Pattern(regexp = DomicilioDto.TEXTO_SEGURO, message = "La empresa contiene caracteres no permitidos (control, < o >)")
     private String empresa;
 
     @Schema(description = "Ingreso mensual estrictamente con dos decimales", example = "15000.00", type = "number", format = "double")

@@ -2,6 +2,7 @@ package com.proyecto.servicios.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.proyecto.servicios.config.RequestSizeLimitFilter;
 import com.proyecto.servicios.enums.ErrorCode;
 import com.proyecto.servicios.model.GenericResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -76,6 +77,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GenericResponse<Void>> handleHttpMessageNotReadable(
             HttpMessageNotReadableException exception) {
 
+        // Spring envuelve los IOException de lectura ("I/O error while reading input message")
+        if (exception.getCause() instanceof RequestSizeLimitFilter.BodyTooLargeException tooLarge) {
+            return handleBodyTooLarge(tooLarge);
+        }
+
         String mensajeError = "Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.";
         Throwable cause = exception.getCause();
 
@@ -112,6 +118,14 @@ public class GlobalExceptionHandler {
     }
 
     // ---------- Errores de la petición HTTP (antes caían en el 500 genérico) ----------
+
+    /** Cuerpo enviado con Transfer-Encoding: chunked que supera el límite (ver RequestSizeLimitFilter). */
+    @ExceptionHandler(RequestSizeLimitFilter.BodyTooLargeException.class)
+    public ResponseEntity<GenericResponse<Void>> handleBodyTooLarge(
+            RequestSizeLimitFilter.BodyTooLargeException exception) {
+
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, 413, exception.getMessage());
+    }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<GenericResponse<Void>> handleTypeMismatch(

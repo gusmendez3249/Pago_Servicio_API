@@ -15,11 +15,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "tb_cliente", indexes = {
-        @Index(name = "idx_cliente_curp", columnList = "curp"),
-        @Index(name = "idx_cliente_rfc", columnList = "rfc"),
-        @Index(name = "idx_cliente_correo", columnList = "correo")
-})
+// curp, rfc y correo no llevan @Index propio: su restricción UNIQUE ya crea un índice
+@Table(name = "tb_cliente")
 public class ClienteEntity {
 
     @Id
@@ -47,13 +44,13 @@ public class ClienteEntity {
     @Column(name = "rfc", nullable = false, unique = true, length = 13)
     private String rfc;
 
-    @Column(name = "sexo", nullable = false, length = 30)
+    @Column(name = "sexo", nullable = false, length = 10)
     private String sexo;
 
     @Column(name = "nacionalidad", nullable = false, length = 50)
     private String nacionalidad;
 
-    @Column(name = "estado_civil", nullable = false, length = 50)
+    @Column(name = "estado_civil", nullable = false, length = 12)
     private String estadoCivil;
 
     @Column(name = "correo", nullable = false, unique = true, length = 100)
@@ -71,7 +68,7 @@ public class ClienteEntity {
     @Column(name = "empresa", nullable = false, length = 100)
     private String empresa;
 
-    @Column(name = "ingreso_mensual", nullable = false, precision = 15, scale = 2)
+    @Column(name = "ingreso_mensual", nullable = false, precision = 14, scale = 2)
     private BigDecimal ingresoMensual;
 
     @Column(name = "datos_biometricos")

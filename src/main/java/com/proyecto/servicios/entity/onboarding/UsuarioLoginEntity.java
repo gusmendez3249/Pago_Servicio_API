@@ -13,10 +13,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "tb_usuario_login", indexes = {
-        @Index(name = "idx_usuario_username", columnList = "username"),
-        @Index(name = "idx_usuario_face_id", columnList = "face_id_biometrico")
-})
+@Table(name = "tb_usuario_login")
 public class UsuarioLoginEntity {
 
     @Id
@@ -38,6 +35,13 @@ public class UsuarioLoginEntity {
 
     @Column(name = "ultima_actividad")
     private LocalDateTime ultimaActividad;
+
+    @Column(name = "intentos_fallidos", nullable = false)
+    @Builder.Default
+    private Short intentosFallidos = 0;
+
+    @Column(name = "bloqueado_hasta")
+    private LocalDateTime bloqueadoHasta;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id", referencedColumnName = "id")

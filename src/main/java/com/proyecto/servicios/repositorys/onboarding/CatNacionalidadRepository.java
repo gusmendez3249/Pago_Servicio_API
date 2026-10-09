@@ -16,6 +16,9 @@ public interface CatNacionalidadRepository extends JpaRepository<CatNacionalidad
 
     boolean existsByNombreIgnoreCaseAndActivoTrue(String nombre);
 
+    /** Coincidencia exacta (sensible a mayúsculas) contra el nombre de un registro activo. */
+    boolean existsByNombreAndActivoTrue(String nombre);
+
     boolean existsByClaveIgnoreCaseAndActivoTrue(String clave);
 
     List<CatNacionalidadEntity> findByActivoTrue();

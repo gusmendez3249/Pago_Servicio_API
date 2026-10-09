@@ -35,7 +35,9 @@ public class ClienteLayawayController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Operación realizada con éxito (Bandera 2 o Bandera 3)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "201", description = "Cliente registrado exitosamente (Bandera 1)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Bad Request: Error de formato JSON, tipo de dato inválido (ej. bandera como String o fecha fuera de formato yyyy-MM-dd) o validación fallida", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request: Error de formato JSON, tipo de dato inválido (ej. bandera como String o fecha fuera de formato yyyy-MM-dd), validación fallida o intento de modificar CURP/RFC", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden: Se intentó actualizar un cliente dado de baja", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "413", description = "Payload Too Large: El cuerpo supera 64 KB (con o sin Content-Length)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "404", description = "Not Found: Cliente o catálogo de nacionalidad no encontrado", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "409", description = "Conflict: El cliente, CURP o RFC ya se encuentra registrado", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal Server Error: Error inesperado en el servidor o base de datos", content = @Content(schema = @Schema(implementation = GenericResponse.class)))
@@ -45,8 +47,13 @@ public class ClienteLayawayController {
 
         LayawayClienteResponse response = clienteLayawayService.procesarOperacion(request);
         HttpStatus status = (request.getBandera() != null && request.getBandera() == 1) ? HttpStatus.CREATED : HttpStatus.OK;
+        String mensaje = switch (request.getBandera()) {
+            case 1 -> "Cliente registrado correctamente";
+            case 2 -> "Cliente actualizado correctamente";
+            default -> "Cliente dado de baja correctamente";
+        };
 
-        return ResponseEntity.status(status).body(GenericResponse.success(response));
+        return ResponseEntity.status(status).body(GenericResponse.success(mensaje, response));
     }
 }
 

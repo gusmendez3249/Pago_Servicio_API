@@ -12,6 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
@@ -29,6 +32,10 @@ class AuthServiceTest {
 
     @Mock
     private PasswordEncoderUtil passwordEncoderUtil;
+
+    // TransactionTemplate real sobre un gestor de transacciones simulado: ejecuta el callback tal cual
+    @Spy
+    private TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class));
 
     @InjectMocks
     private AuthService authService;
@@ -103,6 +110,48 @@ class AuthServiceTest {
 
         when(usuarioLoginRepository.findByUsername("inexistente")).thenReturn(Optional.empty());
 
-        assertThrows(OnboardingException.class, () -> authService.login(request));
+        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+        // Mismo código y mensaje que una contraseña incorrecta: no revela si el usuario existe
+        assertEquals(401, ex.getCodigo());
+        assertEquals("Credenciales inválidas.", ex.getMessage());
+    }
+
+    @Test
+    void login_ContrasenaIncorrecta_RegistraIntentoFallido() {
+        LoginRequest request = LoginRequest.builder()
+                .bandera(1).username("juan_perez").password("mala").build();
+        when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
+        when(passwordEncoderUtil.matches("mala", "encoded_hash")).thenReturn(false);
+
+        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+
+        assertEquals(401, ex.getCodigo());
+        assertEquals("Credenciales inválidas.", ex.getMessage());
+        verify(usuarioLoginRepository).registrarIntentoFallido(eq(1L), eq((short) 5), any());
+    }
+
+    @Test
+    void login_CuentaBloqueada_Lanza423SinVerificarCredencial() {
+        usuarioMock.setBloqueadoHasta(LocalDateTime.now().plusMinutes(10));
+        LoginRequest request = LoginRequest.builder()
+                .bandera(1).username("juan_perez").password("Password123!").build();
+        when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
+
+        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+
+        assertEquals(423, ex.getCodigo());
+        verify(passwordEncoderUtil, never()).matches(any(), any());
+    }
+
+    @Test
+    void login_ClienteInactivo_ConCredencialIncorrecta_NoRevelaEstado() {
+        usuarioMock.getCliente().setActivo(false);
+        LoginRequest request = LoginRequest.builder()
+                .bandera(1).username("juan_perez").password("mala").build();
+        when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
+
+        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+
+        assertEquals(401, ex.getCodigo());
     }
 }

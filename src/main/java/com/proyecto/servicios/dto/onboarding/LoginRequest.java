@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,7 +27,7 @@ public class LoginRequest {
 
     @Schema(description = "Nombre de usuario", example = "gustavo123")
     @NotBlank(message = "El nombre de usuario es SIEMPRE obligatorio")
-    @Size(max = 50, message = "El nombre de usuario no puede superar los 50 caracteres")
+    @Pattern(regexp = "^[A-Za-z0-9._-]{3,50}$", message = "El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto, guion o guion bajo")
     private String username;
 
     @Schema(description = "Contraseña para autenticación por contraseña (bandera = 1)", example = "Password123!")
@@ -33,6 +35,7 @@ public class LoginRequest {
     private String password;
 
     @Schema(description = "Identificador biométrico Face ID para bandera = 2", example = "987654321")
+    @Positive(message = "El identificador biométrico debe ser un número positivo")
     private Long faceIdBiometrico;
 }
 

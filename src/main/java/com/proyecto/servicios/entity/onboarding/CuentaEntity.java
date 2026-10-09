@@ -14,8 +14,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
+// numero_cuenta ya está indexado por su UNIQUE; se indexa la llave foránea cliente_id
 @Table(name = "tb_cuenta", indexes = {
-        @Index(name = "idx_cuenta_numero", columnList = "numero_cuenta")
+        @Index(name = "idx_cuenta_cliente", columnList = "cliente_id")
 })
 public class CuentaEntity {
 
@@ -30,7 +31,7 @@ public class CuentaEntity {
     @Builder.Default
     private BigDecimal saldo = new BigDecimal("1000.00");
 
-    @Column(name = "estatus", nullable = false, length = 20)
+    @Column(name = "estatus", nullable = false, length = 10)
     @Builder.Default
     private String estatus = "ACTIVA";
 

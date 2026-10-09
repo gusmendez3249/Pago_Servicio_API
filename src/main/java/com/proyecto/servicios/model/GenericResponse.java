@@ -21,6 +21,10 @@ public class GenericResponse<T> {
         );
     }
 
+    public static <T> GenericResponse<T> success(String mensaje, T data) {
+        return new GenericResponse<>(0, mensaje, data);
+    }
+
     public static <T> GenericResponse<T> error(
             int codigo,
             String mensaje) {

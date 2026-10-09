@@ -33,7 +33,7 @@ public class CatNacionalidadController {
     })
     public ResponseEntity<GenericResponse<List<CatNacionalidadEntity>>> obtenerNacionalidades() {
         List<CatNacionalidadEntity> lista = catNacionalidadRepository.findByActivoTrue();
-        return ResponseEntity.ok(GenericResponse.success(lista));
+        return ResponseEntity.ok(GenericResponse.success("Catálogo de nacionalidades obtenido correctamente", lista));
     }
 }
 
