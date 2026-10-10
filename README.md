@@ -196,7 +196,7 @@ Contenido íntegro en [`docs/base_de_datos/script_creacion_bd.sql`](docs/base_de
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| `POST` | `/api/v1/layaway/cliente` | Operación unificada de clientes, según el campo `bandera`: **1** = registrar, **2** = actualizar, **3** = baja lógica |
+| `POST` | `/api/v1/layaway/cliente` | Operación unificada de clientes, según el campo `bandera`: **1** = registrar, **2** = actualizar, **3** = baja lógica, **4** = consultar |
 | `POST` | `/api/v1/auth/login` | Inicio de sesión: **1** = contraseña, **2** = Face ID |
 | `GET` | `/api/v1/cat/nacionalidades` | Catálogo de nacionalidades activas |
 
@@ -213,8 +213,63 @@ Todas las respuestas usan el mismo envoltorio:
 | `1` | Registrar cliente | Nulo o `0` | **201**. Crea el domicilio, el cliente, la cuenta bancaria (número único de 12 dígitos, saldo inicial `1000.00`, estatus `ACTIVA`) y el registro de acceso, todo en una sola transacción |
 | `2` | Actualizar datos personales, de contacto, domicilio e información laboral | Obligatorio (> 0) | **200**. CURP y RFC **no** se pueden modificar (400 si se envían distintos); el número de cuenta no forma parte de la petición |
 | `3` | Baja lógica | Obligatorio (> 0) | **200**. `activo = false`, cuentas `INACTIVA`, sesión cerrada; no se borra nada |
+| `4` | Consultar clientes | No se usa (va dentro de `filtros`) | **200**. Lista de clientes con sus cuentas; ver [sección 5.2](#52-consulta-de-clientes-bandera-4) |
 
-### 5.2 Validaciones de entrada
+### 5.2 Consulta de clientes (bandera 4)
+
+Se envía solo el objeto `filtros`, con campos **llave que no cambian** después del registro. Todos son opcionales.
+
+| Filtro | Tipo | Coincidencia |
+|---|---|---|
+| `clienteId` | número entero > 0 | Exacta |
+| `curp` | texto entre comillas, 1 a 18 letras o números | Contiene, sin distinguir mayúsculas |
+| `rfc` | texto entre comillas, 1 a 13 letras o números | Contiene, sin distinguir mayúsculas |
+| `numeroCuenta` | texto entre comillas, 1 a 13 dígitos | Contiene |
+
+- **Sin filtros** (`{"bandera": 4}`, `"filtros": {}` o `"filtros": null`): devuelve **todos** los clientes. Como protección de memoria, la respuesta trae hasta 1000 clientes; `totalCoincidencias` indica el total real y `resultadosTruncados` avisa si hubo más.
+- **Varios filtros** se combinan con `AND`.
+- **Comillas:** los filtros de texto deben ir entre comillas. `"curp": 123` o `"numeroCuenta": 3651` responden **400**.
+- **No en blanco:** `""` o `"   "` responden **400**.
+- **Solo campos llave:** un filtro como `nombre`, `correo` o `activo` responde **400**; no se ignora, para que un error de escritura no devuelva toda la tabla. Tampoco se aceptan otras secciones (`datosPersonales`, `clienteId` de nivel superior…) con la bandera 4.
+- Los comodines `%` y `_`, los espacios y las comillas simples se rechazan (solo letras y números).
+- La respuesta no incluye datos biométricos ni credenciales.
+
+Petición:
+
+```json
+{ "bandera": 4, "filtros": { "curp": "PEPF" } }
+```
+
+Respuesta `200 OK`:
+
+```json
+{
+  "codigo": 0,
+  "mensaje": "Consulta realizada correctamente",
+  "data": {
+    "operacionRealizada": "CONSULTAR",
+    "clientes": [
+      {
+        "clienteId": 67,
+        "nombreCompleto": "Fernando Perez Lopez",
+        "curp": "PEPF900310HGTRRR01",
+        "rfc": "PEPF9003101A1",
+        "correo": "fer@mail.com",
+        "telefonoMovil": "4181234567",
+        "activo": true,
+        "fechaRegistro": "2026-10-09T18:55:14.153443",
+        "cuentas": [ { "numeroCuenta": "635852470689", "saldo": 1000.00, "estatus": "ACTIVA" } ]
+      }
+    ],
+    "totalCoincidencias": 1,
+    "resultadosTruncados": false
+  }
+}
+```
+
+Pruebas: 48 casos contra la API real ([resultado](docs/evidencias/resultado_pruebas_consulta_bandera4.txt), [script](docs/evidencias/pruebas_consulta_bandera4.py)).
+
+### 5.3 Validaciones de entrada
 
 | Campo | Regla |
 |---|---|
@@ -233,9 +288,9 @@ Todas las respuestas usan el mismo envoltorio:
 | `ingresoMensual` | Mayor a cero, exactamente 2 decimales, máximo 12 enteros |
 | `loginCredenciales.username` | 3 a 50 caracteres: letras, números, `.`, `_`, `-` |
 | `loginCredenciales.password` | 8 a 72 caracteres, con al menos una letra y un número |
-| `bandera`, `clienteId` | Números enteros; se rechaza `"1"` (texto) o `1.5` |
+| `bandera`, `clienteId` | Números enteros; se rechaza `"1"` (texto) o `1.5` (la bandera admite 1, 2, 3 o 4) |
 
-### 5.3 Códigos de respuesta
+### 5.4 Códigos de respuesta
 
 | HTTP | Cuándo |
 |---|---|
@@ -250,7 +305,7 @@ Todas las respuestas usan el mismo envoltorio:
 | 423 | Cuenta bloqueada 15 minutos tras 5 intentos fallidos de login |
 | 503 | Base de datos saturada o no disponible (incluye `Retry-After`) |
 
-### 5.4 Ejemplos reales
+### 5.5 Ejemplos reales
 
 Capturados de la API en ejecución. Salida completa: [`docs/evidencias/ejemplos_peticiones_respuestas.txt`](docs/evidencias/ejemplos_peticiones_respuestas.txt).
 
@@ -405,14 +460,15 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 
 > El endpoint del catálogo solo consulta una tabla y no tiene un caso de error propio; los errores del servidor se manejan de forma genérica (500) como se describe en la sección 7.
 
-### 9.2 Pruebas unitarias — 82 de 82 exitosas
+### 9.2 Pruebas unitarias — 124 de 124 exitosas
 
 `.\gradlew.bat test` (JUnit 5 + Mockito):
 
 | Clase | Pruebas | Qué valida |
 |---|---|---|
 | `DatosPersonalesDtoValidationTest` | 52 | Nombres (mínimo 3), catálogos estrictos de sexo y estado civil, formato de nacionalidad e intentos de inyección |
-| `ClienteLayawayServiceTest` | 11 | Alta, baja lógica, IDs inválidos por bandera, sin contraseña por defecto, nacionalidad fuera de catálogo o en minúsculas (404), CURP inmutable, número de cuenta de 12 dígitos (200 repeticiones) |
+| `FiltrosClienteDtoTest` | 38 | Filtros de la consulta (bandera 4): comillas, valores en blanco, comodines, longitud y campos no permitidos |
+| `ClienteLayawayServiceTest` | 15 | Alta, baja lógica, consulta (todos los clientes, filtros, tope, secciones no permitidas), IDs inválidos por bandera, sin contraseña por defecto, nacionalidad fuera de catálogo o en minúsculas (404), CURP inmutable, número de cuenta de 12 dígitos (200 repeticiones) |
 | `AuthServiceTest` | 6 | Login por contraseña y Face ID, mismo 401 para usuario inexistente, registro de intentos fallidos, cuenta bloqueada (423), no revelar cliente inactivo |
 | `PasswordEncoderUtilTest` | 3 | Sal aleatoria (hashes distintos), compatibilidad con hashes antiguos, hashes malformados |
 | `ProductosServiceImplTest` | 10 | Módulo GestoPago (anexo) |

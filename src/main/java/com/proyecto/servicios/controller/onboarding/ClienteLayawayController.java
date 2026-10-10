@@ -29,11 +29,11 @@ public class ClienteLayawayController {
 
     @PostMapping("/cliente")
     @Operation(
-            summary = "Operación unificada de clientes (Bandera 1 = Insertar, Bandera 2 = Actualizar, Bandera 3 = Eliminar/Baja Lógica)",
-            description = "Ejecuta el registro completo con cuenta bancaria automática (bandera 1), actualización de datos preservando CURP/RFC (bandera 2) o baja lógica (bandera 3)."
+            summary = "Operación unificada de clientes (Bandera 1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)",
+            description = "Ejecuta el registro completo con cuenta bancaria automática (bandera 1), actualización de datos preservando CURP/RFC (bandera 2), baja lógica (bandera 3) o consulta de clientes (bandera 4). Consulta: use solo el objeto 'filtros' con campos llave que no cambian (clienteId, curp, rfc, numeroCuenta); los textos van entre comillas y no pueden estar en blanco; sin filtros devuelve todos los clientes."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Operación realizada con éxito (Bandera 2 o Bandera 3)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Operación realizada con éxito (Bandera 2, 3 o 4)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "201", description = "Cliente registrado exitosamente (Bandera 1)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "400", description = "Bad Request: Error de formato JSON, tipo de dato inválido (ej. bandera como String o fecha fuera de formato yyyy-MM-dd), validación fallida o intento de modificar CURP/RFC", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "403", description = "Forbidden: Se intentó actualizar un cliente dado de baja", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
@@ -50,6 +50,7 @@ public class ClienteLayawayController {
         String mensaje = switch (request.getBandera()) {
             case 1 -> "Cliente registrado correctamente";
             case 2 -> "Cliente actualizado correctamente";
+            case 4 -> "Consulta realizada correctamente";
             default -> "Cliente dado de baja correctamente";
         };
 

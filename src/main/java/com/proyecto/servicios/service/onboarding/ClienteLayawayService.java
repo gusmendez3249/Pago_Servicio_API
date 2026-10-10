@@ -5,8 +5,15 @@ import com.proyecto.servicios.dto.onboarding.*;
 import com.proyecto.servicios.entity.onboarding.*;
 import com.proyecto.servicios.exception.OnboardingException;
 import com.proyecto.servicios.repositorys.onboarding.*;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -15,7 +22,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.security.SecureRandom;
 
 @Slf4j
@@ -33,6 +44,9 @@ public class ClienteLayawayService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /** Tope de clientes por consulta (bandera 4): protege la memoria cuando no se envían filtros. */
+    private static final int MAX_RESULTADOS = 1000;
+
     /**
      * Cada operación corre en su propia transacción (TransactionTemplate) en lugar de @Transactional
      * sobre todo el método: el hash PBKDF2 de la contraseña es costoso a propósito y debe calcularse
@@ -42,7 +56,7 @@ public class ClienteLayawayService {
     public LayawayClienteResponse procesarOperacion(LayawayClienteRequest request) {
         Integer bandera = request.getBandera();
         if (bandera == null) {
-            throw new OnboardingException("La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica).", HttpStatus.BAD_REQUEST, 400);
+            throw new OnboardingException("La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar).", HttpStatus.BAD_REQUEST, 400);
         }
 
         return switch (bandera) {
@@ -53,7 +67,8 @@ public class ClienteLayawayService {
             }
             case 2 -> transactionTemplate.execute(status -> actualizarCliente(request));
             case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
-            default -> throw new OnboardingException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar) o 3 (Eliminar).", HttpStatus.BAD_REQUEST, 400);
+            case 4 -> transactionTemplate.execute(status -> consultarClientes(request));
+            default -> throw new OnboardingException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).", HttpStatus.BAD_REQUEST, 400);
         };
     }
 
@@ -344,6 +359,83 @@ public class ClienteLayawayService {
                 .operacionRealizada("ELIMINAR_BAJA_LOGICA")
                 .fechaOperacion(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * Bandera 4: consulta de clientes por campos llave inmutables (clienteId, curp, rfc, numeroCuenta).
+     * Los filtros de texto son "contiene" sin distinguir mayúsculas; varios filtros se combinan con AND.
+     * Sin filtros devuelve todos los clientes (hasta MAX_RESULTADOS; se indica si hubo más).
+     */
+    private LayawayClienteResponse consultarClientes(LayawayClienteRequest request) {
+        // Para la consulta solo se usa "filtros": cualquier otra sección enviada se rechaza en lugar de
+        // ignorarla, porque ignorarla devolvería todos los clientes como si no hubiera filtro.
+        if (request.getClienteId() != null || request.getDatosPersonales() != null || request.getDatosContacto() != null
+                || request.getDomicilio() != null || request.getInformacionLaboral() != null
+                || request.getLoginCredenciales() != null) {
+            throw new OnboardingException("Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (clienteId, curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.", HttpStatus.BAD_REQUEST, 400);
+        }
+
+        FiltrosClienteDto filtros = request.getFiltros() != null ? request.getFiltros() : new FiltrosClienteDto();
+        Specification<ClienteEntity> spec = especificacionConsulta(filtros);
+
+        Page<ClienteEntity> pagina = clienteRepository.findAll(spec, PageRequest.of(0, MAX_RESULTADOS, Sort.by("id")));
+
+        List<Long> ids = pagina.getContent().stream().map(ClienteEntity::getId).toList();
+        Map<Long, List<CuentaEntity>> cuentasPorCliente = ids.isEmpty() ? Map.of()
+                : cuentaRepository.findByClienteIdIn(ids).stream()
+                        .collect(Collectors.groupingBy(c -> c.getCliente().getId()));
+
+        List<ClienteConsultaDto> clientes = pagina.getContent().stream().map(c -> ClienteConsultaDto.builder()
+                .clienteId(c.getId())
+                .nombreCompleto(nombreCompleto(c))
+                .curp(c.getCurp())
+                .rfc(c.getRfc())
+                .correo(c.getCorreo())
+                .telefonoMovil(c.getTelefonoMovil())
+                .activo(c.getActivo())
+                .fechaRegistro(c.getFechaRegistro())
+                .cuentas(cuentasPorCliente.getOrDefault(c.getId(), List.of()).stream()
+                        .map(k -> ClienteConsultaDto.CuentaConsultaDto.builder()
+                                .numeroCuenta(k.getNumeroCuenta()).saldo(k.getSaldo()).estatus(k.getEstatus()).build())
+                        .toList())
+                .build()).toList();
+
+        return LayawayClienteResponse.builder()
+                .operacionRealizada("CONSULTAR")
+                .fechaOperacion(LocalDateTime.now())
+                .clientes(clientes)
+                .totalCoincidencias(pagina.getTotalElements())
+                .resultadosTruncados(pagina.getTotalElements() > clientes.size())
+                .build();
+    }
+
+    private Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f) {
+        return (root, query, cb) -> {
+            List<Predicate> condiciones = new ArrayList<>();
+            if (f.getClienteId() != null) {
+                condiciones.add(cb.equal(root.get("id"), f.getClienteId()));
+            }
+            if (f.getCurp() != null) {
+                condiciones.add(cb.like(cb.upper(root.get("curp")), "%" + f.getCurp().toUpperCase(Locale.ROOT) + "%"));
+            }
+            if (f.getRfc() != null) {
+                condiciones.add(cb.like(cb.upper(root.get("rfc")), "%" + f.getRfc().toUpperCase(Locale.ROOT) + "%"));
+            }
+            if (f.getNumeroCuenta() != null) {
+                Subquery<Long> cuentas = query.subquery(Long.class);
+                Root<CuentaEntity> cuenta = cuentas.from(CuentaEntity.class);
+                cuentas.select(cuenta.get("id")).where(
+                        cb.equal(cuenta.get("cliente"), root),
+                        cb.like(cuenta.get("numeroCuenta"), "%" + f.getNumeroCuenta() + "%"));
+                condiciones.add(cb.exists(cuentas));
+            }
+            return cb.and(condiciones.toArray(new Predicate[0]));
+        };
+    }
+
+    private static String nombreCompleto(ClienteEntity c) {
+        return c.getNombre() + " " + (c.getSegundoNombre() != null ? c.getSegundoNombre() + " " : "")
+                + c.getApellidoPaterno() + " " + c.getApellidoMaterno();
     }
 
     private String generarNumeroCuentaUnico() {

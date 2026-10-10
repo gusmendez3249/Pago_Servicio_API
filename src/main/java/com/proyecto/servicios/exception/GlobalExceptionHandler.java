@@ -94,7 +94,9 @@ public class GlobalExceptionHandler {
                     .collect(Collectors.joining("."));
 
             Class<?> targetType = mie.getTargetType();
-            if (targetType != null && targetType.equals(java.time.LocalDate.class)) {
+            if (targetType != null && targetType.equals(String.class)) {
+                mensajeError = "El campo '" + fieldName + "' debe enviarse como texto entre comillas (por ejemplo \"MERG95\"), no como número ni booleano.";
+            } else if (targetType != null && targetType.equals(java.time.LocalDate.class)) {
                 mensajeError = "Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por ejemplo: 1995-05-15.";
             } else if (targetType != null && (targetType.equals(Integer.class) || targetType.equals(int.class) || targetType.equals(Long.class) || targetType.equals(long.class))) {
                 if (fieldName.toLowerCase().contains("telefono")) {
