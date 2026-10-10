@@ -208,20 +208,38 @@ Todas las respuestas usan el mismo envoltorio:
 
 ### 5.1 Operaciones del endpoint de clientes
 
-| `bandera` | Operación | `clienteId` | Resultado |
+El **ID interno del cliente no se pide ni se devuelve** en ninguna operación: al cliente se le identifica por **llaves que no cambian** (`curp`, `rfc`, `numeroCuenta`) dentro del objeto `filtros`.
+
+| `bandera` | Operación | Cómo se identifica al cliente | Resultado |
 |---|---|---|---|
-| `1` | Registrar cliente | Nulo o `0` | **201**. Crea el domicilio, el cliente, la cuenta bancaria (número único de 12 dígitos, saldo inicial `1000.00`, estatus `ACTIVA`) y el registro de acceso, todo en una sola transacción |
-| `2` | Actualizar datos personales, de contacto, domicilio e información laboral | Obligatorio (> 0) | **200**. CURP y RFC **no** se pueden modificar (400 si se envían distintos); el número de cuenta no forma parte de la petición |
-| `3` | Baja lógica | Obligatorio (> 0) | **200**. `activo = false`, cuentas `INACTIVA`, sesión cerrada; no se borra nada |
-| `4` | Consultar clientes | No se usa (va dentro de `filtros`) | **200**. Lista de clientes con sus cuentas; ver [sección 5.2](#52-consulta-de-clientes-bandera-4) |
+| `1` | Registrar cliente | No aplica | **201**. Crea el domicilio, el cliente, la cuenta bancaria (número único de 12 dígitos, saldo inicial `1000.00`, estatus `ACTIVA`) y el registro de acceso, todo en una sola transacción |
+| `2` | Actualizar datos personales, de contacto, domicilio, información laboral y **contraseña** | `filtros` con el valor **completo** de `curp`, `rfc` o `numeroCuenta` | **200**. CURP y RFC **no** se pueden modificar (400 si se envían distintos); el usuario tampoco; la contraseña nueva cumple la misma política que al registrar y cierra la sesión activa |
+| `3` | Baja lógica | `filtros` con el valor **completo** de `curp`, `rfc` o `numeroCuenta` | **200**. `activo = false`, cuentas `INACTIVA`, sesión cerrada; no se borra nada |
+| `4` | Consultar clientes | `filtros` opcional (parte del valor; ver [sección 5.2](#52-consulta-de-clientes-bandera-4)) | **200**. Lista de clientes con sus cuentas |
+
+**Actualizar y baja con llaves** (si la llave no existe → **404**; sin llaves, con una llave incompleta, con un filtro que no es llave o con `clienteId` → **400**):
+
+```json
+{ "bandera": 3, "filtros": { "curp": "TOVL920821MGTRRR04" } }
+```
+
+```json
+{
+  "bandera": 2,
+  "filtros": { "curp": "TOVL920821MGTRRR04" },
+  "datosContacto": { "correo": "nuevo@example.com", "telefonoMovil": 4189998877 },
+  "loginCredenciales": { "username": "laura.torres", "password": "NuevaClave#2026" }
+}
+```
+
+Con varias llaves en `filtros`, todas deben corresponder al **mismo** cliente (AND); si no, responde 404.
 
 ### 5.2 Consulta de clientes (bandera 4)
 
-Se envía solo el objeto `filtros`, con campos **llave que no cambian** después del registro. Todos son opcionales.
+Se envía solo el objeto `filtros`, con campos **llave que no cambian** después del registro. Todos son opcionales. (Para actualizar o dar de baja las mismas llaves se usan con el valor completo; ver la sección 5.1.)
 
 | Filtro | Tipo | Coincidencia |
 |---|---|---|
-| `clienteId` | número entero > 0 | Exacta |
 | `curp` | texto entre comillas, 1 a 18 letras o números | Contiene, sin distinguir mayúsculas |
 | `rfc` | texto entre comillas, 1 a 13 letras o números | Contiene, sin distinguir mayúsculas |
 | `numeroCuenta` | texto entre comillas, 1 a 13 dígitos | Contiene |
@@ -230,7 +248,7 @@ Se envía solo el objeto `filtros`, con campos **llave que no cambian** después
 - **Varios filtros** se combinan con `AND`.
 - **Comillas:** los filtros de texto deben ir entre comillas. `"curp": 123` o `"numeroCuenta": 3651` responden **400**.
 - **No en blanco:** `""` o `"   "` responden **400**.
-- **Solo campos llave:** un filtro como `nombre`, `correo` o `activo` responde **400**; no se ignora, para que un error de escritura no devuelva toda la tabla. Tampoco se aceptan otras secciones (`datosPersonales`, `clienteId` de nivel superior…) con la bandera 4.
+- **Solo campos llave:** un filtro como `nombre`, `correo` o `activo` responde **400**; no se ignora, para que un error de escritura no devuelva toda la tabla. Tampoco se aceptan otras secciones (`datosPersonales`…) ni `clienteId` con la bandera 4.
 - Los comodines `%` y `_`, los espacios y las comillas simples se rechazan (solo letras y números).
 - La respuesta no incluye datos biométricos ni credenciales.
 
@@ -250,7 +268,6 @@ Respuesta `200 OK`:
     "operacionRealizada": "CONSULTAR",
     "clientes": [
       {
-        "clienteId": 67,
         "nombreCompleto": "Fernando Perez Lopez",
         "curp": "PEPF900310HGTRRR01",
         "rfc": "PEPF9003101A1",
@@ -287,8 +304,8 @@ Pruebas: 48 casos contra la API real ([resultado](docs/evidencias/resultado_prue
 | `calle`, `colonia`, `municipio`, `estado`, `pais`, `ocupacion`, `empresa` | Obligatorios (número interior opcional), máximo 100 caracteres, sin caracteres de control ni `<` `>` |
 | `ingresoMensual` | Mayor a cero, exactamente 2 decimales, máximo 12 enteros |
 | `loginCredenciales.username` | 3 a 50 caracteres: letras, números, `.`, `_`, `-` |
-| `loginCredenciales.password` | 8 a 72 caracteres, con al menos una letra y un número |
-| `bandera`, `clienteId` | Números enteros; se rechaza `"1"` (texto) o `1.5` (la bandera admite 1, 2, 3 o 4) |
+| `loginCredenciales.password` | Al registrar **y** al editar: 8 a 72 caracteres, sin espacios, con al menos **1 mayúscula, 1 minúscula, 1 número y 1 carácter especial** (`! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~`) |
+| `bandera` | Número entero 1, 2, 3 o 4; se rechaza `"1"` (texto) o `1.5` |
 
 ### 5.4 Códigos de respuesta
 
@@ -338,7 +355,6 @@ Respuesta `201 Created`:
   "codigo": 0,
   "mensaje": "Cliente registrado correctamente",
   "data": {
-    "clienteId": 620,
     "nombreCompleto": "Laura Elena Torres Vargas",
     "curp": "TOVL920821MGTRRR04",
     "rfc": "TOVL920821KJ3",
@@ -366,7 +382,7 @@ Actualizar cliente dado de baja    -> 403 {"codigo": 403, "mensaje": "No se pued
 Login tras la baja                 -> 403 {"codigo": 403, "mensaje": "El cliente asociado a este usuario se encuentra inactivo."}
 ```
 
-**Baja lógica (bandera 3):** `{"bandera": 3, "clienteId": 620}` → `200`, con `"activo": false` y `"estatusCuenta": "INACTIVA"`.
+**Baja lógica (bandera 3):** `{"bandera": 3, "filtros": {"curp": "TOVL920821MGTRRR04"}}` → `200`, con `"activo": false` y `"estatusCuenta": "INACTIVA"`.
 
 **Login (bandera 1):** `{"bandera": 1, "username": "laura.torres", "password": "Password123!"}` → `200` con `"isLoggedIn": true`.
 
@@ -460,31 +476,34 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 
 > El endpoint del catálogo solo consulta una tabla y no tiene un caso de error propio; los errores del servidor se manejan de forma genérica (500) como se describe en la sección 7.
 
-### 9.2 Pruebas unitarias — 124 de 124 exitosas
+### 9.2 Pruebas unitarias — 180 de 180 exitosas
 
 `.\gradlew.bat test` (JUnit 5 + Mockito):
 
 | Clase | Pruebas | Qué valida |
 |---|---|---|
 | `DatosPersonalesDtoValidationTest` | 52 | Nombres (mínimo 3), catálogos estrictos de sexo y estado civil, formato de nacionalidad e intentos de inyección |
-| `FiltrosClienteDtoTest` | 38 | Filtros de la consulta (bandera 4): comillas, valores en blanco, comodines, longitud y campos no permitidos |
-| `ClienteLayawayServiceTest` | 15 | Alta, baja lógica, consulta (todos los clientes, filtros, tope, secciones no permitidas), IDs inválidos por bandera, sin contraseña por defecto, nacionalidad fuera de catálogo o en minúsculas (404), CURP inmutable, número de cuenta de 12 dígitos (200 repeticiones) |
+| `FiltrosClienteDtoTest` | 37 | Llaves de la consulta (bandera 4): comillas, valores en blanco, comodines, longitud y campos no permitidos (incluido `clienteId`) |
+| `LoginCredencialesDtoPasswordTest` | 52 | Política de contraseña: 8 a 72 caracteres, 1 mayúscula, 1 minúscula, 1 número, 1 carácter especial, sin espacios (cada símbolo ASCII) |
+| `ClienteLayawayServiceTest` | 20 | Alta, baja lógica y actualización por llaves (sin ID, llave incompleta, inexistente → 404), cambio de contraseña, consulta (todos los clientes, filtros, tope, secciones no permitidas), CURP inmutable, sin contraseña por defecto, nacionalidad fuera de catálogo, número de cuenta de 12 dígitos |
 | `AuthServiceTest` | 6 | Login por contraseña y Face ID, mismo 401 para usuario inexistente, registro de intentos fallidos, cuenta bloqueada (423), no revelar cliente inactivo |
 | `PasswordEncoderUtilTest` | 3 | Sal aleatoria (hashes distintos), compatibilidad con hashes antiguos, hashes malformados |
 | `ProductosServiceImplTest` | 10 | Módulo GestoPago (anexo) |
 
-### 9.3 Pruebas de seguridad, validación, concurrencia y carga — 139 de 139 exitosas
+### 9.3 Pruebas de seguridad, validación, concurrencia y carga — 177 de 177 exitosas
 
 Script reproducible (solo librería estándar de Python): [`docs/evidencias/pruebas_seguridad_carga.py`](docs/evidencias/pruebas_seguridad_carga.py) · resultado completo: [`docs/evidencias/resultado_pruebas_seguridad_carga.txt`](docs/evidencias/resultado_pruebas_seguridad_carga.txt)
 
 | Categoría | Casos | Ejemplos |
 |---|---|---|
-| Registro y validaciones del documento | 84 | Nombres de 2/3/51 letras, CURP/RFC con mes 13 o día 32, correo sin dominio, fecha `1995-02-31`, menor de edad por un día, teléfonos de 9/11 dígitos o como texto, código postal inválido, ingreso `0.00`, negativo o `1e999999999`, catálogos con variantes |
-| Unicidad | 10 | CURP, RFC, correo (incluso en mayúsculas) y username duplicados |
+| Registro y validaciones del documento | 85 | Nombres de 2/3/51 letras, CURP/RFC con mes 13 o día 32, correo sin dominio, fecha `1995-02-31`, menor de edad por un día, teléfonos de 9/11 dígitos o como texto, código postal inválido, ingreso `0.00`, negativo o `1e999999999`, catálogos con variantes, **política de contraseña** (sin mayúscula, minúscula, número, símbolo, corta, con espacio) |
+| Unicidad y política de contraseña | 21 | CURP, RFC, correo (incluso en mayúsculas) y username duplicados; contraseñas que no cumplen la política y contraseñas válidas en el límite (8 y 72 caracteres) |
 | Bandera / JSON | 15 | Bandera como texto o decimal, JSON roto o anidado 5,000 niveles, cuerpo de 200 KB, cuerpo *chunked* de 2 MB, `Content-Type` incorrecto |
-| Actualizar / baja | 12 | Intento de cambiar CURP o RFC, robar el correo de otro cliente, actualizar a un cliente dado de baja |
-| Login | 15 | Contraseña por defecto, fuerza bruta (bloqueo al 5.º intento), enumeración por código y por **tiempo** (67 ms contra 68 ms) |
-| Concurrencia y carga | 3 | 30 altas simultáneas con la misma CURP (1 creada, 29 rechazadas con 409); **600 altas con 100 hilos: 0 errores (170 altas/s)**; 400 logins concurrentes |
+| Actualizar por llaves | 20 | Por CURP, RFC y número de cuenta; intento de cambiar CURP o RFC; sin llaves, llave incompleta, llave inexistente, filtro que no es llave, `clienteId` rechazado; llaves de clientes distintos; robar el correo de otro cliente |
+| Editar contraseña | 10 | Política aplicada al editar, usuario distinto rechazado, la contraseña nueva funciona y la vieja deja de servir |
+| Baja lógica por llaves | 8 | Sin llaves, `clienteId` rechazado, llave incompleta o inexistente, baja por CURP, baja repetida, actualizar un cliente dado de baja; la respuesta no trae el ID |
+| Login | 15 | Contraseña por defecto, fuerza bruta (bloqueo al 5.º intento), enumeración por código y por **tiempo** (51 ms contra 51 ms) |
+| Concurrencia y carga | 3 | 30 altas simultáneas con la misma CURP (1 creada, 29 rechazadas con 409); **600 altas con 100 hilos: 0 errores (134 altas/s)**; 400 logins concurrentes |
 
 ### 9.4 Reglas en la base de datos — 12 de 12
 

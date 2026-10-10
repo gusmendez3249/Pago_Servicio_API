@@ -99,7 +99,8 @@ def years_ago(y, extra_days=0):
 
 print("===== REGISTRO: caso feliz y reglas del documento =====")
 okb, s, okj = ins("alta valida", 201)
-cid = okj["data"]["clienteId"] if s == 201 else None
+check("la respuesta del alta NO expone el id del cliente", 201 if "clienteId" not in okj["data"] else 0, okj, 201)
+curp_ok = okb["datosPersonales"]["curp"]; rfc_ok = okb["datosPersonales"]["rfc"]; cuenta_ok = okj["data"]["numeroCuenta"]
 ins("nombre de 2 letras (minimo 3)", 400, datosPersonales__nombre="Li")
 ins("nombre de 3 letras", 201, datosPersonales__nombre="Ana")
 ins("apellidos de 2 letras (minimo 3)", 400, datosPersonales__apellidoPaterno="Ek", datosPersonales__apellidoMaterno="Ma")
@@ -198,6 +199,13 @@ ins("username con salto de linea", 400, loginCredenciales={"username": "evil\nIN
 ins("username con espacios", 400, loginCredenciales={"username": "a b", "password": "Password123!"})
 ins("password '1' (debil)", 400, loginCredenciales={"username": "weakpwuser" + rnd_letters(4).lower(), "password": "1"})
 ins("faceId negativo", 400, loginCredenciales={"username": "neg" + rnd_letters(6).lower(), "password": "Password123!", "faceIdBiometrico": -1})
+def usr(): return "pw" + rnd_letters(8).lower()
+for nombre_pw, pw in [("sin mayuscula", "password123!"), ("sin minuscula", "PASSWORD123!"), ("sin numero", "Password!!!!"),
+                      ("sin caracter especial", "Password1234"), ("7 caracteres", "Ab1!xyz"), ("con espacio", "Pass word1!"),
+                      ("solo numeros", "12345678"), ("73 caracteres", "Aa1!" + "x" * 69)]:
+    ins(f"password {nombre_pw}", 400, loginCredenciales={"username": usr(), "password": pw})
+for nombre_pw, pw in [("minima valida (8)", "Abcdef1#"), ("con guion bajo", "Clave_Segura9"), ("72 caracteres", "Aa1!" + "x" * 68)]:
+    ins(f"password {nombre_pw}", 201, loginCredenciales={"username": usr(), "password": pw})
 
 print("===== BANDERA / JSON =====")
 ins("bandera como string '1'", 400, bandera="1")
@@ -247,26 +255,59 @@ t0 = time.time(); line, tail = chunked(CLI, 1)
 st = int(line.split()[1]) if line.startswith("HTTP") else -1
 check(f"cuerpo chunked 2MB sin Content-Length ({time.time()-t0:.1f}s)", st, tail.decode(errors='replace'), 413)
 
-print("===== ACTUALIZAR / BAJA =====")
-upd = copy.deepcopy(okb); upd["bandera"] = 2; upd["clienteId"] = cid
-upd["datosPersonales"]["curp"] = curp_rfc()[0]
+print("===== ACTUALIZAR / BAJA (por llaves, nunca por ID) =====")
+def por(**llaves): return {"filtros": llaves}
+def sin_id(j): return isinstance(j, dict) and isinstance(j.get("data"), dict) and "clienteId" not in j["data"]
+
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(curp=curp_ok)); upd["datosPersonales"]["curp"] = curp_rfc()[0]
 s, j = req(CLI, upd); check("bandera 2 intentando cambiar CURP", s, j, 400)
-upd = copy.deepcopy(okb); upd["bandera"] = 2; upd["clienteId"] = cid
-upd["datosPersonales"]["rfc"] = curp_rfc()[1]
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(curp=curp_ok)); upd["datosPersonales"]["rfc"] = curp_rfc()[1]
 s, j = req(CLI, upd); check("bandera 2 intentando cambiar RFC", s, j, 400)
-upd = copy.deepcopy(okb); upd["bandera"] = 2; upd["clienteId"] = cid; upd["datosPersonales"]["nombre"] = "Pedro"
-s, j = req(CLI, upd); check("bandera 2 actualizacion valida", s, j, 200)
-s, j = req(CLI, {"bandera": 2, "clienteId": cid, "domicilio": {"calle": "Nueva", "numeroExterior": "1", "colonia": "C", "municipio": "M", "estado": "E", "codigoPostal": "12345", "pais": "MX"}})
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(curp=curp_ok)); upd["datosPersonales"]["nombre"] = "Pedro"
+s, j = req(CLI, upd); check("bandera 2 actualiza por CURP", s, j, 200); check("  y la respuesta no trae el id", 200 if sin_id(j) else 0, j, 200)
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(rfc=rfc_ok)); upd["datosPersonales"]["nombre"] = "Pablo"
+s, j = req(CLI, upd); check("bandera 2 actualiza por RFC", s, j, 200)
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(numeroCuenta=cuenta_ok)); upd["datosPersonales"]["nombre"] = "Pedro"
+s, j = req(CLI, upd); check("bandera 2 actualiza por numero de cuenta", s, j, 200)
+s, j = req(CLI, {"bandera": 2, **por(curp=curp_ok), "domicilio": {"calle": "Nueva", "numeroExterior": "1", "colonia": "C", "municipio": "M", "estado": "E", "codigoPostal": "12345", "pais": "MX"}})
 check("bandera 2 solo domicilio", s, j, 200)
-s, j = req(CLI, {"bandera": 2, "clienteId": 999999999}); check("bandera 2 cliente inexistente", s, j, 404)
-s, j = req(CLI, {"bandera": 2, "clienteId": -1}); check("bandera 2 id negativo", s, j, 400)
-s, j = req(CLI, {"bandera": 2}); check("bandera 2 sin id", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(curp="ZZZZ900101HDFRMN01")}); check("bandera 2 llave inexistente", s, j, 404)
+s, j = req(CLI, {"bandera": 2}); check("bandera 2 sin llaves", s, j, 400)
+s, j = req(CLI, {"bandera": 2, "filtros": {}}); check("bandera 2 con filtros vacio", s, j, 400)
+s, j = req(CLI, {"bandera": 2, "clienteId": 1, **por(curp=curp_ok)}); check("bandera 2 con clienteId (ya no se usa)", s, j, 400)
+s, j = req(CLI, {"bandera": 2, "clienteId": 1}); check("bandera 2 solo con clienteId", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(curp=curp_ok[:6])}); check("bandera 2 con llave incompleta (curp parcial)", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(rfc=rfc_ok[:5])}); check("bandera 2 con llave incompleta (rfc parcial)", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(numeroCuenta=cuenta_ok[:5])}); check("bandera 2 con llave incompleta (cuenta parcial)", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(nombre="Pedro")}); check("bandera 2 con filtro que no es llave", s, j, 400)
+s, j = req(CLI, raw='{"bandera":2,"filtros":{"curp":123}}'.encode()); check("bandera 2 con llave sin comillas", s, j, 400)
 otro = ins("alta para probar correo ajeno", 201)[0]
-upd = copy.deepcopy(okb); upd["bandera"] = 2; upd["clienteId"] = cid; upd["datosContacto"]["correo"] = otro["datosContacto"]["correo"]
+s, j = req(CLI, {"bandera": 2, **por(curp=curp_ok, rfc=otro["datosPersonales"]["rfc"])}); check("bandera 2 con llaves de clientes distintos (AND)", s, j, 404)
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(curp=curp_ok)); upd["datosContacto"]["correo"] = otro["datosContacto"]["correo"]
 s, j = req(CLI, upd); check("bandera 2 robar correo de otro cliente", s, j, 409)
-s, j = req(CLI, {"bandera": 3, "clienteId": cid}); check("bandera 3 baja logica", s, j, 200)
-s, j = req(CLI, {"bandera": 3, "clienteId": cid}); check("bandera 3 baja repetida", s, j, (200, 409))
-upd = copy.deepcopy(okb); upd["bandera"] = 2; upd["clienteId"] = cid
+
+print("===== EDITAR CONTRASENA (misma politica que el registro) =====")
+usuario_ok = okb["loginCredenciales"]["username"]
+for nombre_pw, pw in [("sin mayuscula", "nuevaclave1!"), ("sin minuscula", "NUEVACLAVE1!"), ("sin numero", "NuevaClave!!"),
+                      ("sin especial", "NuevaClave12"), ("corta", "Nu1!a"), ("con espacio", "Nueva Clave1!")]:
+    s, j = req(CLI, {"bandera": 2, **por(curp=curp_ok), "loginCredenciales": {"username": usuario_ok, "password": pw}})
+    check(f"editar password {nombre_pw} -> rechazada", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(curp=curp_ok), "loginCredenciales": {"username": "otro.usuario", "password": "NuevaClave#2026"}})
+check("editar con un usuario distinto al registrado", s, j, 400)
+s, j = req(CLI, {"bandera": 2, **por(curp=curp_ok), "loginCredenciales": {"username": usuario_ok, "password": "NuevaClave#2026"}})
+check("editar password valida", s, j, 200)
+s, j = req(LOGIN, {"bandera": 1, "username": usuario_ok, "password": "NuevaClave#2026"}); check("login con la contrasena NUEVA", s, j, 200)
+s, j = req(LOGIN, {"bandera": 1, "username": usuario_ok, "password": "Password123!"}); check("login con la contrasena VIEJA (ya no sirve)", s, j, 401)
+
+print("===== BAJA LOGICA (por llaves) =====")
+s, j = req(CLI, {"bandera": 3}); check("bandera 3 sin llaves", s, j, 400)
+s, j = req(CLI, {"bandera": 3, "clienteId": 1}); check("bandera 3 con clienteId (ya no se usa)", s, j, 400)
+s, j = req(CLI, {"bandera": 3, **por(curp=curp_ok[:5])}); check("bandera 3 con llave incompleta", s, j, 400)
+s, j = req(CLI, {"bandera": 3, **por(curp="ZZZZ900101HDFRMN01")}); check("bandera 3 llave inexistente", s, j, 404)
+s, j = req(CLI, {"bandera": 3, **por(curp=curp_ok)}); check("bandera 3 baja logica por CURP", s, j, 200)
+check("  y la respuesta no trae el id", 200 if sin_id(j) else 0, j, 200)
+s, j = req(CLI, {"bandera": 3, **por(curp=curp_ok)}); check("bandera 3 baja repetida", s, j, (200, 409))
+upd = copy.deepcopy(okb); upd["bandera"] = 2; upd.update(por(curp=curp_ok))
 s, j = req(CLI, upd); check("bandera 2 sobre cliente inactivo", s, j, 403)
 
 print("===== LOGIN =====")

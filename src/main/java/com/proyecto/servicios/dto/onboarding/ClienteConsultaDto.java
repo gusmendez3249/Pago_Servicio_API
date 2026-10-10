@@ -16,7 +16,6 @@ import java.util.List;
 @AllArgsConstructor
 public class ClienteConsultaDto {
 
-    private Long clienteId;
     private String nombreCompleto;
     private String curp;
     private String rfc;

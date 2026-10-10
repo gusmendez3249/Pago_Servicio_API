@@ -102,11 +102,9 @@ public class AuthService {
         transactionTemplate.executeWithoutResult(status -> usuarioLoginRepository.save(usuario));
 
         String nombreCliente = cliente != null ? cliente.getNombre() + " " + cliente.getApellidoPaterno() : usuario.getUsername();
-        Long clienteId = cliente != null ? cliente.getId() : null;
 
         return LoginResponse.builder()
                 .username(usuario.getUsername())
-                .clienteId(clienteId)
                 .nombreCliente(nombreCliente)
                 .isLoggedIn(true)
                 .ultimaActividad(usuario.getUltimaActividad())

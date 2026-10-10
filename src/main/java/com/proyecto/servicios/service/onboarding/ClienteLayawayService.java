@@ -65,7 +65,11 @@ public class ClienteLayawayService {
                 String passwordHash = login != null ? passwordEncoderUtil.encode(login.getPassword()) : null;
                 yield transactionTemplate.execute(status -> registrarCliente(request, passwordHash));
             }
-            case 2 -> transactionTemplate.execute(status -> actualizarCliente(request));
+            case 2 -> {
+                LoginCredencialesDto login = request.getLoginCredenciales();
+                String passwordHash = (login != null && login.getPassword() != null) ? passwordEncoderUtil.encode(login.getPassword()) : null;
+                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash));
+            }
             case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
             case 4 -> transactionTemplate.execute(status -> consultarClientes(request));
             default -> throw new OnboardingException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).", HttpStatus.BAD_REQUEST, 400);
@@ -82,6 +86,9 @@ public class ClienteLayawayService {
         // Validación estricta Postura B: Para bandera = 1 (Insertar), clienteId debe ser null o 0
         if (request.getClienteId() != null && request.getClienteId() != 0) {
             throw new OnboardingException("Para la operación INSERTAR (bandera = 1), el clienteId debe ser nulo o 0. No se permite enviar un ID preexistente o arbitrario.", HttpStatus.BAD_REQUEST, 400);
+        }
+        if (request.getFiltros() != null) {
+            throw new OnboardingException("Para la operación INSERTAR (bandera = 1) no se usa el objeto 'filtros'.", HttpStatus.BAD_REQUEST, 400);
         }
 
         if (dp == null || dc == null || dom == null || infoLab == null) {
@@ -188,7 +195,6 @@ public class ClienteLayawayService {
                 clienteEntity.getApellidoPaterno() + " " + clienteEntity.getApellidoMaterno();
 
         return LayawayClienteResponse.builder()
-                .clienteId(clienteEntity.getId())
                 .nombreCompleto(nombreCompleto)
                 .curp(clienteEntity.getCurp())
                 .rfc(clienteEntity.getRfc())
@@ -203,13 +209,8 @@ public class ClienteLayawayService {
                 .build();
     }
 
-    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request) {
-        if (request.getClienteId() == null || request.getClienteId() <= 0) {
-            throw new OnboardingException("El clienteId debe ser un identificador numérico válido mayor a 0 para la operación ACTUALIZAR (bandera = 2).", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        ClienteEntity cliente = clienteRepository.findById(request.getClienteId())
-                .orElseThrow(() -> new OnboardingException("Cliente no encontrado con ID: " + request.getClienteId(), HttpStatus.NOT_FOUND, 404));
+    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash) {
+        ClienteEntity cliente = localizarCliente(request, "ACTUALIZAR (bandera = 2)");
 
         if (Boolean.FALSE.equals(cliente.getActivo())) {
             throw new OnboardingException("No se puede actualizar la información de un cliente inactivo.", HttpStatus.FORBIDDEN, 403);
@@ -286,6 +287,24 @@ public class ClienteLayawayService {
             if (info.getIngresoMensual() != null) cliente.setIngresoMensual(info.getIngresoMensual());
         }
 
+        // Credenciales de acceso: se puede cambiar la contraseña (y el Face ID); el usuario no cambia
+        LoginCredencialesDto credenciales = request.getLoginCredenciales();
+        if (credenciales != null) {
+            UsuarioLoginEntity usuario = usuarioLoginRepository.findByClienteId(cliente.getId())
+                    .orElseThrow(() -> new OnboardingException("El cliente no tiene un usuario de acceso registrado.", HttpStatus.NOT_FOUND, 404));
+            if (credenciales.getUsername() != null && !credenciales.getUsername().equals(usuario.getUsername())) {
+                throw new OnboardingException("El nombre de usuario no puede modificarse. Envíe el usuario registrado u omita 'loginCredenciales'.", HttpStatus.BAD_REQUEST, 400);
+            }
+            if (passwordHash != null) {
+                usuario.setPasswordHash(passwordHash);
+                usuario.setIsLoggedIn(false); // al cambiar la contraseña se cierra la sesión activa
+            }
+            if (credenciales.getFaceIdBiometrico() != null) {
+                usuario.setFaceIdBiometrico(credenciales.getFaceIdBiometrico());
+            }
+            usuarioLoginRepository.save(usuario);
+        }
+
         clienteRepository.save(cliente);
 
         List<CuentaEntity> cuentas = cuentaRepository.findByClienteId(cliente.getId());
@@ -298,7 +317,6 @@ public class ClienteLayawayService {
                 cliente.getApellidoPaterno() + " " + cliente.getApellidoMaterno();
 
         return LayawayClienteResponse.builder()
-                .clienteId(cliente.getId())
                 .nombreCompleto(nombreCompleto)
                 .curp(cliente.getCurp())
                 .rfc(cliente.getRfc())
@@ -313,12 +331,7 @@ public class ClienteLayawayService {
     }
 
     private LayawayClienteResponse darDeBajaCliente(LayawayClienteRequest request) {
-        if (request.getClienteId() == null || request.getClienteId() <= 0) {
-            throw new OnboardingException("El clienteId debe ser un identificador numérico válido mayor a 0 para la operación ELIMINAR / BAJA LÓGICA (bandera = 3).", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        ClienteEntity cliente = clienteRepository.findById(request.getClienteId())
-                .orElseThrow(() -> new OnboardingException("Cliente no encontrado con ID: " + request.getClienteId(), HttpStatus.NOT_FOUND, 404));
+        ClienteEntity cliente = localizarCliente(request, "ELIMINAR / BAJA LÓGICA (bandera = 3)");
 
         // 1. Marcar cliente como inactivo
         cliente.setActivo(false);
@@ -347,7 +360,6 @@ public class ClienteLayawayService {
                 cliente.getApellidoPaterno() + " " + cliente.getApellidoMaterno();
 
         return LayawayClienteResponse.builder()
-                .clienteId(cliente.getId())
                 .nombreCompleto(nombreCompleto)
                 .curp(cliente.getCurp())
                 .rfc(cliente.getRfc())
@@ -362,7 +374,7 @@ public class ClienteLayawayService {
     }
 
     /**
-     * Bandera 4: consulta de clientes por campos llave inmutables (clienteId, curp, rfc, numeroCuenta).
+     * Bandera 4: consulta de clientes por campos llave inmutables (curp, rfc, numeroCuenta).
      * Los filtros de texto son "contiene" sin distinguir mayúsculas; varios filtros se combinan con AND.
      * Sin filtros devuelve todos los clientes (hasta MAX_RESULTADOS; se indica si hubo más).
      */
@@ -372,11 +384,11 @@ public class ClienteLayawayService {
         if (request.getClienteId() != null || request.getDatosPersonales() != null || request.getDatosContacto() != null
                 || request.getDomicilio() != null || request.getInformacionLaboral() != null
                 || request.getLoginCredenciales() != null) {
-            throw new OnboardingException("Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (clienteId, curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.", HttpStatus.BAD_REQUEST, 400);
+            throw new OnboardingException("Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.", HttpStatus.BAD_REQUEST, 400);
         }
 
         FiltrosClienteDto filtros = request.getFiltros() != null ? request.getFiltros() : new FiltrosClienteDto();
-        Specification<ClienteEntity> spec = especificacionConsulta(filtros);
+        Specification<ClienteEntity> spec = especificacionConsulta(filtros, false);
 
         Page<ClienteEntity> pagina = clienteRepository.findAll(spec, PageRequest.of(0, MAX_RESULTADOS, Sort.by("id")));
 
@@ -386,7 +398,6 @@ public class ClienteLayawayService {
                         .collect(Collectors.groupingBy(c -> c.getCliente().getId()));
 
         List<ClienteConsultaDto> clientes = pagina.getContent().stream().map(c -> ClienteConsultaDto.builder()
-                .clienteId(c.getId())
                 .nombreCompleto(nombreCompleto(c))
                 .curp(c.getCurp())
                 .rfc(c.getRfc())
@@ -409,28 +420,64 @@ public class ClienteLayawayService {
                 .build();
     }
 
-    private Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f) {
+    /**
+     * @param exacta true = coincidencia exacta (identificar a UN cliente para modificarlo);
+     *               false = "contiene" (consulta).
+     */
+    private Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f, boolean exacta) {
         return (root, query, cb) -> {
             List<Predicate> condiciones = new ArrayList<>();
-            if (f.getClienteId() != null) {
-                condiciones.add(cb.equal(root.get("id"), f.getClienteId()));
-            }
             if (f.getCurp() != null) {
-                condiciones.add(cb.like(cb.upper(root.get("curp")), "%" + f.getCurp().toUpperCase(Locale.ROOT) + "%"));
+                String curp = f.getCurp().toUpperCase(Locale.ROOT);
+                condiciones.add(exacta ? cb.equal(cb.upper(root.get("curp")), curp)
+                        : cb.like(cb.upper(root.get("curp")), "%" + curp + "%"));
             }
             if (f.getRfc() != null) {
-                condiciones.add(cb.like(cb.upper(root.get("rfc")), "%" + f.getRfc().toUpperCase(Locale.ROOT) + "%"));
+                String rfc = f.getRfc().toUpperCase(Locale.ROOT);
+                condiciones.add(exacta ? cb.equal(cb.upper(root.get("rfc")), rfc)
+                        : cb.like(cb.upper(root.get("rfc")), "%" + rfc + "%"));
             }
             if (f.getNumeroCuenta() != null) {
                 Subquery<Long> cuentas = query.subquery(Long.class);
                 Root<CuentaEntity> cuenta = cuentas.from(CuentaEntity.class);
                 cuentas.select(cuenta.get("id")).where(
                         cb.equal(cuenta.get("cliente"), root),
-                        cb.like(cuenta.get("numeroCuenta"), "%" + f.getNumeroCuenta() + "%"));
+                        exacta ? cb.equal(cuenta.get("numeroCuenta"), f.getNumeroCuenta())
+                                : cb.like(cuenta.get("numeroCuenta"), "%" + f.getNumeroCuenta() + "%"));
                 condiciones.add(cb.exists(cuentas));
             }
             return cb.and(condiciones.toArray(new Predicate[0]));
         };
+    }
+
+    /**
+     * Localiza a UN cliente para actualizarlo (bandera 2) o darlo de baja (bandera 3) usando solo llaves
+     * que no cambian (curp, rfc, numeroCuenta) con el valor COMPLETO. Nunca se usa el ID interno.
+     * Sin llaves se rechaza: de lo contrario la operación podría afectar a un cliente cualquiera.
+     */
+    private ClienteEntity localizarCliente(LayawayClienteRequest request, String operacion) {
+        if (request.getClienteId() != null) {
+            throw new OnboardingException("El clienteId ya no se utiliza. Para la operación " + operacion + " identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).", HttpStatus.BAD_REQUEST, 400);
+        }
+        FiltrosClienteDto filtros = request.getFiltros();
+        if (filtros == null || filtros.estaVacio()) {
+            throw new OnboardingException("Para la operación " + operacion + " identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).", HttpStatus.BAD_REQUEST, 400);
+        }
+        if ((filtros.getCurp() != null && filtros.getCurp().length() != 18)
+                || (filtros.getRfc() != null && filtros.getRfc().length() < 12)
+                || (filtros.getNumeroCuenta() != null && filtros.getNumeroCuenta().length() < 12)) {
+            throw new OnboardingException("Para la operación " + operacion + " use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.", HttpStatus.BAD_REQUEST, 400);
+        }
+
+        List<ClienteEntity> encontrados = clienteRepository
+                .findAll(especificacionConsulta(filtros, true), PageRequest.of(0, 2, Sort.by("id"))).getContent();
+        if (encontrados.isEmpty()) {
+            throw new OnboardingException("No se encontró ningún cliente con las llaves indicadas.", HttpStatus.NOT_FOUND, 404);
+        }
+        if (encontrados.size() > 1) {
+            throw new OnboardingException("Las llaves indicadas corresponden a más de un cliente.", HttpStatus.BAD_REQUEST, 400);
+        }
+        return encontrados.get(0);
     }
 
     private static String nombreCompleto(ClienteEntity c) {

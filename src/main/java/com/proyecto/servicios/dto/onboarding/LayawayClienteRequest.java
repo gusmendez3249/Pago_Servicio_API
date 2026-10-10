@@ -22,7 +22,9 @@ public class LayawayClienteRequest {
     @Max(value = 4, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
     private Integer bandera;
 
-    @Schema(description = "ID de cliente (obligatorio para banderas 2 y 3)", example = "1")
+    // Ya no se usa: se conserva solo para rechazarlo con un mensaje claro en lugar de ignorarlo
+    // (ignorarlo en una consulta devolvería todos los clientes). Para 2, 3 y 4 se usa 'filtros'.
+    @Schema(hidden = true)
     private Long clienteId;
 
     @Valid
@@ -40,7 +42,7 @@ public class LayawayClienteRequest {
     @Valid
     private LoginCredencialesDto loginCredenciales;
 
-    @Schema(description = "Solo para bandera 4 (consulta). Opcional: sin filtros se devuelven todos los clientes")
+    @Schema(description = "Llaves del cliente (curp, rfc, numeroCuenta): obligatorias con el valor completo en las banderas 2 (actualizar) y 3 (baja); opcionales en la bandera 4 (consulta; sin filtros devuelve todos los clientes)")
     @Valid
     private FiltrosClienteDto filtros;
 }

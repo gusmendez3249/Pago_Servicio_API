@@ -19,7 +19,6 @@ import java.util.List;
 @AllArgsConstructor
 public class LayawayClienteResponse {
 
-    private Long clienteId;
     private String nombreCompleto;
     private String curp;
     private String rfc;

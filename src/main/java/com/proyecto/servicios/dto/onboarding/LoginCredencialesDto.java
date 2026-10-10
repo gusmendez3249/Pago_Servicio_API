@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,9 +20,14 @@ public class LoginCredencialesDto {
     @Pattern(regexp = "^[A-Za-z0-9._-]{3,50}$", message = "El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto, guion o guion bajo")
     private String username;
 
-    @Schema(description = "Contraseña de acceso", example = "Password123!")
-    @Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres")
-    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[^\\p{Cntrl}]+$", message = "La contraseña debe incluir al menos una letra y un número")
+    // Política: 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y
+    // 1 carácter especial (signo de puntuación ASCII: ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \\ ] ^ _ ` { | } ~)
+    public static final String POLITICA_PASSWORD =
+            "^(?=.*\\p{Lower})(?=.*\\p{Upper})(?=.*\\d)(?=.*\\p{Punct})[^\\s\\p{Cntrl}]{8,72}$";
+
+    @Schema(description = "Contraseña (al registrar o al editar): mínimo 8 caracteres, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial; sin espacios", example = "Password123!")
+    @Pattern(regexp = POLITICA_PASSWORD,
+            message = "La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial")
     private String password;
 
     @Schema(description = "Identificador biométrico Face ID (opcional)", example = "987654321")

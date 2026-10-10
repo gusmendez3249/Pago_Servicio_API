@@ -159,10 +159,11 @@ class ClienteLayawayServiceTest {
 
         LayawayClienteRequest requestBaja = LayawayClienteRequest.builder()
                 .bandera(3)
-                .clienteId(5L)
+                .filtros(FiltrosClienteDto.builder().curp("LOPS900101MDFRMN02").build())
                 .build();
 
-        when(clienteRepository.findById(5L)).thenReturn(Optional.of(clienteExistente));
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(clienteExistente), PageRequest.of(0, 2), 1));
         when(cuentaRepository.findByClienteId(5L)).thenReturn(Collections.singletonList(cuenta));
 
         LayawayClienteResponse response = clienteLayawayService.procesarOperacion(requestBaja);
@@ -172,6 +173,9 @@ class ClienteLayawayServiceTest {
         assertFalse(response.getActivo());
         assertEquals("INACTIVA", response.getEstatusCuenta());
         verify(clienteRepository, times(1)).save(clienteExistente);
+        // El ID interno ya no se expone en ninguna respuesta
+        assertFalse(com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules().build()
+                .valueToTree(response).has("clienteId"));
     }
 
     @Test
@@ -187,33 +191,112 @@ class ClienteLayawayServiceTest {
     }
 
     @Test
-    void procesarOperacion_Bandera2_ConClienteIdInvalido_LanzaBadRequest() {
-        LayawayClienteRequest requestActualizar = LayawayClienteRequest.builder()
-                .bandera(2)
-                .clienteId(-1L) // ID menor o igual a 0 no permitido
-                .build();
-
-        OnboardingException exception = assertThrows(OnboardingException.class, () ->
-                clienteLayawayService.procesarOperacion(requestActualizar)
-        );
-
-        assertEquals(400, exception.getCodigo());
-        assertTrue(exception.getMessage().contains("mayor a 0"));
+    void procesarOperacion_Bandera2y3_SinLlaves_LanzaBadRequestSinTocarNada() {
+        for (int bandera : new int[]{2, 3}) {
+            LayawayClienteRequest[] invalidas = {
+                    LayawayClienteRequest.builder().bandera(bandera).build(),
+                    LayawayClienteRequest.builder().bandera(bandera).filtros(new FiltrosClienteDto()).build(),
+            };
+            for (LayawayClienteRequest req : invalidas) {
+                OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(req));
+                assertEquals(400, ex.getCodigo());
+                assertTrue(ex.getMessage().contains("'filtros'"), ex.getMessage());
+            }
+        }
+        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+        verify(clienteRepository, never()).save(any());
     }
 
     @Test
-    void procesarOperacion_Bandera3_ConClienteIdInvalido_LanzaBadRequest() {
-        LayawayClienteRequest requestBaja = LayawayClienteRequest.builder()
-                .bandera(3)
-                .clienteId(0L) // ID 0 no permitido en baja
-                .build();
+    void procesarOperacion_Bandera2y3_ConClienteId_SeRechazaPorqueYaNoSeUsa() {
+        for (int bandera : new int[]{2, 3}) {
+            LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera).clienteId(5L)
+                    .filtros(FiltrosClienteDto.builder().curp("LOPS900101MDFRMN02").build()).build();
+            OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(req));
+            assertEquals(400, ex.getCodigo());
+            assertTrue(ex.getMessage().contains("clienteId ya no se utiliza"));
+        }
+    }
 
-        OnboardingException exception = assertThrows(OnboardingException.class, () ->
-                clienteLayawayService.procesarOperacion(requestBaja)
-        );
+    @Test
+    void procesarOperacion_Bandera2y3_LlaveIncompleta_ExigeValorCompleto() {
+        FiltrosClienteDto[] incompletos = {
+                FiltrosClienteDto.builder().curp("LOPS90").build(),
+                FiltrosClienteDto.builder().rfc("LOPS").build(),
+                FiltrosClienteDto.builder().numeroCuenta("3001").build(),
+        };
+        for (int bandera : new int[]{2, 3}) {
+            for (FiltrosClienteDto f : incompletos) {
+                LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera).filtros(f).build();
+                OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(req));
+                assertEquals(400, ex.getCodigo());
+                assertTrue(ex.getMessage().contains("COMPLETO"));
+            }
+        }
+        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
 
-        assertEquals(400, exception.getCodigo());
-        assertTrue(exception.getMessage().contains("mayor a 0"));
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2y3_LlaveSinCoincidencia_Lanza404() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+        for (int bandera : new int[]{2, 3}) {
+            LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera)
+                    .filtros(FiltrosClienteDto.builder().curp("ZZZZ900101MDFRMN02").build()).build();
+            OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(req));
+            assertEquals(404, ex.getCodigo());
+        }
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_ConFiltros_LanzaBadRequest() {
+        requestInsertar.setFiltros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build());
+        OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(requestInsertar));
+        assertEquals(400, ex.getCodigo());
+        assertTrue(ex.getMessage().contains("filtros"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarContrasena_GuardaNuevoHashYCierraSesion() {
+        ClienteEntity existente = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").rfc("PERJ9505151A2")
+                .nombre("Juan").apellidoPaterno("Perez").apellidoMaterno("Gomez").activo(true).build();
+        UsuarioLoginEntity usuario = UsuarioLoginEntity.builder().id(3L).username("juan_perez")
+                .passwordHash("hash_viejo").isLoggedIn(true).cliente(existente).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+        when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
+        when(cuentaRepository.findByClienteId(7L)).thenReturn(List.of());
+        when(passwordEncoderUtil.encode("NuevaClave#2026")).thenReturn("hash_nuevo");
+
+        clienteLayawayService.procesarOperacion(LayawayClienteRequest.builder().bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").password("NuevaClave#2026").build())
+                .build());
+
+        assertEquals("hash_nuevo", usuario.getPasswordHash());
+        assertFalse(usuario.getIsLoggedIn());
+        verify(usuarioLoginRepository).save(usuario);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarUsuario_LanzaBadRequest() {
+        ClienteEntity existente = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").activo(true).build();
+        UsuarioLoginEntity usuario = UsuarioLoginEntity.builder().id(3L).username("juan_perez").cliente(existente).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+        when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
+
+        OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(
+                LayawayClienteRequest.builder().bandera(2)
+                        .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
+                        .loginCredenciales(LoginCredencialesDto.builder().username("otro_usuario").build()).build()));
+
+        assertEquals(400, ex.getCodigo());
+        assertTrue(ex.getMessage().contains("usuario no puede modificarse"));
     }
 
     @Test
@@ -255,14 +338,16 @@ class ClienteLayawayServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void procesarOperacion_Bandera2_CambiarCurp_LanzaBadRequest() {
         ClienteEntity existente = ClienteEntity.builder()
                 .id(7L).curp("OTRA950515HDFRMN09").rfc("PERJ9505151A2").activo(true).build();
-        when(clienteRepository.findById(7L)).thenReturn(Optional.of(existente));
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
 
         LayawayClienteRequest requestActualizar = LayawayClienteRequest.builder()
                 .bandera(2)
-                .clienteId(7L)
+                .filtros(FiltrosClienteDto.builder().curp("OTRA950515HDFRMN09").build())
                 .datosPersonales(requestInsertar.getDatosPersonales())
                 .build();
 
@@ -345,7 +430,7 @@ class ClienteLayawayServiceTest {
         when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of());
 
         LayawayClienteResponse r = clienteLayawayService.procesarOperacion(LayawayClienteRequest.builder().bandera(4)
-                .filtros(FiltrosClienteDto.builder().curp("PARA95").rfc("PARA").numeroCuenta("3001").clienteId(1L).build())
+                .filtros(FiltrosClienteDto.builder().curp("PARA95").rfc("PARA").numeroCuenta("3001").build())
                 .build());
 
         assertEquals(1, r.getClientes().size());

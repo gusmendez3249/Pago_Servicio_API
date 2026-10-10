@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 public class LoginResponse {
 
     private String username;
-    private Long clienteId;
     private String nombreCliente;
     private Boolean isLoggedIn;
     private LocalDateTime ultimaActividad;
