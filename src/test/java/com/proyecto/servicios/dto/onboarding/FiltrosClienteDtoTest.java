@@ -52,7 +52,7 @@ class FiltrosClienteDtoTest {
 
     @Test
     void camposNulosExplicitos_CuentanComoSinFiltro() throws Exception {
-        FiltrosClienteDto dto = mapper.readValue("{\"curp\": null, \"rfc\": null, \"numeroCuenta\": null, \"clienteId\": null}", FiltrosClienteDto.class);
+        FiltrosClienteDto dto = mapper.readValue("{\"curp\": null, \"rfc\": null, \"numeroCuenta\": null}", FiltrosClienteDto.class);
         assertTrue(dto.estaVacio());
     }
 
@@ -67,7 +67,7 @@ class FiltrosClienteDtoTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"{\"curp\": \"MERG95\"}", "{\"rfc\": \"merg9505\"}", "{\"numeroCuenta\": \"3651\"}",
-            "{\"curp\": \"M\"}", "{\"clienteId\": 5}", "{\"curp\": \"MERG\", \"rfc\": \"AB1\", \"numeroCuenta\": \"12\", \"clienteId\": 1}"})
+            "{\"curp\": \"M\"}", "{\"curp\": \"MERG\", \"rfc\": \"AB1\", \"numeroCuenta\": \"12\"}"})
     void valoresValidosEntreComillas_SeAceptan(String json) throws Exception {
         assertTrue(camposInvalidos(json).isEmpty(), json);
     }
@@ -91,16 +91,10 @@ class FiltrosClienteDtoTest {
         assertFalse(camposInvalidos(json).isEmpty(), json);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"{\"clienteId\": 0}", "{\"clienteId\": -3}"})
-    void clienteIdNoPositivo_SeRechaza(String json) throws Exception {
-        assertTrue(camposInvalidos(json).contains("clienteId"), json);
-    }
-
     // ---------- Solo parámetros llave que no cambian ----------
 
     @ParameterizedTest
-    @ValueSource(strings = {"{\"nombre\": \"f\"}", "{\"correo\": \"a@b.com\"}", "{\"activo\": true}",
+    @ValueSource(strings = {"{\"clienteId\": 5}", "{\"id\": 5}", "{\"nombre\": \"f\"}", "{\"correo\": \"a@b.com\"}", "{\"activo\": true}",
             "{\"telefonoMovil\": \"4181234567\"}", "{\"curp\": \"MERG\", \"apellidoPaterno\": \"x\"}"})
     void camposQueNoSonLlave_SeRechazanEnLugarDeDevolverTodo(String json) throws Exception {
         assertTrue(camposInvalidos(json).contains("sinCamposDesconocidos"), json);

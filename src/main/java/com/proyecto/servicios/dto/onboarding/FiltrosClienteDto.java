@@ -7,7 +7,6 @@ import com.proyecto.servicios.validation.TextoEstrictoDeserializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,9 +16,9 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Filtros de la consulta de clientes (bandera 4). Solo se admiten campos llave que NO cambian
- * (no se pueden modificar después del registro). Todos son opcionales; sin ninguno se devuelven
- * todos los clientes. Un campo desconocido (p. ej. "nombre") se rechaza con 400 para que un error de
+ * Llaves para identificar clientes: consulta (bandera 4, "contiene") y actualización o baja
+ * (banderas 2 y 3, valor completo). Solo campos que NO cambian después del registro; nunca el ID
+ * interno. En la consulta todos son opcionales; sin ninguno se devuelven todos los clientes. Un campo desconocido (p. ej. "nombre") se rechaza con 400 para que un error de
  * escritura no devuelva toda la tabla sin avisar.
  *
  * Nota: Spring Boot desactiva FAIL_ON_UNKNOWN_PROPERTIES y @JsonIgnoreProperties(ignoreUnknown = false)
@@ -31,10 +30,6 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FiltrosClienteDto {
-
-    @Schema(description = "ID del cliente (coincidencia exacta)", example = "1")
-    @Positive(message = "El filtro 'clienteId' debe ser un número entero mayor a 0")
-    private Long clienteId;
 
     @Schema(description = "CURP completa o parte de ella (contiene, sin distinguir mayúsculas). Entre comillas y sin espacios", example = "MERG95")
     @JsonDeserialize(using = TextoEstrictoDeserializer.class)
@@ -66,13 +61,13 @@ public class FiltrosClienteDto {
 
     @JsonIgnore
     @Schema(hidden = true)
-    @AssertTrue(message = "El objeto 'filtros' solo admite los campos llave: clienteId, curp, rfc y numeroCuenta")
+    @AssertTrue(message = "El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta")
     public boolean isSinCamposDesconocidos() {
         return camposDesconocidos.isEmpty();
     }
 
     /** true si no se envió ningún filtro. */
     public boolean estaVacio() {
-        return clienteId == null && curp == null && rfc == null && numeroCuenta == null;
+        return curp == null && rfc == null && numeroCuenta == null;
     }
 }

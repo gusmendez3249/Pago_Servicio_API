@@ -102,7 +102,7 @@ public class GlobalExceptionHandler {
                 if (fieldName.toLowerCase().contains("telefono")) {
                     mensajeError = "Error de tipo de dato JSON: Los números de teléfono deben enviarse como números enteros numéricos sin comillas (ejemplo: 4181234567) y NO como cadenas de texto (String).";
                 } else {
-                    mensajeError = "Error de tipo de dato JSON: El campo '" + (fieldName.isEmpty() ? "bandera" : fieldName) + "' debe ser un número entero numérico (ej. 1, 2 o 3) y NO una cadena de texto (String) ni un decimal.";
+                    mensajeError = "Error de tipo de dato JSON: El campo '" + (fieldName.isEmpty() ? "bandera" : fieldName) + "' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de texto (String) ni un decimal.";
                 }
             } else if (!fieldName.isEmpty()) {
                 mensajeError = "Error de tipo de dato en el campo '" + fieldName + "': Se esperaba el tipo " + (targetType != null ? targetType.getSimpleName() : "válido") + ".";

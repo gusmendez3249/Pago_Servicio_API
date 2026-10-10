@@ -1,4 +1,4 @@
-clientes de prueba: [67, 68, 69]
+clientes de prueba: ['PEPF900310HGTRRR01', 'GOMB850512MGTMRT02', 'RUCC950101HGTZRR03']
 ===== SIN FILTROS =====
 PASS [200 esp 200] bandera 4 sin 'filtros' -> todos -> 3 clientes :: Consulta realizada correctamente
 PASS [200 esp 200] bandera 4 con filtros {} -> todos :: Consulta realizada correctamente
@@ -13,7 +13,6 @@ PASS [200 esp 200] curp sin coincidencias -> lista vacia :: Consulta realizada c
 PASS [200 esp 200] rfc 'gomb85' -> 1 :: Consulta realizada correctamente
 PASS [200 esp 200] numeroCuenta (prefijo de 6) -> contiene al cliente 3 :: Consulta realizada correctamente
 PASS [200 esp 200] numeroCuenta completo -> 1 :: Consulta realizada correctamente
-PASS [200 esp 200] clienteId exacto -> 1 :: Consulta realizada correctamente
 PASS [200 esp 200] curp + rfc que no coinciden en el mismo cliente (AND) -> 0 :: Consulta realizada correctamente
 PASS [200 esp 200] los 4 filtros a la vez (AND) -> 1 :: Consulta realizada correctamente
 ===== DATOS DEVUELTOS =====
@@ -26,7 +25,7 @@ PASS [400 esp 400] rfc numerico -> 400 :: El campo 'filtros.rfc' debe enviarse c
 PASS [400 esp 400] numeroCuenta sin comillas -> 400 :: El campo 'filtros.numeroCuenta' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
 PASS [400 esp 400] curp booleano -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
 PASS [400 esp 400] curp arreglo -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
-PASS [400 esp 400] clienteId entre comillas -> 400 :: Error de tipo de dato JSON: El campo 'filtros.clienteId' debe ser un número entero numérico (ej. 1, 2 o 3) y NO una cadena de texto (String) ni un dec
+PASS [400 esp 400] clienteId entre comillas -> 400 :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 ===== EN BLANCO / FORMATO =====
 PASS [400 esp 400] curp vacia '' -> 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o números}
 PASS [400 esp 400] curp solo espacios -> 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o números}
@@ -38,23 +37,24 @@ PASS [400 esp 400] curp con guion bajo _ -> 400 :: Datos no validos{filtros.curp
 PASS [400 esp 400] curp con espacio -> 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o números}
 PASS [400 esp 400] curp con comilla simple -> 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o números}
 PASS [400 esp 400] curp de 19 caracteres -> 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o números}
-PASS [400 esp 400] clienteId 0 -> 400 :: Datos no validos{filtros.clienteId=El filtro 'clienteId' debe ser un número entero mayor a 0}
-PASS [400 esp 400] clienteId negativo -> 400 :: Datos no validos{filtros.clienteId=El filtro 'clienteId' debe ser un número entero mayor a 0}
+PASS [400 esp 400] clienteId 0 -> 400 :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 esp 400] clienteId negativo -> 400 :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 ===== SOLO CAMPOS LLAVE =====
-PASS [400 esp 400] filtro 'nombre' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: clienteId, curp, rfc y numeroCuenta}
-PASS [400 esp 400] filtro 'correo' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: clienteId, curp, rfc y numeroCuenta}
-PASS [400 esp 400] filtro 'activo' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: clienteId, curp, rfc y numeroCuenta}
-PASS [400 esp 400] filtro 'telefonoMovil' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: clienteId, curp, rfc y numeroCuenta}
-PASS [400 esp 400] filtro 'curp valida + nombre' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: clienteId, curp, rfc y numeroCuenta}
+PASS [400 esp 400] filtro 'nombre' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 esp 400] filtro 'correo' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 esp 400] filtro 'activo' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 esp 400] filtro 'telefonoMovil' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 esp 400] filtro 'clienteId' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 esp 400] filtro 'curp valida + nombre' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 ===== OTRAS SECCIONES CON BANDERA 4 =====
-PASS [400 esp 400] clienteId de nivel superior -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (clienteId, curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
-PASS [400 esp 400] datosPersonales -> 400 (no devuelve todos) :: Datos no validos{datosPersonales.sexo=El sexo es obligatorio, datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.apel
-PASS [400 esp 400] loginCredenciales -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (clienteId, curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
+PASS [400 esp 400] clienteId de nivel superior -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
+PASS [400 esp 400] datosPersonales -> 400 (no devuelve todos) :: Datos no validos{datosPersonales.sexo=El sexo es obligatorio, datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.esta
+PASS [400 esp 400] loginCredenciales -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
 ===== OTRAS BANDERAS SIGUEN IGUAL =====
 PASS [400 esp 400] bandera 5 -> 400 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)}
 PASS [200 esp 200] baja logica (bandera 3) sigue funcionando :: Cliente dado de baja correctamente
 PASS [200 esp 200] consulta muestra al cliente dado de baja como inactivo :: Consulta realizada correctamente
 ===== VOLUMEN: todos los clientes sin filtros =====
-PASS [200 esp 200] sin filtros con 33 clientes (61 ms) :: Consulta realizada correctamente
+PASS [200 esp 200] sin filtros con 33 clientes (24 ms) :: Consulta realizada correctamente
 
 TOTAL 48  PASS 48  FAIL 0

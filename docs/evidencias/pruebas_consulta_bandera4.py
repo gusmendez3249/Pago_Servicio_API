@@ -51,7 +51,7 @@ def consulta(filtros):
 a = alta("Fernando", "Perez", "PEPF900310HGTRRR01", "PEPF9003101A1", "fer@mail.com", "fernando.u")
 b = alta("Beatriz", "Gomez", "GOMB850512MGTMRT02", "GOMB8505122B2", "bea@mail.com", "beatriz.u")
 c = alta("Carlos", "Ruiz", "RUCC950101HGTZRR03", "RUCC9501013C3", "car@mail.com", "carlos.u")
-ids = [a["clienteId"], b["clienteId"], c["clienteId"]]
+ids = [a["curp"], b["curp"], c["curp"]]
 cuentas = [a["numeroCuenta"], b["numeroCuenta"], c["numeroCuenta"]]
 print("clientes de prueba:", ids)
 
@@ -67,7 +67,7 @@ check("campos null -> todos", 200, s, j, None, lambda x: len(x["data"]["clientes
 
 print("===== FILTROS (contiene, sin distinguir mayusculas) =====")
 s, j = consulta({"curp": "PEPF"})
-check("curp 'PEPF' -> 1", 200, s, j, None, lambda x: [k["clienteId"] for k in x["data"]["clientes"]] == [ids[0]])
+check("curp 'PEPF' -> 1", 200, s, j, None, lambda x: [k["curp"] for k in x["data"]["clientes"]] == [ids[0]])
 s, j = consulta({"curp": "pepf90"})
 check("curp en minusculas 'pepf90' -> 1", 200, s, j, None, lambda x: len(x["data"]["clientes"]) == 1)
 s, j = consulta({"curp": "HGTRR"})
@@ -77,23 +77,21 @@ check("curp 'G' (una letra) -> todos los que la contengan", 200, s, j, f"{len(j[
 s, j = consulta({"curp": "ZZZZ"})
 check("curp sin coincidencias -> lista vacia", 200, s, j, None, lambda x: x["data"]["clientes"] == [] and x["data"]["totalCoincidencias"] == 0)
 s, j = consulta({"rfc": "gomb85"})
-check("rfc 'gomb85' -> 1", 200, s, j, None, lambda x: [k["clienteId"] for k in x["data"]["clientes"]] == [ids[1]])
+check("rfc 'gomb85' -> 1", 200, s, j, None, lambda x: [k["curp"] for k in x["data"]["clientes"]] == [ids[1]])
 s, j = consulta({"numeroCuenta": cuentas[2][:6]})
-check("numeroCuenta (prefijo de 6) -> contiene al cliente 3", 200, s, j, None, lambda x: ids[2] in [k["clienteId"] for k in x["data"]["clientes"]])
+check("numeroCuenta (prefijo de 6) -> contiene al cliente 3", 200, s, j, None, lambda x: ids[2] in [k["curp"] for k in x["data"]["clientes"]])
 s, j = consulta({"numeroCuenta": cuentas[2]})
-check("numeroCuenta completo -> 1", 200, s, j, None, lambda x: [k["clienteId"] for k in x["data"]["clientes"]] == [ids[2]] and x["data"]["clientes"][0]["cuentas"][0]["numeroCuenta"] == cuentas[2])
-s, j = consulta({"clienteId": ids[1]})
-check("clienteId exacto -> 1", 200, s, j, None, lambda x: [k["clienteId"] for k in x["data"]["clientes"]] == [ids[1]])
+check("numeroCuenta completo -> 1", 200, s, j, None, lambda x: [k["curp"] for k in x["data"]["clientes"]] == [ids[2]] and x["data"]["clientes"][0]["cuentas"][0]["numeroCuenta"] == cuentas[2])
 s, j = consulta({"curp": "PEPF", "rfc": "GOMB"})
 check("curp + rfc que no coinciden en el mismo cliente (AND) -> 0", 200, s, j, None, lambda x: x["data"]["clientes"] == [])
-s, j = consulta({"curp": "PEPF", "rfc": "PEPF90", "clienteId": ids[0], "numeroCuenta": cuentas[0][:4]})
+s, j = consulta({"curp": "PEPF", "rfc": "PEPF90", "numeroCuenta": cuentas[0][:4]})
 check("los 4 filtros a la vez (AND) -> 1", 200, s, j, None, lambda x: len(x["data"]["clientes"]) == 1)
 
 print("===== DATOS DEVUELTOS =====")
-s, j = consulta({"clienteId": ids[0]})
+s, j = consulta({"curp": ids[0]})
 k = j["data"]["clientes"][0]
 check("no expone biometricos ni credenciales", 200, s, j, None,
-      lambda x: not any(n in k for n in ("datosBiometricos", "passwordHash", "faceId", "username")))
+      lambda x: not any(n in k for n in ("clienteId", "datosBiometricos", "passwordHash", "faceId", "username")))
 check("trae nombre completo, correo, activo y cuenta", 200, s, j, None,
       lambda x: k["nombreCompleto"] == "Fernando Perez Lopez" and k["correo"] == "fer@mail.com" and k["activo"] is True and k["cuentas"][0]["saldo"] == 1000)
 s, j = post(json.dumps({"bandera": 1}))
@@ -120,7 +118,7 @@ for nombre, f in [("curp vacia ''", {"curp": ""}), ("curp solo espacios", {"curp
 
 print("===== SOLO CAMPOS LLAVE =====")
 for nombre, f in [("nombre", {"nombre": "f"}), ("correo", {"correo": "fer@mail.com"}), ("activo", {"activo": True}),
-                  ("telefonoMovil", {"telefonoMovil": "4181234567"}), ("curp valida + nombre", {"curp": "PEPF", "nombre": "f"})]:
+                  ("telefonoMovil", {"telefonoMovil": "4181234567"}), ("clienteId", {"clienteId": 1}), ("curp valida + nombre", {"curp": "PEPF", "nombre": "f"})]:
     s, j = consulta(f)
     check(f"filtro '{nombre}' no permitido -> 400 (no devuelve todos)", 400, s, j)
 
@@ -134,9 +132,9 @@ for nombre, raw in [("clienteId de nivel superior", '{"bandera":4,"clienteId":1}
 print("===== OTRAS BANDERAS SIGUEN IGUAL =====")
 s, j = post('{"bandera":5}')
 check("bandera 5 -> 400", 400, s, j)
-s, j = post(json.dumps({"bandera": 3, "clienteId": ids[2]}))
+s, j = post(json.dumps({"bandera": 3, "filtros": {"curp": ids[2]}}))
 check("baja logica (bandera 3) sigue funcionando", 200, s, j, None, lambda x: x["data"]["activo"] is False and "clientes" not in x["data"])
-s, j = consulta({"clienteId": ids[2]})
+s, j = consulta({"curp": ids[2]})
 check("consulta muestra al cliente dado de baja como inactivo", 200, s, j, None,
       lambda x: x["data"]["clientes"][0]["activo"] is False and x["data"]["clientes"][0]["cuentas"][0]["estatus"] == "INACTIVA")
 
