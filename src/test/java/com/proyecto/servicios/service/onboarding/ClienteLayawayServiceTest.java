@@ -15,9 +15,15 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -298,4 +304,82 @@ class ClienteLayawayServiceTest {
                 && "UNION LIBRE".equals(c.getEstadoCivil()) && "MEXICANA".equals(c.getNacionalidad())));
     }
 
+    // ---------- Bandera 4: consulta ----------
+
+    private ClienteEntity clienteConsulta(Long id) {
+        return ClienteEntity.builder().id(id).nombre("Ana").apellidoPaterno("Paz").apellidoMaterno("Ruiz")
+                .curp("PARA950515HDFRMN01").rfc("PARA9505151A2").correo("ana@test.com").telefonoMovil("5512345678")
+                .activo(true).build();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_SinFiltros_DevuelveTodosLosClientes() {
+        ClienteEntity c1 = clienteConsulta(1L);
+        ClienteEntity c2 = clienteConsulta(2L);
+        CuentaEntity cuenta = CuentaEntity.builder().id(9L).numeroCuenta("300123456789")
+                .saldo(new BigDecimal("1000.00")).estatus("ACTIVA").cliente(c1).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(c1, c2), PageRequest.of(0, 1000), 2));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of(cuenta));
+
+        // Con "filtros" ausente y con "filtros": {} el resultado es el mismo: todos los clientes
+        for (FiltrosClienteDto filtros : new FiltrosClienteDto[]{null, new FiltrosClienteDto()}) {
+            LayawayClienteResponse r = clienteLayawayService.procesarOperacion(
+                    LayawayClienteRequest.builder().bandera(4).filtros(filtros).build());
+
+            assertEquals("CONSULTAR", r.getOperacionRealizada());
+            assertEquals(2, r.getClientes().size());
+            assertEquals(2L, r.getTotalCoincidencias());
+            assertFalse(r.getResultadosTruncados());
+            assertEquals("300123456789", r.getClientes().get(0).getCuentas().get(0).getNumeroCuenta());
+            assertTrue(r.getClientes().get(1).getCuentas().isEmpty());
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_ConFiltros_ConsultaConEspecificacion() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(clienteConsulta(1L)), PageRequest.of(0, 1000), 1));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of());
+
+        LayawayClienteResponse r = clienteLayawayService.procesarOperacion(LayawayClienteRequest.builder().bandera(4)
+                .filtros(FiltrosClienteDto.builder().curp("PARA95").rfc("PARA").numeroCuenta("3001").clienteId(1L).build())
+                .build());
+
+        assertEquals(1, r.getClientes().size());
+        verify(clienteRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_MasCoincidenciasQueElTope_IndicaTruncado() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(clienteConsulta(1L)), PageRequest.of(0, 1), 5000));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of());
+
+        LayawayClienteResponse r = clienteLayawayService.procesarOperacion(LayawayClienteRequest.builder().bandera(4).build());
+
+        assertEquals(5000L, r.getTotalCoincidencias());
+        assertTrue(r.getResultadosTruncados());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_ConOtrasSeccionesOClienteId_LanzaBadRequestSinConsultar() {
+        LayawayClienteRequest[] invalidas = {
+                LayawayClienteRequest.builder().bandera(4).clienteId(5L).build(),
+                LayawayClienteRequest.builder().bandera(4).datosPersonales(requestInsertar.getDatosPersonales()).build(),
+                LayawayClienteRequest.builder().bandera(4).datosContacto(requestInsertar.getDatosContacto()).build(),
+                LayawayClienteRequest.builder().bandera(4).loginCredenciales(requestInsertar.getLoginCredenciales()).build(),
+        };
+        for (LayawayClienteRequest req : invalidas) {
+            OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(req));
+            assertEquals(400, ex.getCodigo());
+            assertTrue(ex.getMessage().contains("'filtros'"));
+        }
+        verifyNoInteractions(cuentaRepository);
+        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
 }
