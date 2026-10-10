@@ -10,6 +10,10 @@ Uso (con la API levantada; solo usa la librería estándar de Python 3.10+):
     python -X utf8 pruebas_seguridad_carga.py 8081
 
 ADVERTENCIA: inserta cientos de clientes de prueba. Ejecutar contra una base de datos de pruebas.
+
+Autenticación: las banderas 2, 3 y 4 exigen token. Se inicia sesión como ejecutivo con las variables de entorno
+EJECUTIVO_USUARIO y EJECUTIVO_PASSWORD (el ejecutivo creado al arrancar la API con APP_EJECUTIVO_USUARIO /
+APP_EJECUTIVO_PASSWORD).
 """
 import json, http.client, random, string, sys, time, copy, socket
 from concurrent.futures import ThreadPoolExecutor
@@ -20,9 +24,29 @@ CLI, LOGIN = "/api/v1/layaway/cliente", "/api/v1/auth/login"
 results = []
 
 
+# --- Autenticación: las banderas 2, 3 y 4 exigen token. Se inicia sesión como EJECUTIVO (usuario creado al arrancar
+# la API con APP_EJECUTIVO_USUARIO / APP_EJECUTIVO_PASSWORD; aquí se leen de EJECUTIVO_USUARIO / EJECUTIVO_PASSWORD).
+import os as _os
+TOKEN = None
+
+
+def _login_ejecutivo():
+    usuario = _os.environ.get("EJECUTIVO_USUARIO", "ejecutivo.admin")
+    password = _os.environ.get("EJECUTIVO_PASSWORD", "Ejecutivo#2026")
+    c = http.client.HTTPConnection(HOST, PORT, timeout=60)
+    c.request("POST", "/api/v1/auth/login", body=json.dumps({"bandera": 1, "username": usuario, "password": password}).encode(),
+              headers={"Content-Type": "application/json"})
+    r = c.getresponse(); j = json.loads(r.read().decode("utf-8"))
+    if r.status != 200:
+        raise SystemExit("No se pudo iniciar sesión como ejecutivo (%s): %s" % (r.status, j.get("mensaje")))
+    return j["data"]["token"]
+
+
+
 def req(path, body=None, raw=None, headers=None, method="POST"):
     c = http.client.HTTPConnection(HOST, PORT, timeout=60)
     h = {"Content-Type": "application/json"}
+    if TOKEN and path == CLI: h["Authorization"] = "Bearer " + TOKEN
     if headers: h.update(headers)
     data = raw if raw is not None else (dumps(body).encode() if body is not None else None)
     c.request(method, path, body=data, headers=h)
@@ -97,6 +121,7 @@ def years_ago(y, extra_days=0):
     except ValueError: d = hoy.replace(year=hoy.year - y, day=28)
     return (d + timedelta(days=extra_days)).isoformat()
 
+TOKEN = _login_ejecutivo()
 print("===== REGISTRO: caso feliz y reglas del documento =====")
 okb, s, okj = ins("alta valida", 201)
 check("la respuesta del alta NO expone el id del cliente", 201 if "clienteId" not in okj["data"] else 0, okj, 201)

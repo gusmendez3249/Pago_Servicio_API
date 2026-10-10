@@ -17,9 +17,9 @@ import lombok.NoArgsConstructor;
 public class LayawayClienteRequest {
 
     @Schema(description = "Bandera de operación (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)", example = "1")
-    @NotNull(message = "La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)")
-    @Min(value = 1, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
-    @Max(value = 4, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
+    @NotNull(groups = GrupoBandera.class, message = "La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)")
+    @Min(groups = GrupoBandera.class, value = 1, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
+    @Max(groups = GrupoBandera.class, value = 4, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
     private Integer bandera;
 
     // Ya no se usa: se conserva solo para rechazarlo con un mensaje claro en lugar de ignorarlo

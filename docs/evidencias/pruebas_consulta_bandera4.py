@@ -4,6 +4,10 @@ Pruebas de la consulta de clientes (bandera 4) contra la API en ejecución: sin 
 
 Uso:  python -X utf8 pruebas_consulta_bandera4.py 8081
 ADVERTENCIA: inserta clientes de prueba. Ejecutar contra una base de datos de pruebas.
+
+Autenticación: las banderas 2, 3 y 4 exigen token. Se inicia sesión como ejecutivo con las variables de entorno
+EJECUTIVO_USUARIO y EJECUTIVO_PASSWORD (el ejecutivo creado al arrancar la API con APP_EJECUTIVO_USUARIO /
+APP_EJECUTIVO_PASSWORD).
 """
 import json, http.client, random, string, sys, time
 
@@ -12,10 +16,29 @@ CLI = "/api/v1/layaway/cliente"
 res = []
 
 
+# --- Autenticación: las banderas 2, 3 y 4 exigen token. Se inicia sesión como EJECUTIVO (usuario creado al arrancar
+# la API con APP_EJECUTIVO_USUARIO / APP_EJECUTIVO_PASSWORD; aquí se leen de EJECUTIVO_USUARIO / EJECUTIVO_PASSWORD).
+import os as _os
+TOKEN = None
+
+
+def _login_ejecutivo():
+    usuario = _os.environ.get("EJECUTIVO_USUARIO", "ejecutivo.admin")
+    password = _os.environ.get("EJECUTIVO_PASSWORD", "Ejecutivo#2026")
+    c = http.client.HTTPConnection("localhost", PORT, timeout=60)
+    c.request("POST", "/api/v1/auth/login", body=json.dumps({"bandera": 1, "username": usuario, "password": password}).encode(),
+              headers={"Content-Type": "application/json"})
+    r = c.getresponse(); j = json.loads(r.read().decode("utf-8"))
+    if r.status != 200:
+        raise SystemExit("No se pudo iniciar sesión como ejecutivo (%s): %s" % (r.status, j.get("mensaje")))
+    return j["data"]["token"]
+
+
+
 def post(raw):
     c = http.client.HTTPConnection("localhost", PORT, timeout=60)
     c.request("POST", CLI, body=raw.encode("utf-8") if isinstance(raw, str) else json.dumps(raw).encode("utf-8"),
-              headers={"Content-Type": "application/json"})
+              headers={"Content-Type": "application/json", **({"Authorization": "Bearer " + TOKEN} if TOKEN else {})})
     r = c.getresponse()
     return r.status, json.loads(r.read().decode("utf-8"))
 
@@ -47,6 +70,7 @@ def consulta(filtros):
     return post(json.dumps({"bandera": 4, "filtros": filtros}) if filtros is not None else json.dumps({"bandera": 4}))
 
 
+TOKEN = _login_ejecutivo()
 # --- datos de prueba: 3 clientes con CURP/RFC distintos y dos que comparten fragmentos
 a = alta("Fernando", "Perez", "PEPF900310HGTRRR01", "PEPF9003101A1", "fer@mail.com", "fernando.u")
 b = alta("Beatriz", "Gomez", "GOMB850512MGTMRT02", "GOMB8505122B2", "bea@mail.com", "beatriz.u")
@@ -75,7 +99,7 @@ check("curp contiene 'HGTRR' (mitad del texto) -> 1", 200, s, j, None, lambda x:
 s, j = consulta({"curp": "G"})
 check("curp 'G' (una letra) -> todos los que la contengan", 200, s, j, f"{len(j['data']['clientes'])}", lambda x: len(x["data"]["clientes"]) == 3)
 s, j = consulta({"curp": "ZZZZ"})
-check("curp sin coincidencias -> lista vacia", 200, s, j, None, lambda x: x["data"]["clientes"] == [] and x["data"]["totalCoincidencias"] == 0)
+check("curp sin coincidencias -> 404 descriptivo (el registro no existe)", 404, s, j, None, lambda x: "No se encontró" in x["mensaje"] and x["data"] is None)
 s, j = consulta({"rfc": "gomb85"})
 check("rfc 'gomb85' -> 1", 200, s, j, None, lambda x: [k["curp"] for k in x["data"]["clientes"]] == [ids[1]])
 s, j = consulta({"numeroCuenta": cuentas[2][:6]})
@@ -83,7 +107,7 @@ check("numeroCuenta (prefijo de 6) -> contiene al cliente 3", 200, s, j, None, l
 s, j = consulta({"numeroCuenta": cuentas[2]})
 check("numeroCuenta completo -> 1", 200, s, j, None, lambda x: [k["curp"] for k in x["data"]["clientes"]] == [ids[2]] and x["data"]["clientes"][0]["cuentas"][0]["numeroCuenta"] == cuentas[2])
 s, j = consulta({"curp": "PEPF", "rfc": "GOMB"})
-check("curp + rfc que no coinciden en el mismo cliente (AND) -> 0", 200, s, j, None, lambda x: x["data"]["clientes"] == [])
+check("curp + rfc que no coinciden en el mismo cliente (AND) -> 404", 404, s, j, None, lambda x: "No se encontró" in x["mensaje"])
 s, j = consulta({"curp": "PEPF", "rfc": "PEPF90", "numeroCuenta": cuentas[0][:4]})
 check("los 4 filtros a la vez (AND) -> 1", 200, s, j, None, lambda x: len(x["data"]["clientes"]) == 1)
 

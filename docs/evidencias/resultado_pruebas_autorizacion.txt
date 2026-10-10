@@ -1,0 +1,68 @@
+Objetivo: http://localhost:8094
+
+===== EJECUTIVO INICIAL Y REGISTRO PUBLICO =====
+PASS [200 esp 200] login del ejecutivo :: Inicio de sesión exitoso
+PASS [200 esp 200] la respuesta del login no expone el ID :: Inicio de sesión exitoso
+alta pública (sin token) de dos clientes: alicia.jbnpfdof y beto.yombcbgy
+
+===== SIN TOKEN / TOKEN INVALIDO =====
+PASS [401 esp 401] bandera 2 sin encabezado Authorization :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 2 -> trae WWW-Authenticate: Bearer :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 3 sin encabezado Authorization :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 3 -> trae WWW-Authenticate: Bearer :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 sin encabezado Authorization :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 -> trae WWW-Authenticate: Bearer :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 con token inventado :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 con token corto :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 con token con comillas :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 con token con signos no permitidos :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 401] bandera 4 con esquema Basic :: Esquema de autenticación no soportado: use 'Authorization: Bearer <token>'.
+PASS [401 esp 401] bandera 4 con 'Bearer' sin token :: Esquema de autenticación no soportado: use 'Authorization: Bearer <token>'.
+PASS [400 esp 400] bandera inválida se rechaza antes de autenticar (400) :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+
+===== CLIENTE: SOLO SU PROPIO REGISTRO =====
+PASS [200 esp 200] login de Alicia (rol CLIENTE) :: Inicio de sesión exitoso
+PASS [200 esp 200] Alicia consulta SIN filtros: solo ve su registro (no todos) :: Consulta realizada correctamente
+PASS [200 esp 200]   y la respuesta no expone el ID :: Consulta realizada correctamente
+PASS [200 esp 200] Alicia consulta su propia CURP :: Consulta realizada correctamente
+PASS [404 esp 404] Alicia consulta la CURP de Beto -> 404 (no revela si existe) :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404] Alicia consulta el RFC de Beto -> 404 :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404] Alicia consulta la cuenta de Beto -> 404 :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404] Alicia busca por un fragmento de la CURP de Beto -> 404 :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [400 esp 400] filtro en blanco sigue siendo 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [404 esp 404] CURP que no existe -> 404 (ejecutivo) :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404] la respuesta a 'no existe' y a 'es de otro' es la misma (sin enumeración) :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404] Alicia intenta ACTUALIZAR a Beto -> 404 :: No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.
+PASS [404 esp 404] Alicia intenta CAMBIAR LA CONTRASENA de Beto -> 404 :: No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.
+PASS [200 esp 200] Beto sigue entrando con su contrasena original :: Inicio de sesión exitoso
+PASS [200 esp 200] el ejecutivo comprueba que el teléfono de Beto NO cambió :: Consulta realizada correctamente
+PASS [200 esp 200] Alicia actualiza SU registro :: Cliente actualizado correctamente
+PASS [403 esp 403] Alicia intenta darse de baja -> 403 (solo ejecutivos) :: Solo un ejecutivo puede dar de baja clientes.
+PASS [403 esp 403] Alicia intenta dar de baja a Beto -> 403 :: Solo un ejecutivo puede dar de baja clientes.
+
+===== CAMBIO DE CONTRASENA CIERRA LA SESION =====
+PASS [400 esp 400] contraseña débil -> 400 con detalle por campo :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [200 esp 200] Alicia cambia su contraseña :: Cliente actualizado correctamente
+PASS [401 esp 401] el token anterior de Alicia ya no sirve -> 401 :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [200 esp 200] Alicia entra con la contraseña nueva :: Inicio de sesión exitoso
+PASS [401 esp 401] la contraseña vieja ya no sirve :: Credenciales inválidas.
+PASS [200 esp 200] y el token anterior (previo al nuevo login) ya no sirve; el nuevo sí :: Consulta realizada correctamente
+
+===== EJECUTIVO: TODOS LOS REGISTROS =====
+PASS [200 esp 200] el ejecutivo consulta sin filtros y ve a todos :: Consulta realizada correctamente
+PASS [200 esp 200] el ejecutivo consulta a Beto :: Consulta realizada correctamente
+PASS [200 esp 200] el ejecutivo actualiza a Beto :: Cliente actualizado correctamente
+PASS [200 esp 200] el ejecutivo da de baja a Beto :: Cliente dado de baja correctamente
+PASS [401 esp 401] el token de Beto deja de servir tras la baja -> 401 :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [403 esp 403] Beto ya no puede iniciar sesión (cliente inactivo) -> 403 :: El cliente asociado a este usuario se encuentra inactivo.
+
+===== ERRORES CON FORMATO CONSISTENTE =====
+PASS [400 esp 400] validación: codigo = 400 y detalle por campo en data :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.apellidoPaterno=El 
+PASS [400 esp 400] JSON mal formado: codigo = 400 :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [415 esp 415] Content-Type incorrecto: codigo = 415 :: Content-Type no soportado. Envíe la petición con 'Content-Type: application/json'.
+PASS [405 esp 405] método no permitido: codigo = 405 :: Método HTTP 'GET' no permitido para este endpoint.
+PASS [404 esp 404] recurso inexistente: codigo = 404 :: El recurso '/api/v1/no-existe' no existe.
+PASS [400 esp 400] /api/v1/layaway/cliente: todo error trae codigo, mensaje y data :: Los datos personales, de contacto, domicilio e información laboral son obligatorios para la creación.
+PASS [400 esp 400] /api/v1/auth/login: todo error trae codigo, mensaje y data :: Datos no validos{username=El nombre de usuario es SIEMPRE obligatorio}
+
+TOTAL 52  PASS 52  FAIL 0

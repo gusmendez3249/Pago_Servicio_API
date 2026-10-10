@@ -1,6 +1,7 @@
 package com.proyecto.servicios.service.onboarding;
 
 import com.proyecto.servicios.config.onboarding.PasswordEncoderUtil;
+import com.proyecto.servicios.config.onboarding.TokenUtil;
 import com.proyecto.servicios.dto.onboarding.LoginRequest;
 import com.proyecto.servicios.dto.onboarding.LoginResponse;
 import com.proyecto.servicios.entity.onboarding.ClienteEntity;
@@ -94,11 +95,15 @@ public class AuthService {
             usuario.setPasswordHash(passwordEncoderUtil.encode(request.getPassword()));
         }
 
-        // Fase 3 (transacción corta): is_logged_in = true, reiniciar intentos y actualizar última actividad
+        // Fase 3 (transacción corta): is_logged_in = true, reiniciar intentos, actualizar última actividad
+        // y emitir el token de sesión (en base de datos solo se guarda su hash)
+        String token = TokenUtil.generar();
         usuario.setIntentosFallidos((short) 0);
         usuario.setBloqueadoHasta(null);
         usuario.setIsLoggedIn(true);
         usuario.setUltimaActividad(LocalDateTime.now());
+        usuario.setTokenHash(TokenUtil.hash(token));
+        usuario.setTokenExpira(LocalDateTime.now().plusMinutes(SesionService.INACTIVIDAD_MINUTOS));
         transactionTemplate.executeWithoutResult(status -> usuarioLoginRepository.save(usuario));
 
         String nombreCliente = cliente != null ? cliente.getNombre() + " " + cliente.getApellidoPaterno() : usuario.getUsername();
@@ -108,6 +113,10 @@ public class AuthService {
                 .nombreCliente(nombreCliente)
                 .isLoggedIn(true)
                 .ultimaActividad(usuario.getUltimaActividad())
+                .token(token)
+                .tipoToken("Bearer")
+                .expiraEnMinutos(SesionService.INACTIVIDAD_MINUTOS)
+                .rol(usuario.getRol())
                 .mensaje("Inicio de sesión exitoso (" + (bandera == 1 ? "Por Contraseña" : "Por Face ID Biométrico") + ")")
                 .build();
     }

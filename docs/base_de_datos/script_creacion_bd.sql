@@ -3,7 +3,7 @@
 --  Script de creación de la base de datos (PostgreSQL 14+)
 --
 --  Esquema final consolidado. En la aplicación este mismo esquema lo construye Flyway
---  (src/main/resources/db/migration V3 + V8 + V9); este archivo sirve para crear la base
+--  (src/main/resources/db/migration V3 + V8 + V9 + V10); este archivo sirve para crear la base
 --  manualmente desde cero y como documentación del diseño.
 --
 --  Uso:
@@ -153,16 +153,29 @@ CREATE TABLE tb_usuario_login (
     ultima_actividad    TIMESTAMP,
     intentos_fallidos   SMALLINT     NOT NULL DEFAULT 0,
     bloqueado_hasta     TIMESTAMP,
+    rol                 VARCHAR(10)  NOT NULL DEFAULT 'CLIENTE',
+    token_hash          VARCHAR(64),
+    token_expira        TIMESTAMP,
     cliente_id          BIGINT,
 
     CONSTRAINT uq_usuario_username  UNIQUE (username),
     CONSTRAINT uq_usuario_cliente   UNIQUE (cliente_id),
     CONSTRAINT fk_usuario_cliente   FOREIGN KEY (cliente_id) REFERENCES tb_cliente (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_usuario_intentos CHECK (intentos_fallidos >= 0)
+    CONSTRAINT chk_usuario_intentos CHECK (intentos_fallidos >= 0),
+    CONSTRAINT chk_usuario_rol      CHECK (rol IN ('CLIENTE', 'EJECUTIVO')),
+    -- un ejecutivo no pertenece a un cliente; un usuario cliente siempre pertenece a uno
+    CONSTRAINT chk_usuario_rol_cliente CHECK (
+        (rol = 'EJECUTIVO' AND cliente_id IS NULL) OR (rol = 'CLIENTE' AND cliente_id IS NOT NULL))
 );
+
+-- Búsqueda del usuario por token en cada petición autenticada (solo filas con sesión activa)
+CREATE UNIQUE INDEX uq_usuario_token ON tb_usuario_login (token_hash) WHERE token_hash IS NOT NULL;
 
 COMMENT ON COLUMN tb_usuario_login.password_hash   IS 'PBKDF2-HMAC-SHA256 con sal aleatoria: pbkdf2$iteraciones$sal$hash';
 COMMENT ON COLUMN tb_usuario_login.bloqueado_hasta IS 'Bloqueo temporal tras 5 intentos fallidos de login';
+COMMENT ON COLUMN tb_usuario_login.rol          IS 'CLIENTE: solo accede a su propio registro. EJECUTIVO: puede operar sobre cualquier cliente';
+COMMENT ON COLUMN tb_usuario_login.token_hash   IS 'SHA-256 del token de sesión vigente; el token en claro nunca se guarda';
+COMMENT ON COLUMN tb_usuario_login.token_expira IS 'Vencimiento del token (5 min de inactividad; se renueva en cada petición autenticada)';
 
 -- -------------------------------------------------------------------------------------
 -- 6. Reglas de negocio garantizadas por la base de datos

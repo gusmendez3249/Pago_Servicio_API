@@ -8,6 +8,7 @@ import com.proyecto.servicios.model.GenericResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.NestedExceptionUtils;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.TransientDataAccessResourceException;
@@ -29,7 +30,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.sql.SQLException;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -42,24 +45,37 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GenericResponse<Void>> handleOnboardingException(
             OnboardingException exception) {
 
-        return ResponseEntity
-                .status(exception.getStatus())
-                .body(GenericResponse.error(
-                        exception.getCodigo(),
-                        exception.getMessage()
-                ));
+        ResponseEntity.BodyBuilder respuesta = ResponseEntity.status(exception.getStatus());
+        if (exception.getStatus() == HttpStatus.UNAUTHORIZED) {
+            // RFC 9110: toda respuesta 401 debe indicar el esquema de autenticación esperado
+            respuesta.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"onboarding\"");
+        }
+        return respuesta.body(GenericResponse.error(
+                exception.getCodigo(),
+                exception.getMessage()
+        ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<GenericResponse> dtoValidation(MethodArgumentNotValidException errors) {
-        GenericResponse genericResponse = new GenericResponse();
-        Map<String, String> listError = new HashMap<>();
+    public ResponseEntity<GenericResponse<List<Map<String, String>>>> dtoValidation(MethodArgumentNotValidException errors) {
+        Map<String, String> campos = new LinkedHashMap<>();
         for (FieldError fieldError : errors.getFieldErrors()) {
-            listError.put(fieldError.getField(), fieldError.getDefaultMessage());
+            campos.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
-        genericResponse.setCodigo(1);
-        genericResponse.setMensaje("Datos no validos" + listError);
-        return new ResponseEntity<>(genericResponse, HttpStatus.BAD_REQUEST);
+        return respuestaValidacion(campos);
+    }
+
+    /** Validación del cuerpo hecha en el servicio, después de autenticar al usuario. */
+    @ExceptionHandler(ValidacionException.class)
+    public ResponseEntity<GenericResponse<List<Map<String, String>>>> handleValidacion(ValidacionException exception) {
+        return respuestaValidacion(exception.getErrores());
+    }
+
+    /** El código coincide con el estado HTTP (como en el resto de errores) y 'data' detalla cada campo inválido. */
+    private ResponseEntity<GenericResponse<List<Map<String, String>>>> respuestaValidacion(Map<String, String> campos) {
+        List<Map<String, String>> detalle = new ArrayList<>();
+        campos.forEach((campo, mensaje) -> detalle.add(Map.of("campo", campo, "mensaje", String.valueOf(mensaje))));
+        return ResponseEntity.badRequest().body(GenericResponse.error(400, "Datos no validos" + campos, detalle));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -120,6 +136,18 @@ public class GlobalExceptionHandler {
     }
 
     // ---------- Errores de la petición HTTP (antes caían en el 500 genérico) ----------
+
+    /**
+     * Cualquier otro fallo de acceso a datos durante una consulta o una operación (los casos de BD saturada o
+     * duplicados tienen su propio manejador). Se registra el detalle y se responde un mensaje descriptivo sin
+     * exponer SQL ni nombres internos.
+     */
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<GenericResponse<Void>> handleDataAccess(DataAccessException exception) {
+        log.error("Error de acceso a datos", exception);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, 500,
+                "Ocurrió un error al acceder a la información. Intente nuevamente; si el problema continúa, contacte al administrador.");
+    }
 
     /** Cuerpo enviado con Transfer-Encoding: chunked que supera el límite (ver RequestSizeLimitFilter). */
     @ExceptionHandler(RequestSizeLimitFilter.BodyTooLargeException.class)

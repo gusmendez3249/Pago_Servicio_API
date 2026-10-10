@@ -4,10 +4,13 @@ import com.proyecto.servicios.config.onboarding.PasswordEncoderUtil;
 import com.proyecto.servicios.dto.onboarding.*;
 import com.proyecto.servicios.entity.onboarding.*;
 import com.proyecto.servicios.exception.OnboardingException;
+import com.proyecto.servicios.exception.ValidacionException;
 import com.proyecto.servicios.repositorys.onboarding.*;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,6 +26,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +46,8 @@ public class ClienteLayawayService {
     private final CatNacionalidadRepository catNacionalidadRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
     private final TransactionTemplate transactionTemplate;
+    private final SesionService sesionService;
+    private final Validator validator;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -53,11 +60,22 @@ public class ClienteLayawayService {
      * ANTES de abrir la transacción, para no retener una conexión del pool mientras tanto
      * (bajo carga con JMeter eso agotaba el pool y producía respuestas 503).
      */
-    public LayawayClienteResponse procesarOperacion(LayawayClienteRequest request) {
+    public LayawayClienteResponse procesarOperacion(LayawayClienteRequest request, String authorization) {
         Integer bandera = request.getBandera();
         if (bandera == null) {
             throw new OnboardingException("La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar).", HttpStatus.BAD_REQUEST, 400);
         }
+
+        // Orden de las comprobaciones: 1) autenticación (401), 2) autorización por rol (403), 3) validación del
+        // cuerpo (400) y 4) operación. Así quien no presenta un token válido nunca recibe el detalle de validación.
+        // El registro (bandera 1) es público: no requiere token.
+        SesionUsuario sesion = (bandera >= 2 && bandera <= 4) ? sesionService.autenticar(authorization) : null;
+        if (bandera == 3 && !sesion.esEjecutivo()) {
+            throw new OnboardingException("Solo un ejecutivo puede dar de baja clientes.", HttpStatus.FORBIDDEN, 403);
+        }
+        // Autorización a nivel de recurso: un cliente solo accede a SU registro; el ejecutivo, a cualquiera (null)
+        Long propietario = (bandera == 2 || bandera == 4) ? propietarioPermitido(sesion) : null;
+        validarCuerpo(request);
 
         return switch (bandera) {
             case 1 -> {
@@ -68,12 +86,38 @@ public class ClienteLayawayService {
             case 2 -> {
                 LoginCredencialesDto login = request.getLoginCredenciales();
                 String passwordHash = (login != null && login.getPassword() != null) ? passwordEncoderUtil.encode(login.getPassword()) : null;
-                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash));
+                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash, propietario));
             }
             case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
-            case 4 -> transactionTemplate.execute(status -> consultarClientes(request));
+            case 4 -> transactionTemplate.execute(status -> consultarClientes(request, propietario));
             default -> throw new OnboardingException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).", HttpStatus.BAD_REQUEST, 400);
         };
+    }
+
+    /** Valida el cuerpo completo (la bandera ya se validó al recibir la petición). */
+    private void validarCuerpo(LayawayClienteRequest request) {
+        Set<ConstraintViolation<LayawayClienteRequest>> violaciones = validator.validate(request);
+        if (!violaciones.isEmpty()) {
+            Map<String, String> errores = new TreeMap<>();
+            for (ConstraintViolation<LayawayClienteRequest> v : violaciones) {
+                errores.put(v.getPropertyPath().toString(), v.getMessage());
+            }
+            throw new ValidacionException(errores);
+        }
+    }
+
+    /**
+     * Para el ejecutivo devuelve null (sin restricción). Para un cliente devuelve su propio ID interno,
+     * que se agrega como condición a toda búsqueda: así, aunque envíe la llave de otro cliente, no lo encuentra.
+     */
+    private Long propietarioPermitido(SesionUsuario sesion) {
+        if (sesion.esEjecutivo()) {
+            return null;
+        }
+        if (sesion.clienteId() == null) {
+            throw new OnboardingException("El usuario no tiene un cliente asociado.", HttpStatus.FORBIDDEN, 403);
+        }
+        return sesion.clienteId();
     }
 
     private LayawayClienteResponse registrarCliente(LayawayClienteRequest request, String passwordHash) {
@@ -209,8 +253,8 @@ public class ClienteLayawayService {
                 .build();
     }
 
-    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash) {
-        ClienteEntity cliente = localizarCliente(request, "ACTUALIZAR (bandera = 2)");
+    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash, Long soloClienteId) {
+        ClienteEntity cliente = localizarCliente(request, "ACTUALIZAR (bandera = 2)", soloClienteId);
 
         if (Boolean.FALSE.equals(cliente.getActivo())) {
             throw new OnboardingException("No se puede actualizar la información de un cliente inactivo.", HttpStatus.FORBIDDEN, 403);
@@ -298,6 +342,8 @@ public class ClienteLayawayService {
             if (passwordHash != null) {
                 usuario.setPasswordHash(passwordHash);
                 usuario.setIsLoggedIn(false); // al cambiar la contraseña se cierra la sesión activa
+                usuario.setTokenHash(null);
+                usuario.setTokenExpira(null);
             }
             if (credenciales.getFaceIdBiometrico() != null) {
                 usuario.setFaceIdBiometrico(credenciales.getFaceIdBiometrico());
@@ -331,7 +377,7 @@ public class ClienteLayawayService {
     }
 
     private LayawayClienteResponse darDeBajaCliente(LayawayClienteRequest request) {
-        ClienteEntity cliente = localizarCliente(request, "ELIMINAR / BAJA LÓGICA (bandera = 3)");
+        ClienteEntity cliente = localizarCliente(request, "ELIMINAR / BAJA LÓGICA (bandera = 3)", null);
 
         // 1. Marcar cliente como inactivo
         cliente.setActivo(false);
@@ -347,6 +393,8 @@ public class ClienteLayawayService {
         // 3. Desactivar sesión de login
         usuarioLoginRepository.findByClienteId(cliente.getId()).ifPresent(u -> {
             u.setIsLoggedIn(false);
+            u.setTokenHash(null);
+            u.setTokenExpira(null);
             usuarioLoginRepository.save(u);
         });
 
@@ -378,7 +426,7 @@ public class ClienteLayawayService {
      * Los filtros de texto son "contiene" sin distinguir mayúsculas; varios filtros se combinan con AND.
      * Sin filtros devuelve todos los clientes (hasta MAX_RESULTADOS; se indica si hubo más).
      */
-    private LayawayClienteResponse consultarClientes(LayawayClienteRequest request) {
+    private LayawayClienteResponse consultarClientes(LayawayClienteRequest request, Long soloClienteId) {
         // Para la consulta solo se usa "filtros": cualquier otra sección enviada se rechaza en lugar de
         // ignorarla, porque ignorarla devolvería todos los clientes como si no hubiera filtro.
         if (request.getClienteId() != null || request.getDatosPersonales() != null || request.getDatosContacto() != null
@@ -388,9 +436,14 @@ public class ClienteLayawayService {
         }
 
         FiltrosClienteDto filtros = request.getFiltros() != null ? request.getFiltros() : new FiltrosClienteDto();
-        Specification<ClienteEntity> spec = especificacionConsulta(filtros, false);
+        Specification<ClienteEntity> spec = especificacionConsulta(filtros, false, soloClienteId);
 
         Page<ClienteEntity> pagina = clienteRepository.findAll(spec, PageRequest.of(0, MAX_RESULTADOS, Sort.by("id")));
+
+        // Se buscó un cliente concreto y no existe (o no está entre los registros a los que se tiene acceso)
+        if (!filtros.estaVacio() && pagina.isEmpty()) {
+            throw new OnboardingException("No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.", HttpStatus.NOT_FOUND, 404);
+        }
 
         List<Long> ids = pagina.getContent().stream().map(ClienteEntity::getId).toList();
         Map<Long, List<CuentaEntity>> cuentasPorCliente = ids.isEmpty() ? Map.of()
@@ -421,12 +474,17 @@ public class ClienteLayawayService {
     }
 
     /**
-     * @param exacta true = coincidencia exacta (identificar a UN cliente para modificarlo);
-     *               false = "contiene" (consulta).
+     * @param exacta       true = coincidencia exacta (identificar a UN cliente para modificarlo);
+     *                     false = "contiene" (consulta).
+     * @param soloClienteId si no es nulo, limita la búsqueda a ese cliente (autorización a nivel de recurso).
      */
-    private Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f, boolean exacta) {
+    private Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f, boolean exacta, Long soloClienteId) {
         return (root, query, cb) -> {
             List<Predicate> condiciones = new ArrayList<>();
+            if (soloClienteId != null) {
+                // Control de acceso por recurso: la búsqueda queda limitada al registro del propio usuario
+                condiciones.add(cb.equal(root.get("id"), soloClienteId));
+            }
             if (f.getCurp() != null) {
                 String curp = f.getCurp().toUpperCase(Locale.ROOT);
                 condiciones.add(exacta ? cb.equal(cb.upper(root.get("curp")), curp)
@@ -455,7 +513,7 @@ public class ClienteLayawayService {
      * que no cambian (curp, rfc, numeroCuenta) con el valor COMPLETO. Nunca se usa el ID interno.
      * Sin llaves se rechaza: de lo contrario la operación podría afectar a un cliente cualquiera.
      */
-    private ClienteEntity localizarCliente(LayawayClienteRequest request, String operacion) {
+    private ClienteEntity localizarCliente(LayawayClienteRequest request, String operacion, Long soloClienteId) {
         if (request.getClienteId() != null) {
             throw new OnboardingException("El clienteId ya no se utiliza. Para la operación " + operacion + " identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).", HttpStatus.BAD_REQUEST, 400);
         }
@@ -470,9 +528,9 @@ public class ClienteLayawayService {
         }
 
         List<ClienteEntity> encontrados = clienteRepository
-                .findAll(especificacionConsulta(filtros, true), PageRequest.of(0, 2, Sort.by("id"))).getContent();
+                .findAll(especificacionConsulta(filtros, true, soloClienteId), PageRequest.of(0, 2, Sort.by("id"))).getContent();
         if (encontrados.isEmpty()) {
-            throw new OnboardingException("No se encontró ningún cliente con las llaves indicadas.", HttpStatus.NOT_FOUND, 404);
+            throw new OnboardingException("No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.", HttpStatus.NOT_FOUND, 404);
         }
         if (encontrados.size() > 1) {
             throw new OnboardingException("Las llaves indicadas corresponden a más de un cliente.", HttpStatus.BAD_REQUEST, 400);

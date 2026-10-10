@@ -1,4 +1,4 @@
-### PETICION ALTA
+### PETICION: ALTA (bandera 1, pública: no requiere token)
 {
   "bandera": 1,
   "datosPersonales": {
@@ -44,84 +44,197 @@
   "codigo": 0,
   "mensaje": "Cliente registrado correctamente",
   "data": {
-    "clienteId": 621,
     "nombreCompleto": "Laura Elena Torres Vargas",
     "curp": "TOVL920821MGTRRR04",
     "rfc": "TOVL920821KJ3",
     "correo": "laura.torres@example.com",
     "activo": true,
-    "numeroCuenta": "981507313391",
+    "numeroCuenta": "993062645556",
     "saldoInicial": 1000.00,
     "estatusCuenta": "ACTIVA",
     "username": "laura.torres",
     "operacionRealizada": "INSERTAR",
-    "fechaOperacion": "2026-10-09T13:28:06.0285179"
+    "fechaOperacion": "2026-10-10T14:57:12.4899061"
   }
 }
 ### ALTA DUPLICADA -> HTTP 409
 {"codigo": 409, "mensaje": "Ya existe un cliente registrado con la CURP: TOVL920821MGTRRR04", "data": null}
-### VALIDACION (nombre de 2 letras y sexo en minusculas) -> HTTP 400
-{"codigo": 1, "mensaje": "Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO, datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres}", "data": null}
-### ACTUALIZAR (bandera 2: nuevo telefono y estado civil) -> HTTP 200
+### VALIDACION (nombre de 2 letras, sexo en minúsculas, contraseña débil) -> HTTP 400
 {
-  "codigo": 0,
-  "mensaje": "Cliente actualizado correctamente",
-  "data": {
-    "clienteId": 621,
-    "nombreCompleto": "Laura Elena Torres Vargas",
-    "curp": "TOVL920821MGTRRR04",
-    "rfc": "TOVL920821KJ3",
-    "correo": "laura.torres@example.com",
-    "activo": true,
-    "numeroCuenta": "981507313391",
-    "saldoInicial": 1000.00,
-    "estatusCuenta": "ACTIVA",
-    "username": null,
-    "operacionRealizada": "ACTUALIZAR",
-    "fechaOperacion": "2026-10-09T13:28:06.1095529"
-  }
+  "codigo": 400,
+  "mensaje": "Datos no validos{datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres, datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO, loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial}",
+  "data": [
+    {
+      "mensaje": "El nombre debe tener entre 3 y 50 caracteres",
+      "campo": "datosPersonales.nombre"
+    },
+    {
+      "mensaje": "El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO",
+      "campo": "datosPersonales.sexo"
+    },
+    {
+      "mensaje": "La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial",
+      "campo": "loginCredenciales.password"
+    }
+  ]
 }
-### ACTUALIZAR INTENTANDO CAMBIAR CURP -> HTTP 400
-{"codigo": 400, "mensaje": "La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.", "data": null}
-### LOGIN POR CONTRASENA (bandera 1) -> HTTP 200
+### LOGIN DEL CLIENTE (bandera 1) -> HTTP 200
 {
   "codigo": 0,
   "mensaje": "Inicio de sesión exitoso",
   "data": {
     "username": "laura.torres",
-    "clienteId": 621,
     "nombreCliente": "Laura Torres",
     "isLoggedIn": true,
-    "ultimaActividad": "2026-10-09T13:28:06.1794453",
-    "mensaje": "Inicio de sesión exitoso (Por Contraseña)"
+    "ultimaActividad": "2026-10-10T14:57:13.0095581",
+    "mensaje": "Inicio de sesión exitoso (Por Contraseña)",
+    "token": "bqeKjc…(token de 43 caracteres)",
+    "tipoToken": "Bearer",
+    "expiraEnMinutos": 5,
+    "rol": "CLIENTE"
   }
 }
-### LOGIN POR FACE ID (bandera 2) -> HTTP 200
-{"codigo": 0, "mensaje": "Inicio de sesión exitoso", "data": {"username": "laura.torres", "clienteId": 621, "nombreCliente": "Laura Torres", "isLoggedIn": true, "ultimaActividad": "2026-10-09T13:28:06.1918433", "mensaje": "Inicio de sesión exitoso (Por Face ID Biométrico)"}}
+### LOGIN DEL EJECUTIVO -> HTTP 200
+{"codigo": 0, "mensaje": "Inicio de sesión exitoso", "data": {"username": "ejecutivo.admin", "nombreCliente": "ejecutivo.admin", "isLoggedIn": true, "ultimaActividad": "2026-10-10T14:57:13.1331687", "mensaje": "Inicio de sesión exitoso (Por Contraseña)", "token": "BhmMQn…(token de 43 caracteres)", "tipoToken": "Bearer", "expiraEnMinutos": 5, "rol": "EJECUTIVO"}}
 ### LOGIN CONTRASENA INCORRECTA -> HTTP 401
 {"codigo": 401, "mensaje": "Credenciales inválidas.", "data": null}
-### LOGIN USUARIO INEXISTENTE -> HTTP 401
+### LOGIN USUARIO INEXISTENTE (mismo mensaje) -> HTTP 401
 {"codigo": 401, "mensaje": "Credenciales inválidas.", "data": null}
-### BAJA LOGICA (bandera 3) -> HTTP 200
+### CONSULTA SIN TOKEN -> HTTP 401
+WWW-Authenticate: Bearer realm="onboarding"
+{"codigo": 401, "mensaje": "Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.", "data": null}
+### CONSULTA CON TOKEN INVENTADO -> HTTP 401
+WWW-Authenticate: Bearer realm="onboarding"
+{"codigo": 401, "mensaje": "Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.", "data": null}
+### CONSULTA DEL CLIENTE SIN FILTROS (solo ve su propio registro) -> HTTP 200
+{
+  "codigo": 0,
+  "mensaje": "Consulta realizada correctamente",
+  "data": {
+    "operacionRealizada": "CONSULTAR",
+    "fechaOperacion": "2026-10-10T14:57:13.5933182",
+    "clientes": [
+      {
+        "nombreCompleto": "Laura Elena Torres Vargas",
+        "curp": "TOVL920821MGTRRR04",
+        "rfc": "TOVL920821KJ3",
+        "correo": "laura.torres@example.com",
+        "telefonoMovil": "4181234567",
+        "activo": true,
+        "fechaRegistro": "2026-10-10T14:57:12.454235",
+        "cuentas": [
+          {
+            "numeroCuenta": "993062645556",
+            "saldo": 1000.00,
+            "estatus": "ACTIVA"
+          }
+        ]
+      }
+    ],
+    "totalCoincidencias": 1,
+    "resultadosTruncados": false
+  }
+}
+### EL CLIENTE CONSULTA LA CURP DE OTRO CLIENTE -> HTTP 404
+{"codigo": 404, "mensaje": "No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.", "data": null}
+### CURP QUE NO EXISTE (mismo mensaje que el caso anterior) -> HTTP 404
+{"codigo": 404, "mensaje": "No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.", "data": null}
+### CONSULTA DEL EJECUTIVO SIN FILTROS (ve a todos) -> HTTP 200
+{
+  "codigo": 0,
+  "mensaje": "Consulta realizada correctamente",
+  "data": {
+    "operacionRealizada": "CONSULTAR",
+    "fechaOperacion": "2026-10-10T14:57:13.7243561",
+    "clientes": [
+      {
+        "nombreCompleto": "Laura Elena Torres Vargas",
+        "curp": "TOVL920821MGTRRR04",
+        "rfc": "TOVL920821KJ3",
+        "correo": "laura.torres@example.com",
+        "telefonoMovil": "4181234567",
+        "activo": true,
+        "fechaRegistro": "2026-10-10T14:57:12.454235",
+        "cuentas": [
+          {
+            "numeroCuenta": "993062645556",
+            "saldo": 1000.00,
+            "estatus": "ACTIVA"
+          }
+        ]
+      },
+      {
+        "nombreCompleto": "Pedro Elena Torres Salas",
+        "curp": "TOSP880415HGTRLD07",
+        "rfc": "TOSP880415QW9",
+        "correo": "pedro.torres@example.com",
+        "telefonoMovil": "4181234567",
+        "activo": true,
+        "fechaRegistro": "2026-10-10T14:57:12.725106",
+        "cuentas": [
+          {
+            "numeroCuenta": "499620150046",
+            "saldo": 1000.00,
+            "estatus": "ACTIVA"
+          }
+        ]
+      }
+    ],
+    "totalCoincidencias": 2,
+    "resultadosTruncados": false
+  }
+}
+### FILTRO SIN COMILLAS -> HTTP 400
+{"codigo": 400, "mensaje": "El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo \"MERG95\"), no como número ni booleano.", "data": null}
+### FILTRO QUE NO ES LLAVE -> HTTP 400
+{"codigo": 400, "mensaje": "Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}", "data": [{"mensaje": "El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta", "campo": "filtros.sinCamposDesconocidos"}]}
+### ACTUALIZAR SU PROPIO REGISTRO (bandera 2, por CURP) -> HTTP 200
+{
+  "codigo": 0,
+  "mensaje": "Cliente actualizado correctamente",
+  "data": {
+    "nombreCompleto": "Laura Elena Torres Vargas",
+    "curp": "TOVL920821MGTRRR04",
+    "rfc": "TOVL920821KJ3",
+    "correo": "laura.torres@example.com",
+    "activo": true,
+    "numeroCuenta": "993062645556",
+    "saldoInicial": 1000.00,
+    "estatusCuenta": "ACTIVA",
+    "operacionRealizada": "ACTUALIZAR",
+    "fechaOperacion": "2026-10-10T14:57:13.8056559"
+  }
+}
+### EL CLIENTE INTENTA ACTUALIZAR A OTRO CLIENTE -> HTTP 404
+{"codigo": 404, "mensaje": "No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.", "data": null}
+### ACTUALIZAR INTENTANDO CAMBIAR LA CURP -> HTTP 400
+{"codigo": 400, "mensaje": "La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.", "data": null}
+### CAMBIAR LA CONTRASENA (política: 8+, mayúscula, minúscula, número y especial) -> HTTP 200
+{"codigo": 0, "mensaje": "Cliente actualizado correctamente", "data": {"nombreCompleto": "Laura Elena Torres Vargas", "curp": "TOVL920821MGTRRR04", "rfc": "TOVL920821KJ3", "correo": "laura.torres@example.com", "activo": true, "numeroCuenta": "993062645556", "saldoInicial": 1000.00, "estatusCuenta": "ACTIVA", "operacionRealizada": "ACTUALIZAR", "fechaOperacion": "2026-10-10T14:57:13.9768323"}}
+### EL TOKEN ANTERIOR YA NO SIRVE TRAS CAMBIAR LA CONTRASENA -> HTTP 401
+WWW-Authenticate: Bearer realm="onboarding"
+{"codigo": 401, "mensaje": "Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.", "data": null}
+### EL CLIENTE INTENTA LA BAJA -> HTTP 403
+{"codigo": 403, "mensaje": "Solo un ejecutivo puede dar de baja clientes.", "data": null}
+### BAJA LOGICA POR EL EJECUTIVO (bandera 3) -> HTTP 200
 {
   "codigo": 0,
   "mensaje": "Cliente dado de baja correctamente",
   "data": {
-    "clienteId": 621,
     "nombreCompleto": "Laura Elena Torres Vargas",
     "curp": "TOVL920821MGTRRR04",
     "rfc": "TOVL920821KJ3",
     "correo": "laura.torres@example.com",
     "activo": false,
-    "numeroCuenta": "981507313391",
+    "numeroCuenta": "993062645556",
     "saldoInicial": 1000.00,
     "estatusCuenta": "INACTIVA",
-    "username": null,
     "operacionRealizada": "ELIMINAR_BAJA_LOGICA",
-    "fechaOperacion": "2026-10-09T13:28:06.3346941"
+    "fechaOperacion": "2026-10-10T14:57:14.1353992"
   }
 }
-### ACTUALIZAR CLIENTE DADO DE BAJA -> HTTP 403
-{"codigo": 403, "mensaje": "No se puede actualizar la información de un cliente inactivo.", "data": null}
+### EL TOKEN DEL CLIENTE DADO DE BAJA YA NO SIRVE -> HTTP 401
+WWW-Authenticate: Bearer realm="onboarding"
+{"codigo": 401, "mensaje": "Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.", "data": null}
 ### LOGIN TRAS LA BAJA -> HTTP 403
 {"codigo": 403, "mensaje": "El cliente asociado a este usuario se encuentra inactivo.", "data": null}

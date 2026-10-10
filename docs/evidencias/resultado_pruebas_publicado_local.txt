@@ -1,0 +1,46 @@
+Objetivo: http://localhost:8094
+
+--- Disponibilidad (si el servicio estaba dormido, la primera respuesta tarda) ---
+PASS [200 esp 200]  1083 ms  GET /api-docs (documentación OpenAPI) :: None
+PASS [200 esp 200]   111 ms  GET /swagger-ui.html :: (página HTML)
+
+--- Base de datos (Neon) y catálogo ---
+PASS [200 esp 200]    77 ms  GET catálogo de nacionalidades :: Catálogo de nacionalidades obtenido correctamente
+
+--- Registro ---
+PASS [201 esp 201]   171 ms  Alta de cliente válida :: Cliente registrado correctamente
+
+--- Sesión (token para las operaciones protegidas) ---
+PASS [200 esp 200]   156 ms  Inicio de sesión del ejecutivo :: Inicio de sesión exitoso
+
+--- Autenticación ---
+PASS [401 esp 401]    53 ms  Sin token: consulta (bandera 4) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
+PASS [401 esp 401]    64 ms  Sin token: actualización (bandera 2) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
+PASS [401 esp 401]    77 ms  Sin token: baja (bandera 3) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
+PASS [401 esp 401]    64 ms  Token inventado -> 401 :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+
+--- Registro: duplicados ---
+PASS [409 esp 409]   132 ms  Alta duplicada (misma CURP) :: Ya existe un cliente registrado con la CURP: GHNB900310HGTMWS04
+PASS [400 esp 400]    69 ms  Datos inválidos (nombre corto, sexo en minúsculas, CURP con mes 13) :: Datos no validos{datosPersonales.curp=Formato de CURP no válido, datosPersonales.nombre=El nombre debe tener e
+PASS [400 esp 400]    54 ms  Bandera como texto :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una c
+PASS [400 esp 400]    65 ms  Contraseña débil (sin mayúscula ni carácter especial) :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con a
+PASS [200 esp 200]    79 ms  Actualizar por CURP (sin ID) :: Cliente actualizado correctamente
+PASS [400 esp 400]    63 ms  Actualizar con llave incompleta :: Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12
+PASS [400 esp 400]    64 ms  Actualizar con clienteId (ya no se usa) :: El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto
+
+--- Login ---
+PASS [200 esp 200]   143 ms  Login correcto :: Inicio de sesión exitoso
+PASS [401 esp 401]   160 ms  Login con contraseña incorrecta :: Credenciales inválidas.
+PASS [401 esp 401]   142 ms  Login con usuario inexistente (mismo 401) :: Credenciales inválidas.
+
+--- Consulta (bandera 4) ---
+PASS [200 esp 200]    82 ms  Consulta por parte de la CURP :: Consulta realizada correctamente
+PASS [200 esp 200]    87 ms  Consulta sin filtros (todos los clientes) :: Consulta realizada correctamente
+PASS [400 esp 400]    66 ms  Filtro sin comillas :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni bool
+PASS [400 esp 400]    76 ms  Filtro en blanco :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 le
+PASS [400 esp 400]    68 ms  Filtro no permitido (nombre) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y n
+
+--- Limpieza: baja lógica del cliente de prueba ---
+PASS [200 esp 200]    71 ms  Baja lógica del cliente de prueba (por CURP) :: Cliente dado de baja correctamente
+
+TOTAL 25  PASS 25  FAIL 0

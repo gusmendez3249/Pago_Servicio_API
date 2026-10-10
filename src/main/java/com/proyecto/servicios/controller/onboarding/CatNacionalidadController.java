@@ -29,7 +29,8 @@ public class CatNacionalidadController {
     @Operation(summary = "Obtener catálogo de nacionalidades activas de la BD", description = "Retorna la lista de nacionalidades registradas en la tabla cat_nacionalidad.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Catálogo de nacionalidades obtenido exitosamente", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal Server Error: Error interno al consultar el catálogo en la base de datos", content = @Content(schema = @Schema(implementation = GenericResponse.class)))
+            @ApiResponse(responseCode = "500", description = "Internal Server Error: Error interno al consultar el catálogo en la base de datos", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "503", description = "Service Unavailable: base de datos saturada o no disponible; incluye `Retry-After`", content = @Content(schema = @Schema(implementation = GenericResponse.class)))
     })
     public ResponseEntity<GenericResponse<List<CatNacionalidadEntity>>> obtenerNacionalidades() {
         List<CatNacionalidadEntity> lista = catNacionalidadRepository.findByActivoTrue();

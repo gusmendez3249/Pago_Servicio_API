@@ -43,6 +43,18 @@ public class UsuarioLoginEntity {
     @Column(name = "bloqueado_hasta")
     private LocalDateTime bloqueadoHasta;
 
+    /** CLIENTE: solo accede a su propio registro. EJECUTIVO: puede operar sobre cualquier cliente. */
+    @Column(name = "rol", nullable = false, length = 10)
+    @Builder.Default
+    private String rol = "CLIENTE";
+
+    /** SHA-256 del token de sesión vigente (el token en claro no se guarda). */
+    @Column(name = "token_hash", length = 64)
+    private String tokenHash;
+
+    @Column(name = "token_expira")
+    private LocalDateTime tokenExpira;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id", referencedColumnName = "id")
     private ClienteEntity cliente;
