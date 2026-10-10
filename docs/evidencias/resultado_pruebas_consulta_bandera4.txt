@@ -9,11 +9,11 @@ PASS [200 esp 200] curp 'PEPF' -> 1 :: Consulta realizada correctamente
 PASS [200 esp 200] curp en minusculas 'pepf90' -> 1 :: Consulta realizada correctamente
 PASS [200 esp 200] curp contiene 'HGTRR' (mitad del texto) -> 1 :: Consulta realizada correctamente
 PASS [200 esp 200] curp 'G' (una letra) -> todos los que la contengan -> 3 :: Consulta realizada correctamente
-PASS [200 esp 200] curp sin coincidencias -> lista vacia :: Consulta realizada correctamente
+PASS [404 esp 404] curp sin coincidencias -> 404 descriptivo (el registro no existe) :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
 PASS [200 esp 200] rfc 'gomb85' -> 1 :: Consulta realizada correctamente
 PASS [200 esp 200] numeroCuenta (prefijo de 6) -> contiene al cliente 3 :: Consulta realizada correctamente
 PASS [200 esp 200] numeroCuenta completo -> 1 :: Consulta realizada correctamente
-PASS [200 esp 200] curp + rfc que no coinciden en el mismo cliente (AND) -> 0 :: Consulta realizada correctamente
+PASS [404 esp 404] curp + rfc que no coinciden en el mismo cliente (AND) -> 404 :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
 PASS [200 esp 200] los 4 filtros a la vez (AND) -> 1 :: Consulta realizada correctamente
 ===== DATOS DEVUELTOS =====
 PASS [200 esp 200] no expone biometricos ni credenciales :: Consulta realizada correctamente
@@ -48,13 +48,13 @@ PASS [400 esp 400] filtro 'clienteId' no permitido -> 400 (no devuelve todos) ::
 PASS [400 esp 400] filtro 'curp valida + nombre' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 ===== OTRAS SECCIONES CON BANDERA 4 =====
 PASS [400 esp 400] clienteId de nivel superior -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
-PASS [400 esp 400] datosPersonales -> 400 (no devuelve todos) :: Datos no validos{datosPersonales.sexo=El sexo es obligatorio, datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.esta
+PASS [400 esp 400] datosPersonales -> 400 (no devuelve todos) :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.apellidoPaterno=El apellido paterno es obligatori
 PASS [400 esp 400] loginCredenciales -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
 ===== OTRAS BANDERAS SIGUEN IGUAL =====
 PASS [400 esp 400] bandera 5 -> 400 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)}
 PASS [200 esp 200] baja logica (bandera 3) sigue funcionando :: Cliente dado de baja correctamente
 PASS [200 esp 200] consulta muestra al cliente dado de baja como inactivo :: Consulta realizada correctamente
 ===== VOLUMEN: todos los clientes sin filtros =====
-PASS [200 esp 200] sin filtros con 33 clientes (24 ms) :: Consulta realizada correctamente
+PASS [200 esp 200] sin filtros con 33 clientes (58 ms) :: Consulta realizada correctamente
 
 TOTAL 48  PASS 48  FAIL 0

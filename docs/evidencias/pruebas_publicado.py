@@ -8,6 +8,10 @@ Uso:
 - Despierta el servicio si está dormido (plan gratis de Render: puede tardar ~1 minuto).
 - Crea UN cliente de prueba (ocupación "Prueba automatizada") y al final lo da de baja (baja lógica),
   identificándolo por su CURP: la API ya no usa ni devuelve el ID del cliente.
+- Actualizar, consultar y dar de baja exigen token. Si define EJECUTIVO_USUARIO y EJECUTIVO_PASSWORD
+  (el ejecutivo configurado en el servidor) se usa ese usuario y se prueba todo, incluida la baja.
+  Sin ellos se usa el token del propio cliente de prueba: puede consultar y actualizar SU registro, pero
+  no darlo de baja (solo ejecutivos), así que ese paso se omite y el cliente de prueba queda activo.
 - Detecta si la versión publicada ya incluye la consulta (bandera 4).
 Solo usa la librería estándar de Python 3.10+.
 """
@@ -21,14 +25,19 @@ import urllib.error
 import urllib.request
 
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8081").rstrip("/")
+import os
+TOKEN = None
 CLI, LOGIN, CAT = "/api/v1/layaway/cliente", "/api/v1/auth/login", "/api/v1/cat/nacionalidades"
 resultados = []
 
 
-def llamar(metodo, ruta, cuerpo=None, timeout=120):
+def llamar(metodo, ruta, cuerpo=None, timeout=120, token=None, sin_token=False):
     datos = cuerpo.encode("utf-8") if isinstance(cuerpo, str) else (json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None)
     req = urllib.request.Request(BASE + ruta, data=datos, method=metodo,
                                  headers={"Content-Type": "application/json", "Accept": "application/json"})
+    # las operaciones protegidas (banderas 2, 3 y 4) llevan el token de la sesión
+    if not sin_token and (token or TOKEN) and ruta == "/api/v1/layaway/cliente":
+        req.add_header("Authorization", "Bearer " + (token or TOKEN))
     t0 = time.time()
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=ssl.create_default_context()) as r:
@@ -95,6 +104,24 @@ estado, cuerpo, ms = llamar("POST", CLI, alta)
 creado = check("Alta de cliente válida", 201, estado, cuerpo, ms,
                lambda c: len(c["data"]["numeroCuenta"]) == 12 and c["data"]["estatusCuenta"] == "ACTIVA" and c["data"]["saldoInicial"] == 1000
                and "clienteId" not in c["data"])
+print("\n--- Sesión (token para las operaciones protegidas) ---")
+usuario_ej, password_ej = os.environ.get("EJECUTIVO_USUARIO"), os.environ.get("EJECUTIVO_PASSWORD")
+modo_ejecutivo = bool(usuario_ej and password_ej)
+estado, cuerpo, ms = llamar("POST", LOGIN, {"bandera": 1, "username": usuario_ej if modo_ejecutivo else usuario,
+                                            "password": password_ej if modo_ejecutivo else "Password123!"})
+check("Inicio de sesión del " + ("ejecutivo" if modo_ejecutivo else "cliente de prueba (modo sin ejecutivo)"), 200, estado, cuerpo, ms,
+      lambda c: len(c["data"]["token"]) == 43 and "clienteId" not in c["data"])
+TOKEN = cuerpo["data"]["token"] if estado == 200 else None
+
+print("\n--- Autenticación ---")
+for etiqueta, cuerpo_peticion in [("consulta (bandera 4)", {"bandera": 4}), ("actualización (bandera 2)", {"bandera": 2, "filtros": {"curp": curp}}),
+                                  ("baja (bandera 3)", {"bandera": 3, "filtros": {"curp": curp}})]:
+    estado, cuerpo, ms = llamar("POST", CLI, cuerpo_peticion, sin_token=True)
+    check(f"Sin token: {etiqueta} -> 401", 401, estado, cuerpo, ms)
+estado, cuerpo, ms = llamar("POST", CLI, {"bandera": 4}, token="x" * 43)
+check("Token inventado -> 401", 401, estado, cuerpo, ms)
+
+print("\n--- Registro: duplicados ---")
 estado, cuerpo, ms = llamar("POST", CLI, alta)
 check("Alta duplicada (misma CURP)", 409, estado, cuerpo, ms)
 estado, cuerpo, ms = llamar("POST", CLI, alta.replace('"nombre":"Prueba"', '"nombre":"Li"').replace('"MASCULINO"', '"masculino"')
@@ -116,6 +143,8 @@ check("Actualizar con clienteId (ya no se usa)", 400, estado, cuerpo, ms)
 print("\n--- Login ---")
 estado, cuerpo, ms = llamar("POST", LOGIN, {"bandera": 1, "username": usuario, "password": "Password123!"})
 check("Login correcto", 200, estado, cuerpo, ms, lambda c: c["data"]["isLoggedIn"] is True)
+if not modo_ejecutivo and estado == 200:
+    TOKEN = cuerpo["data"]["token"]  # cada login nuevo invalida el token anterior
 estado, cuerpo, ms = llamar("POST", LOGIN, {"bandera": 1, "username": usuario, "password": "Incorrecta123"})
 check("Login con contraseña incorrecta", 401, estado, cuerpo, ms)
 estado, cuerpo, ms = llamar("POST", LOGIN, {"bandera": 1, "username": "usuario.que.no.existe", "password": "Incorrecta123"})
@@ -138,9 +167,13 @@ else:
     check("Filtro no permitido (nombre)", 400, estado, cuerpo, ms)
 
 print("\n--- Limpieza: baja lógica del cliente de prueba ---")
-if creado:
+if creado and modo_ejecutivo:
     estado, cuerpo, ms = llamar("POST", CLI, {"bandera": 3, "filtros": {"curp": curp}})
     check("Baja lógica del cliente de prueba (por CURP)", 200, estado, cuerpo, ms, lambda c: c["data"]["activo"] is False)
+elif creado:
+    estado, cuerpo, ms = llamar("POST", CLI, {"bandera": 3, "filtros": {"curp": curp}})
+    check("Un cliente NO puede dar de baja (solo ejecutivos) -> 403", 403, estado, cuerpo, ms)
+    print(f"AVISO: sin EJECUTIVO_USUARIO / EJECUTIVO_PASSWORD no se puede dar de baja el cliente de prueba; queda activo (CURP {curp}).")
 else:
     print("No se creó cliente de prueba; no hay nada que limpiar.")
 

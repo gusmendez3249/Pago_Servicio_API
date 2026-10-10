@@ -82,6 +82,40 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_Exitoso_EmiteTokenDeSesionYGuardaSoloSuHash() {
+        LoginRequest request = LoginRequest.builder().bandera(1).username("juan_perez").password("Password123!").build();
+        when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
+        when(passwordEncoderUtil.matches("Password123!", "encoded_hash")).thenReturn(true);
+        when(usuarioLoginRepository.save(any(UsuarioLoginEntity.class))).thenReturn(usuarioMock);
+
+        LoginResponse response = authService.login(request);
+
+        assertNotNull(response.getToken());
+        assertEquals(43, response.getToken().length());
+        assertEquals("Bearer", response.getTipoToken());
+        assertEquals(5, response.getExpiraEnMinutos());
+        assertEquals("CLIENTE", response.getRol());
+        // En la base solo queda el hash: el token en claro no se almacena
+        assertEquals(com.proyecto.servicios.config.onboarding.TokenUtil.hash(response.getToken()), usuarioMock.getTokenHash());
+        assertNotEquals(response.getToken(), usuarioMock.getTokenHash());
+        assertTrue(usuarioMock.getTokenExpira().isAfter(java.time.LocalDateTime.now().plusMinutes(4)));
+    }
+
+    @Test
+    void login_DosVeces_CadaSesionTieneUnTokenDistintoYElAnteriorDejaDeServir() {
+        LoginRequest request = LoginRequest.builder().bandera(2).username("juan_perez").faceIdBiometrico(9876543210L).build();
+        when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
+        when(usuarioLoginRepository.save(any(UsuarioLoginEntity.class))).thenReturn(usuarioMock);
+
+        String primero = authService.login(request).getToken();
+        String hashDelPrimero = usuarioMock.getTokenHash();
+        String segundo = authService.login(request).getToken();
+
+        assertNotEquals(primero, segundo);
+        assertNotEquals(hashDelPrimero, usuarioMock.getTokenHash());
+    }
+
+    @Test
     void login_ConBandera2_FaceIdCorrecto_Exito() {
         LoginRequest request = LoginRequest.builder()
                 .bandera(2)

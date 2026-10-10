@@ -37,14 +37,20 @@ API REST en Java / Spring Boot para registrar clientes personas físicas, valida
    ```sql
    CREATE DATABASE pago_servicios_db;
    ```
-   Las tablas las crea **Flyway automáticamente** al arrancar (migraciones `V3`, `V8` y `V9`). Para crearla manualmente se puede usar [`docs/base_de_datos/script_creacion_bd.sql`](docs/base_de_datos/script_creacion_bd.sql).
+   Las tablas las crea **Flyway automáticamente** al arrancar (migraciones `V3`, `V8`, `V9` y `V10`). Para crearla manualmente se puede usar [`docs/base_de_datos/script_creacion_bd.sql`](docs/base_de_datos/script_creacion_bd.sql).
 2. **Configurar la conexión** en `src/main/resources/application.properties` (`spring.datasource.url`, `username`, `password`). El puerto de la API es `8081`.
-3. **Compilar, probar y arrancar:**
+3. **Definir el usuario ejecutivo inicial** con variables de entorno (nunca en el código ni en `application.properties`):
+   ```powershell
+   $env:APP_EJECUTIVO_USUARIO  = "ejecutivo.admin"
+   $env:APP_EJECUTIVO_PASSWORD = "Ejecutivo#2026"   # mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial
+   ```
+   Al arrancar se crea ese usuario con rol `EJECUTIVO` si no existe. Sin él, las operaciones de actualizar, baja y consulta solo estarán disponibles para cada cliente sobre su propio registro (ver [sección 5.6](#56-autenticación-y-autorización-control-de-acceso-por-recurso)).
+4. **Compilar, probar y arrancar:**
    ```powershell
    .\gradlew.bat clean test      # pruebas unitarias
    .\gradlew.bat bootRun         # levanta la API en http://localhost:8081
    ```
-4. **Probar la API** desde Swagger UI: `http://localhost:8081/swagger-ui.html`
+5. **Probar la API** desde Swagger UI: `http://localhost:8081/swagger-ui.html`. Para las operaciones protegidas: iniciar sesión en `POST /api/v1/auth/login`, copiar `data.token` y pegarlo en el botón **Authorize**.
 
 ---
 
@@ -118,7 +124,10 @@ erDiagram
         timestamp ultima_actividad
         smallint intentos_fallidos "bloqueo tras 5"
         timestamp bloqueado_hasta
-        bigint cliente_id FK "UNIQUE"
+        varchar rol "CLIENTE o EJECUTIVO"
+        varchar token_hash UK "SHA-256 del token de sesion"
+        timestamp token_expira
+        bigint cliente_id FK "UNIQUE, nulo en ejecutivos"
     }
 ```
 
@@ -197,14 +206,17 @@ Contenido íntegro en [`docs/base_de_datos/script_creacion_bd.sql`](docs/base_de
 | Método | Endpoint | Descripción |
 |---|---|---|
 | `POST` | `/api/v1/layaway/cliente` | Operación unificada de clientes, según el campo `bandera`: **1** = registrar, **2** = actualizar, **3** = baja lógica, **4** = consultar |
-| `POST` | `/api/v1/auth/login` | Inicio de sesión: **1** = contraseña, **2** = Face ID |
+| `POST` | `/api/v1/auth/login` | Inicio de sesión: **1** = contraseña, **2** = Face ID. Devuelve el **token** de sesión y el rol |
 | `GET` | `/api/v1/cat/nacionalidades` | Catálogo de nacionalidades activas |
 
-Todas las respuestas usan el mismo envoltorio:
+Todas las respuestas —de éxito y de error— usan el mismo envoltorio, y en los errores `codigo` es siempre el estado HTTP:
 
 ```json
 { "codigo": 0, "mensaje": "Cliente registrado correctamente", "data": { } }
+{ "codigo": 404, "mensaje": "No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.", "data": null }
 ```
+
+Las operaciones de **actualizar, baja y consulta** requieren un token (`Authorization: Bearer <token>`) y aplican control de acceso por recurso: ver las secciones [5.6](#56-autenticación-y-autorización-control-de-acceso-por-recurso) y [5.7](#57-escenarios-de-error-por-endpoint).
 
 ### 5.1 Operaciones del endpoint de clientes
 
@@ -309,17 +321,20 @@ Pruebas: 48 casos contra la API real ([resultado](docs/evidencias/resultado_prue
 
 ### 5.4 Códigos de respuesta
 
+El campo `codigo` del cuerpo coincide con el estado HTTP en todos los errores del módulo de onboarding.
+
 | HTTP | Cuándo |
 |---|---|
 | 200 / 201 | Operación exitosa (201 en el registro) |
-| 400 | Error de validación, JSON mal formado, tipo de dato incorrecto, intento de cambiar CURP/RFC |
-| 401 | Credenciales inválidas (mismo mensaje si el usuario no existe o la contraseña es incorrecta) |
-| 403 | Actualizar un cliente dado de baja, o iniciar sesión con un cliente inactivo |
-| 404 | Cliente inexistente, o nacionalidad fuera del catálogo |
+| 400 | Error de validación (el detalle por campo viene en `data`), JSON mal formado, tipo de dato incorrecto, llave ausente o incompleta, intento de cambiar CURP/RFC |
+| 401 | **Falta el token**, el esquema no es `Bearer`, el token es inválido o la sesión expiró; o credenciales inválidas en el login (mismo mensaje si el usuario no existe o la contraseña es incorrecta). Incluye `WWW-Authenticate: Bearer` |
+| 403 | Un cliente intenta dar de baja (solo ejecutivos), actualizar un cliente dado de baja, o el cliente asociado al token está inactivo |
+| 404 | **El registro no existe o no está entre los que el usuario puede ver** (misma respuesta en ambos casos), o nacionalidad fuera del catálogo |
 | 405 / 415 | Método HTTP o `Content-Type` no soportado |
 | 409 | CURP, RFC, correo o username ya registrados (también en altas simultáneas) |
 | 413 | Cuerpo de la petición mayor a 64 KB (con o sin `Content-Length`) |
 | 423 | Cuenta bloqueada 15 minutos tras 5 intentos fallidos de login |
+| 500 | Fallo inesperado o error al acceder a los datos (mensaje genérico; el detalle solo se registra en el log) |
 | 503 | Base de datos saturada o no disponible (incluye `Retry-After`) |
 
 ### 5.5 Ejemplos reales
@@ -382,9 +397,84 @@ Actualizar cliente dado de baja    -> 403 {"codigo": 403, "mensaje": "No se pued
 Login tras la baja                 -> 403 {"codigo": 403, "mensaje": "El cliente asociado a este usuario se encuentra inactivo."}
 ```
 
-**Baja lógica (bandera 3):** `{"bandera": 3, "filtros": {"curp": "TOVL920821MGTRRR04"}}` → `200`, con `"activo": false` y `"estatusCuenta": "INACTIVA"`.
+**Baja lógica (bandera 3, con el token de un ejecutivo):** `{"bandera": 3, "filtros": {"curp": "TOVL920821MGTRRR04"}}` → `200`, con `"activo": false` y `"estatusCuenta": "INACTIVA"`.
 
-**Login (bandera 1):** `{"bandera": 1, "username": "laura.torres", "password": "Password123!"}` → `200` con `"isLoggedIn": true`.
+**Login (bandera 1):** `{"bandera": 1, "username": "laura.torres", "password": "Password123!"}` → `200` con `"isLoggedIn": true` y el `token` de sesión (ver [sección 5.6](#56-autenticación-y-autorización-control-de-acceso-por-recurso)).
+
+### 5.6 Autenticación y autorización (control de acceso por recurso)
+
+Ninguna operación usa el ID interno del cliente (ni en la URL, ni en el cuerpo, ni en las respuestas): no hay un identificador que se pueda "modificar" para llegar al registro de otra persona. Además, cada petición protegida se autentica y se autoriza en el servidor.
+
+**Flujo**
+
+1. `POST /api/v1/auth/login` con usuario y contraseña (o Face ID) → la respuesta incluye el token:
+   ```json
+   { "codigo": 0, "mensaje": "Inicio de sesión exitoso",
+     "data": { "username": "gustavo.mendez", "nombreCliente": "Gustavo Mendez", "isLoggedIn": true,
+               "token": "9XgXIMuPAEPVF5ZwJTl_aYNuMUcrEFvbSQKJGkuTSf4", "tipoToken": "Bearer",
+               "expiraEnMinutos": 5, "rol": "CLIENTE" } }
+   ```
+2. En las operaciones protegidas se envía `Authorization: Bearer <token>`. En Swagger UI: botón **Authorize** (pegar solo el token).
+
+**Quién puede hacer qué**
+
+| Operación | Token | Rol `CLIENTE` | Rol `EJECUTIVO` |
+|---|---|---|---|
+| Registro (bandera 1), login y catálogo | No (públicos) | — | — |
+| Actualizar (bandera 2) | Sí | Solo **su propio** registro | Cualquier cliente |
+| Baja lógica (bandera 3) | Sí | **403** | Cualquier cliente |
+| Consulta (bandera 4) | Sí | Solo **su propio** registro: sin filtros devuelve únicamente el suyo | Todos los clientes |
+
+**Cómo se garantiza el acceso por recurso**
+
+- Para un `CLIENTE`, el servidor agrega a la búsqueda la condición *"el registro es el del propio usuario"* **antes** de consultar. Enviar la CURP, el RFC o la cuenta de otra persona devuelve **404**, exactamente igual que si no existiera: no se revela qué registros existen.
+- Orden de comprobaciones: **1)** token (401) → **2)** permiso por rol (403) → **3)** validación del cuerpo (400) → **4)** existencia del registro (404). Así, quien no presenta un token válido no recibe nunca el detalle de las reglas de validación.
+- La baja y el cambio de contraseña cierran la sesión del cliente afectado.
+
+**El token**
+
+- 256 bits aleatorios (`SecureRandom`). En la base de datos solo se guarda su hash SHA-256 (`token_hash`): una filtración de la tabla no permite usar tokens vigentes.
+- Vence tras **5 minutos sin actividad**; cada petición autenticada lo renueva. Un nuevo inicio de sesión invalida el token anterior del mismo usuario.
+- Un token ausente, mal formado, inventado o vencido responde 401 con `WWW-Authenticate: Bearer`.
+
+**Roles y usuario ejecutivo.** Los clientes se registran con rol `CLIENTE`. El ejecutivo no pertenece a ningún cliente y se crea al arrancar con las variables de entorno `APP_EJECUTIVO_USUARIO` y `APP_EJECUTIVO_PASSWORD` (la contraseña cumple la misma política y no se guarda en el código). La base lo garantiza con la restricción `chk_usuario_rol_cliente`.
+
+### 5.7 Escenarios de error por endpoint
+
+Cada escenario se probó con la API en ejecución (ver [sección 9](#9-evidencias-de-pruebas)); también están documentados en Swagger UI, en cada operación.
+
+**`POST /api/v1/layaway/cliente`**
+
+| Código | Escenario | Mensaje (resumen) |
+|---|---|---|
+| 400 | Bandera ausente o fuera de 1–4; cuerpo inválido (nombre corto, catálogos, CURP/RFC, teléfono, contraseña débil…), con el detalle de cada campo en `data` | `Datos no validos{campo=motivo}` |
+| 400 | JSON mal formado, tipo incorrecto (bandera como texto, filtro sin comillas) | `Error de formato…` / `…debe enviarse como texto entre comillas` |
+| 400 | Bandera 2 o 3 sin llaves, con llave incompleta, con un filtro que no es llave o con `clienteId` | `…use el valor COMPLETO de la llave…` |
+| 400 | Se intenta cambiar CURP, RFC o el usuario | `La CURP no puede modificarse…` |
+| 401 | Banderas 2, 3 y 4 sin token, con esquema distinto de Bearer, token inválido o sesión expirada | `Se requiere autenticación…` / `Token inválido o sesión expirada…` |
+| 403 | Un cliente intenta la baja; actualizar un cliente dado de baja; cliente del token inactivo | `Solo un ejecutivo puede dar de baja clientes.` |
+| 404 | Ningún cliente coincide con las llaves o filtros **entre los registros a los que se tiene acceso**; nacionalidad fuera del catálogo | `No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.` |
+| 409 | CURP, RFC, correo o usuario ya registrados (también por altas simultáneas); nuevo correo ya usado | `Ya existe un cliente registrado con la CURP: …` |
+| 413 / 415 | Cuerpo mayor a 64 KB / `Content-Type` distinto de JSON | `El cuerpo de la petición excede…` |
+| 500 / 503 | Fallo inesperado o de acceso a datos / base saturada (con `Retry-After`) | `Ocurrió un error al acceder a la información…` |
+
+**`POST /api/v1/auth/login`**
+
+| Código | Escenario |
+|---|---|
+| 200 | Credenciales correctas: devuelve token, tipo, vigencia y rol |
+| 400 | Formato inválido, bandera desconocida, falta la contraseña (bandera 1) o el Face ID (bandera 2) |
+| 401 | Usuario inexistente, contraseña o Face ID incorrectos (mismo mensaje y mismo tiempo de respuesta) |
+| 403 | Credenciales correctas pero el cliente está inactivo |
+| 423 | Cuenta bloqueada 15 minutos tras 5 intentos fallidos |
+| 413 / 415 / 500 / 503 | Como en el endpoint de clientes |
+
+**`GET /api/v1/cat/nacionalidades`**
+
+| Código | Escenario |
+|---|---|
+| 200 | Catálogo de nacionalidades activas |
+| 500 / 503 | Error al consultar la base de datos / base saturada |
 
 ---
 
@@ -407,19 +497,24 @@ Cada regla se valida en el API **y** en la base de datos, para que no pueda salt
 
 ## 7. Manejo de excepciones
 
-La aplicación usa la excepción de negocio `OnboardingException` (mensaje + código HTTP), y `GlobalExceptionHandler` (`@RestControllerAdvice`) traduce todos los errores al envoltorio estándar sin exponer detalles internos (SQL, clases o trazas).
+El manejo es **centralizado**: `GlobalExceptionHandler` (`@RestControllerAdvice`) traduce todas las excepciones al mismo envoltorio `{ codigo, mensaje, data }`, con `codigo` igual al estado HTTP, y nunca expone detalles internos (SQL, clases o trazas): esos solo se registran en el log. Las reglas de negocio se lanzan como `OnboardingException` (mensaje + estado HTTP) y los errores de validación del cuerpo como `ValidacionException`.
 
 | Caso | Respuesta |
 |---|---|
-| Cliente ya registrado (correo o username duplicados) | 409 |
+| Error de validación (bandera o cuerpo) | **400**, `codigo: 400`, `mensaje: "Datos no validos{campo=motivo…}"` y en `data` la lista `[{ "campo": "...", "mensaje": "..." }]` |
+| JSON mal formado o tipo de dato incorrecto | 400 con un mensaje específico (fecha, teléfono, bandera, filtro sin comillas…) |
+| Falta el token, token inválido o sesión expirada | **401** + `WWW-Authenticate: Bearer` |
+| Sin permiso por rol, cliente inactivo, actualizar un cliente dado de baja | **403** |
+| Registro inexistente o fuera de los registros accesibles | **404** `No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.` |
 | CURP duplicada | 409 `Ya existe un cliente registrado con la CURP: ...` |
 | RFC duplicado | 409 `Ya existe un cliente registrado con el RFC: ...` |
-| Cliente no encontrado | 404 `Cliente no encontrado con ID: ...` |
-| Cuenta no encontrada | No ocurre en los endpoints actuales: la cuenta se crea en la misma transacción que el cliente; si un cliente no tuviera cuenta, la respuesta devuelve `numeroCuenta: "N/A"` |
-| Error de validación | 400 con el detalle de cada campo inválido |
+| Correo o usuario ya registrados | 409 |
 | Duplicado por condición de carrera (dos altas simultáneas) | 409 (se traduce el error `23505` de PostgreSQL) |
-| Base de datos saturada | 503 + `Retry-After` |
-| Cualquier error no previsto | 500 genérico; el detalle solo se escribe en el log |
+| Cuenta no encontrada | No ocurre en los endpoints actuales: la cuenta se crea en la misma transacción que el cliente; si un cliente no tuviera cuenta, la respuesta devuelve `numeroCuenta: "N/A"` |
+| Error al acceder a los datos durante una consulta u operación | **500** `Ocurrió un error al acceder a la información. Intente nuevamente…` (sin SQL) |
+| Base de datos saturada o no disponible | 503 + `Retry-After` |
+| Método, `Content-Type` o ruta no soportados | 405 / 415 / 404 |
+| Cualquier otro error no previsto | 500 genérico |
 
 ## 8. Seguridad y resistencia a carga
 
@@ -435,6 +530,11 @@ La aplicación usa la excepción de negocio `OnboardingException` (mensaje + có
 | Números de cuenta predecibles | `SecureRandom` |
 | Agotamiento del pool bajo carga | El hash PBKDF2 se calcula **fuera** de la transacción; pool Hikari configurable y respuesta 503 controlada |
 | Altas simultáneas con el mismo CURP | `UNIQUE` en BD + traducción del error a 409 (nunca 500) |
+| Acceder a los datos de otro cliente cambiando la llave enviada | Autorización por recurso: la búsqueda de un `CLIENTE` se limita a su propio registro; no existe ID en URL ni respuestas |
+| Enumerar qué registros existen | "No existe" y "no es tuyo" devuelven el mismo 404 con el mismo mensaje |
+| Operaciones sin autenticar | Token obligatorio en actualizar, baja y consulta; baja solo para ejecutivos |
+| Robo de tokens desde la base | Solo se guarda el hash SHA-256; vencen a los 5 min de inactividad; el cambio de contraseña y la baja los invalidan |
+| Sondeo de reglas de validación sin sesión | Primero se autentica (401) y después se valida el cuerpo (400) |
 
 ---
 
@@ -442,17 +542,20 @@ La aplicación usa la excepción de negocio `OnboardingException` (mensaje + có
 
 ### 9.1 Evidencias en Swagger UI — un caso de éxito y uno de error por endpoint
 
-Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagger-ui.html` → *Try it out* → *Execute*) sobre una base de datos de pruebas. Cada captura muestra el cuerpo enviado, el `curl` generado, la URL, el código HTTP y la respuesta del servidor. Archivos y script para reproducirlas: [`docs/evidencias/swagger`](docs/evidencias/swagger).
+Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagger-ui.html` → *Try it out* → *Execute*) sobre una base de datos de pruebas. Las operaciones protegidas se ejecutaron con el botón **Authorize** y un token real. Cada captura muestra el cuerpo enviado, el `curl` generado, la URL, el código HTTP y la respuesta del servidor. Archivos y script para reproducirlas: [`docs/evidencias/swagger`](docs/evidencias/swagger).
 
 ![Vista general de Swagger UI](docs/evidencias/swagger/00_swagger_vista_general.png)
 
 | Endpoint | Caso | Petición | Resultado | Captura |
 |---|---|---|---|---|
-| `POST /api/v1/layaway/cliente` | ✅ Éxito | Registro (`bandera: 1`) con datos válidos | **201** · cliente creado, cuenta de 12 dígitos, saldo 1000, `ACTIVA` | [01_cliente_exito_201.png](docs/evidencias/swagger/01_cliente_exito_201.png) |
-| `POST /api/v1/layaway/cliente` | ❌ Error | Nombre de 2 letras, sexo `masculino`, CURP con mes 13 y teléfono de 9 dígitos | **400** · detalle de los 4 campos inválidos | [02_cliente_error_400.png](docs/evidencias/swagger/02_cliente_error_400.png) |
-| `POST /api/v1/auth/login` | ✅ Éxito | Usuario y contraseña del cliente registrado | **200** · `isLoggedIn: true` | [03_login_exito_200.png](docs/evidencias/swagger/03_login_exito_200.png) |
-| `POST /api/v1/auth/login` | ❌ Error | Contraseña incorrecta | **401** · `Credenciales inválidas.` | [04_login_error_401.png](docs/evidencias/swagger/04_login_error_401.png) |
-| `GET /api/v1/cat/nacionalidades` | ✅ Éxito | Consulta del catálogo | **200** · nacionalidades activas | [05_catalogo_nacionalidades_exito_200.png](docs/evidencias/swagger/05_catalogo_nacionalidades_exito_200.png) |
+| `POST /api/v1/layaway/cliente` | ✅ Éxito | Registro (`bandera: 1`) con datos válidos | **201** · cliente creado, cuenta de 12 dígitos, saldo 1000, `ACTIVA`; sin ID en la respuesta | [01](docs/evidencias/swagger/01_cliente_exito_201.png) |
+| `POST /api/v1/layaway/cliente` | ❌ Error | Nombre de 2 letras, sexo `masculino`, CURP con mes 13, teléfono de 9 dígitos y contraseña débil | **400** · `codigo: 400` y el detalle de cada campo en `data` | [02](docs/evidencias/swagger/02_cliente_error_400.png) |
+| `POST /api/v1/auth/login` | ✅ Éxito | Usuario y contraseña del cliente registrado | **200** · `token`, `tipoToken`, `expiraEnMinutos` y `rol` | [03](docs/evidencias/swagger/03_login_exito_200.png) |
+| `POST /api/v1/auth/login` | ❌ Error | Contraseña incorrecta | **401** · `Credenciales inválidas.` | [04](docs/evidencias/swagger/04_login_error_401.png) |
+| `GET /api/v1/cat/nacionalidades` | ✅ Éxito | Consulta del catálogo | **200** · nacionalidades activas | [05](docs/evidencias/swagger/05_catalogo_nacionalidades_exito_200.png) |
+| `POST /api/v1/layaway/cliente` (bandera 4) | ✅ Éxito | Consulta por CURP con el token del **ejecutivo** | **200** · cliente con su cuenta, sin ID | [06](docs/evidencias/swagger/06_cliente_consulta_ejecutivo_exito_200.png) |
+| `POST /api/v1/layaway/cliente` (bandera 4) | ❌ Error | La misma consulta **sin token** | **401** · `Se requiere autenticación…` | [07](docs/evidencias/swagger/07_cliente_consulta_sin_token_error_401.png) |
+| `POST /api/v1/layaway/cliente` (bandera 4) | ❌ Error | Un **cliente** consulta la CURP de **otro** cliente | **404** · `No se encontró ningún cliente… entre los registros a los que tiene acceso.` | [08](docs/evidencias/swagger/08_cliente_consulta_registro_ajeno_error_404.png) |
 
 **`POST /api/v1/layaway/cliente` — éxito (201)**
 
@@ -474,19 +577,33 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 
 ![Catálogo de nacionalidades](docs/evidencias/swagger/05_catalogo_nacionalidades_exito_200.png)
 
-> El endpoint del catálogo solo consulta una tabla y no tiene un caso de error propio; los errores del servidor se manejan de forma genérica (500) como se describe en la sección 7.
+**Consulta autorizada por el ejecutivo (200)**
 
-### 9.2 Pruebas unitarias — 180 de 180 exitosas
+![Consulta con token de ejecutivo](docs/evidencias/swagger/06_cliente_consulta_ejecutivo_exito_200.png)
+
+**Consulta sin token (401)**
+
+![Consulta sin token](docs/evidencias/swagger/07_cliente_consulta_sin_token_error_401.png)
+
+**Un cliente intenta ver el registro de otro (404)**
+
+![Cliente consulta registro ajeno](docs/evidencias/swagger/08_cliente_consulta_registro_ajeno_error_404.png)
+
+> El endpoint del catálogo solo consulta una tabla y no tiene un caso de error propio; los errores del servidor se manejan de forma centralizada (500/503) como se describe en la sección 7.
+
+### 9.2 Pruebas unitarias — 223 de 223 exitosas
 
 `.\gradlew.bat test` (JUnit 5 + Mockito):
 
 | Clase | Pruebas | Qué valida |
 |---|---|---|
 | `DatosPersonalesDtoValidationTest` | 52 | Nombres (mínimo 3), catálogos estrictos de sexo y estado civil, formato de nacionalidad e intentos de inyección |
-| `FiltrosClienteDtoTest` | 37 | Llaves de la consulta (bandera 4): comillas, valores en blanco, comodines, longitud y campos no permitidos (incluido `clienteId`) |
-| `LoginCredencialesDtoPasswordTest` | 52 | Política de contraseña: 8 a 72 caracteres, 1 mayúscula, 1 minúscula, 1 número, 1 carácter especial, sin espacios (cada símbolo ASCII) |
-| `ClienteLayawayServiceTest` | 20 | Alta, baja lógica y actualización por llaves (sin ID, llave incompleta, inexistente → 404), cambio de contraseña, consulta (todos los clientes, filtros, tope, secciones no permitidas), CURP inmutable, sin contraseña por defecto, nacionalidad fuera de catálogo, número de cuenta de 12 dígitos |
-| `AuthServiceTest` | 6 | Login por contraseña y Face ID, mismo 401 para usuario inexistente, registro de intentos fallidos, cuenta bloqueada (423), no revelar cliente inactivo |
+| `LoginCredencialesDtoPasswordTest` | 52 | Política de contraseña: 8 a 72 caracteres, 1 mayúscula, 1 minúscula, 1 número, 1 carácter especial, sin espacios |
+| `FiltrosClienteDtoTest` | 37 | Llaves de la consulta: comillas, valores en blanco, comodines, longitud y campos no permitidos (incluido `clienteId`) |
+| `ClienteLayawayServiceTest` | 32 | Alta, baja y actualización por llaves, consulta, cambio de contraseña, 404 de registro inexistente, **autenticación y autorización** (sin token, cliente sin permiso de baja, orden 401 → 403 → 400) |
+| `SesionServiceTest` | 20 | Token vigente y renovación, encabezados ausentes o mal formados, token inexistente, vencido, sesión cerrada, cliente inactivo, solo se busca el hash |
+| `GlobalExceptionHandlerTest` | 9 | Manejo centralizado: 400 con detalle por campo, 401 con `WWW-Authenticate`, 403, 404, 415, 500 sin exponer SQL; `codigo` = estado HTTP |
+| `AuthServiceTest` | 8 | Login por contraseña y Face ID, token de sesión (solo se guarda su hash), 401 uniforme, intentos fallidos, bloqueo |
 | `PasswordEncoderUtilTest` | 3 | Sal aleatoria (hashes distintos), compatibilidad con hashes antiguos, hashes malformados |
 | `ProductosServiceImplTest` | 10 | Módulo GestoPago (anexo) |
 
@@ -505,7 +622,27 @@ Script reproducible (solo librería estándar de Python): [`docs/evidencias/prue
 | Login | 15 | Contraseña por defecto, fuerza bruta (bloqueo al 5.º intento), enumeración por código y por **tiempo** (51 ms contra 51 ms) |
 | Concurrencia y carga | 3 | 30 altas simultáneas con la misma CURP (1 creada, 29 rechazadas con 409); **600 altas con 100 hilos: 0 errores (134 altas/s)**; 400 logins concurrentes |
 
-### 9.4 Reglas en la base de datos — 12 de 12
+### 9.4 Autenticación y autorización a nivel de recurso — 52 de 52 exitosas
+
+Script: [`docs/evidencias/pruebas_autorizacion.py`](docs/evidencias/pruebas_autorizacion.py) · resultado: [`docs/evidencias/resultado_pruebas_autorizacion.txt`](docs/evidencias/resultado_pruebas_autorizacion.txt). Dos clientes (Alicia y Beto) y un ejecutivo contra PostgreSQL:
+
+| Escenario | Resultado |
+|---|---|
+| Banderas 2, 3 y 4 sin token, con token inventado, corto, con comillas o `<script>`, con esquema Basic o `Bearer` vacío | **401** y `WWW-Authenticate: Bearer` |
+| Alicia consulta **sin filtros** | Solo ve su propio registro (no la lista completa) |
+| Alicia consulta la CURP, el RFC, la cuenta o un fragmento de la CURP de Beto | **404**, con el mismo mensaje que un registro que no existe |
+| Alicia intenta **actualizar** o **cambiar la contraseña** de Beto | **404**; se comprobó después que los datos de Beto no cambiaron y que él sigue entrando con su contraseña |
+| Alicia intenta la baja (propia o de Beto) | **403** (solo ejecutivos) |
+| Alicia cambia su contraseña | Su token anterior deja de servir (401) y entra con la nueva |
+| El ejecutivo consulta, actualiza y da de baja a Beto | **200**; tras la baja el token de Beto da 401 y su login da 403 |
+| Errores: validación, JSON roto, `Content-Type` y método incorrectos, ruta inexistente | Todos con `codigo` = estado HTTP y `{codigo, mensaje, data}` |
+| Respuestas del alta, login, consulta y baja | Ninguna incluye el ID del cliente |
+
+La expiración del token (5 minutos) se verificó además con datos reales: con `token_expira` en el pasado la petición responde 401 y la sesión queda cerrada; en la base solo existe el hash del token (64 caracteres), nunca el token en claro.
+
+También se verificó el servicio contra una instancia publicada con [`docs/evidencias/pruebas_publicado.py`](docs/evidencias/pruebas_publicado.py) (25 casos; con `EJECUTIVO_USUARIO`/`EJECUTIVO_PASSWORD` prueba además la baja).
+
+### 9.5 Reglas en la base de datos — 12 de 12
 
 La base rechaza por sí misma los datos inválidos aunque se manipule por SQL directo (sexo en minúsculas, nacionalidad fuera del catálogo, menor de edad, saldo negativo, borrado físico, reactivar la cuenta de un cliente dado de baja…). Detalle: [`docs/evidencias/pruebas_reglas_base_de_datos.txt`](docs/evidencias/pruebas_reglas_base_de_datos.txt)
 
@@ -520,15 +657,16 @@ src/main/java/com/proyecto/servicios/
 │   ├── AuthController.java             # POST /api/v1/auth/login
 │   └── CatNacionalidadController.java  # GET  /api/v1/cat/nacionalidades
 ├── service/onboarding/
-│   ├── ClienteLayawayService.java      # Lógica de negocio: alta + cuenta automática, actualización, baja lógica
-│   └── AuthService.java                # Login, bloqueo por intentos, expiración de sesión
+│   ├── ClienteLayawayService.java      # Lógica de negocio: alta + cuenta automática, actualización, baja lógica, consulta; autorización por recurso
+│   ├── AuthService.java                # Login (emite el token), bloqueo por intentos, expiración de sesión
+│   └── SesionService.java              # Autenticación de cada petición protegida por token (Bearer)
 ├── entity/onboarding/                  # Entidades JPA: Cliente, Domicilio, Cuenta, UsuarioLogin, CatNacionalidad
 ├── repositorys/onboarding/             # Repositorios Spring Data JPA (incluye las consultas solicitadas)
 ├── dto/onboarding/                     # DTO de petición/respuesta con Bean Validation
 ├── validation/                         # @MayorDeEdad, @DosDecimales, FechaEstrictaDeserializer
-├── exception/                          # OnboardingException + GlobalExceptionHandler
-└── config/                             # Pool de BD, Flyway, Jackson estricto, límite de tamaño, PasswordEncoderUtil
-src/main/resources/db/migration/        # Migraciones Flyway (V3, V8, V9 para onboarding)
+├── exception/                          # OnboardingException, ValidacionException + GlobalExceptionHandler (manejo centralizado)
+└── config/                             # Pool de BD, Flyway, Jackson estricto, límite de tamaño, PasswordEncoderUtil, TokenUtil, usuario ejecutivo inicial, esquema de seguridad de Swagger
+src/main/resources/db/migration/        # Migraciones Flyway (V3, V8, V9 y V10 para onboarding)
 src/test/java/                          # Pruebas unitarias
 docs/
 ├── base_de_datos/                      # Script de creación y diagrama ER

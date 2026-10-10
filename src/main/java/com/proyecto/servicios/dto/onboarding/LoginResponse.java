@@ -18,4 +18,11 @@ public class LoginResponse {
     private Boolean isLoggedIn;
     private LocalDateTime ultimaActividad;
     private String mensaje;
+
+    /** Token de sesión: se envía en las peticiones protegidas como "Authorization: Bearer <token>". */
+    private String token;
+    private String tipoToken;
+    /** Minutos de inactividad tras los cuales vence la sesión. */
+    private Integer expiraEnMinutos;
+    private String rol;
 }

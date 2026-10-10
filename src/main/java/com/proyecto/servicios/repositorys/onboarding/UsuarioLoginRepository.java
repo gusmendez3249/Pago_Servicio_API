@@ -16,6 +16,8 @@ public interface UsuarioLoginRepository extends JpaRepository<UsuarioLoginEntity
 
     Optional<UsuarioLoginEntity> findByUsername(String username);
 
+    Optional<UsuarioLoginEntity> findByTokenHash(String tokenHash);
+
     Optional<UsuarioLoginEntity> findByFaceIdBiometrico(Long faceIdBiometrico);
 
     Optional<UsuarioLoginEntity> findByUsernameAndFaceIdBiometrico(String username, Long faceIdBiometrico);
