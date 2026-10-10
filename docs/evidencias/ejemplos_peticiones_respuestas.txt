@@ -1,0 +1,127 @@
+### PETICION ALTA
+{
+  "bandera": 1,
+  "datosPersonales": {
+    "nombre": "Laura",
+    "segundoNombre": "Elena",
+    "apellidoPaterno": "Torres",
+    "apellidoMaterno": "Vargas",
+    "fechaNacimiento": "1992-08-21",
+    "curp": "TOVL920821MGTRRR04",
+    "rfc": "TOVL920821KJ3",
+    "sexo": "FEMENINO",
+    "nacionalidad": "MEXICANA",
+    "estadoCivil": "CASADO"
+  },
+  "datosContacto": {
+    "correo": "laura.torres@example.com",
+    "telefonoMovil": 4181234567,
+    "telefonoAlt": 4187654321
+  },
+  "domicilio": {
+    "calle": "Hidalgo",
+    "numeroExterior": "123",
+    "numeroInterior": "A",
+    "colonia": "Centro",
+    "municipio": "Dolores Hidalgo",
+    "estado": "Guanajuato",
+    "codigoPostal": "37800",
+    "pais": "MEXICO"
+  },
+  "informacionLaboral": {
+    "ocupacion": "Contadora",
+    "empresa": "Tech Corp",
+    "ingresoMensual": 15000.00
+  },
+  "loginCredenciales": {
+    "username": "laura.torres",
+    "password": "Password123!",
+    "faceIdBiometrico": 987654321
+  }
+}
+### ALTA (bandera 1) -> HTTP 201
+{
+  "codigo": 0,
+  "mensaje": "Cliente registrado correctamente",
+  "data": {
+    "clienteId": 621,
+    "nombreCompleto": "Laura Elena Torres Vargas",
+    "curp": "TOVL920821MGTRRR04",
+    "rfc": "TOVL920821KJ3",
+    "correo": "laura.torres@example.com",
+    "activo": true,
+    "numeroCuenta": "981507313391",
+    "saldoInicial": 1000.00,
+    "estatusCuenta": "ACTIVA",
+    "username": "laura.torres",
+    "operacionRealizada": "INSERTAR",
+    "fechaOperacion": "2026-10-09T13:28:06.0285179"
+  }
+}
+### ALTA DUPLICADA -> HTTP 409
+{"codigo": 409, "mensaje": "Ya existe un cliente registrado con la CURP: TOVL920821MGTRRR04", "data": null}
+### VALIDACION (nombre de 2 letras y sexo en minusculas) -> HTTP 400
+{"codigo": 1, "mensaje": "Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO, datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres}", "data": null}
+### ACTUALIZAR (bandera 2: nuevo telefono y estado civil) -> HTTP 200
+{
+  "codigo": 0,
+  "mensaje": "Cliente actualizado correctamente",
+  "data": {
+    "clienteId": 621,
+    "nombreCompleto": "Laura Elena Torres Vargas",
+    "curp": "TOVL920821MGTRRR04",
+    "rfc": "TOVL920821KJ3",
+    "correo": "laura.torres@example.com",
+    "activo": true,
+    "numeroCuenta": "981507313391",
+    "saldoInicial": 1000.00,
+    "estatusCuenta": "ACTIVA",
+    "username": null,
+    "operacionRealizada": "ACTUALIZAR",
+    "fechaOperacion": "2026-10-09T13:28:06.1095529"
+  }
+}
+### ACTUALIZAR INTENTANDO CAMBIAR CURP -> HTTP 400
+{"codigo": 400, "mensaje": "La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.", "data": null}
+### LOGIN POR CONTRASENA (bandera 1) -> HTTP 200
+{
+  "codigo": 0,
+  "mensaje": "Inicio de sesión exitoso",
+  "data": {
+    "username": "laura.torres",
+    "clienteId": 621,
+    "nombreCliente": "Laura Torres",
+    "isLoggedIn": true,
+    "ultimaActividad": "2026-10-09T13:28:06.1794453",
+    "mensaje": "Inicio de sesión exitoso (Por Contraseña)"
+  }
+}
+### LOGIN POR FACE ID (bandera 2) -> HTTP 200
+{"codigo": 0, "mensaje": "Inicio de sesión exitoso", "data": {"username": "laura.torres", "clienteId": 621, "nombreCliente": "Laura Torres", "isLoggedIn": true, "ultimaActividad": "2026-10-09T13:28:06.1918433", "mensaje": "Inicio de sesión exitoso (Por Face ID Biométrico)"}}
+### LOGIN CONTRASENA INCORRECTA -> HTTP 401
+{"codigo": 401, "mensaje": "Credenciales inválidas.", "data": null}
+### LOGIN USUARIO INEXISTENTE -> HTTP 401
+{"codigo": 401, "mensaje": "Credenciales inválidas.", "data": null}
+### BAJA LOGICA (bandera 3) -> HTTP 200
+{
+  "codigo": 0,
+  "mensaje": "Cliente dado de baja correctamente",
+  "data": {
+    "clienteId": 621,
+    "nombreCompleto": "Laura Elena Torres Vargas",
+    "curp": "TOVL920821MGTRRR04",
+    "rfc": "TOVL920821KJ3",
+    "correo": "laura.torres@example.com",
+    "activo": false,
+    "numeroCuenta": "981507313391",
+    "saldoInicial": 1000.00,
+    "estatusCuenta": "INACTIVA",
+    "username": null,
+    "operacionRealizada": "ELIMINAR_BAJA_LOGICA",
+    "fechaOperacion": "2026-10-09T13:28:06.3346941"
+  }
+}
+### ACTUALIZAR CLIENTE DADO DE BAJA -> HTTP 403
+{"codigo": 403, "mensaje": "No se puede actualizar la información de un cliente inactivo.", "data": null}
+### LOGIN TRAS LA BAJA -> HTTP 403
+{"codigo": 403, "mensaje": "El cliente asociado a este usuario se encuentra inactivo.", "data": null}

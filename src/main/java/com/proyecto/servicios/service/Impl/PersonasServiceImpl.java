@@ -38,7 +38,7 @@ public class PersonasServiceImpl implements PersonaService {
     public GenericResponse eliminaPersona(EliminaPersonaRequest eliminaPersonaRequest) {
         GenericResponse genericResponse=new GenericResponse();
 
-        Optional<Personas> existePersona=personasRepository.findByNombre(eliminaPersonaRequest.getNombre());
+        Optional<Personas> existePersona=personasRepository.findFirstByNombreOrderByIdAsc(eliminaPersonaRequest.getNombre());
         if(existePersona.isPresent()){
             Personas personaElimina=existePersona.get();
             personasRepository.delete(personaElimina);
@@ -56,7 +56,7 @@ public class PersonasServiceImpl implements PersonaService {
     @Override
     public GenericResponse actualizaPersona(PersonasRequest personasRequest) {
         GenericResponse genericResponse=new GenericResponse();
-        Optional<Personas> existePersona=personasRepository.findByNombre(personasRequest.getNombre());
+        Optional<Personas> existePersona=personasRepository.findFirstByNombreOrderByIdAsc(personasRequest.getNombre());
         if(existePersona.isPresent()){
             Personas personaActualiza=existePersona.get();
             personaActualiza.setApellidoP(personasRequest.getApellidoP());
