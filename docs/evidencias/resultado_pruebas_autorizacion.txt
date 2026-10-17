@@ -3,7 +3,7 @@ Objetivo: http://localhost:8081
 ===== EJECUTIVO INICIAL Y REGISTRO PUBLICO =====
 PASS [200 esp 200] login del ejecutivo :: Inicio de sesión exitoso
 PASS [200 esp 200] la respuesta del login no expone el ID :: Inicio de sesión exitoso
-alta pública (sin token) de dos clientes: alicia.wxxmshjv y beto.kkincbjn
+alta pública (sin token) de dos clientes: alicia.pthizxnp y beto.umeodmmp
 
 ===== SIN TOKEN / TOKEN INVALIDO =====
 PASS [401 esp 401] bandera 2 sin encabezado Authorization :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
