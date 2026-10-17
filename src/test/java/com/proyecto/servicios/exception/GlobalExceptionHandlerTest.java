@@ -200,6 +200,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void cuerpoEnXml_Responde415PorqueLaApiSoloAceptaJson() throws Exception {
+        mvc.perform(post("/api/v1/layaway/cliente").accept(MediaType.APPLICATION_JSON).contentType(MediaType.APPLICATION_XML)
+                        .content("<LayawayClienteRequest><bandera>4</bandera></LayawayClienteRequest>"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.codigo").value(415));
+        verifyNoInteractions(servicio);
+    }
+
+    @Test
     void contentTypeIncorrecto_Responde415() throws Exception {
         mvc.perform(post("/api/v1/layaway/cliente").accept(MediaType.APPLICATION_JSON).contentType(MediaType.TEXT_PLAIN).content(CUERPO_VALIDO))
                 .andExpect(status().isUnsupportedMediaType())

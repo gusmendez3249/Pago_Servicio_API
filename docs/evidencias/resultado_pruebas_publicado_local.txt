@@ -1,46 +1,46 @@
 Objetivo: http://localhost:8081
 
 --- Disponibilidad (si el servicio estaba dormido, la primera respuesta tarda) ---
-PASS [200 esp 200]   597 ms  GET /api-docs (documentación OpenAPI) :: None
-PASS [200 esp 200]    81 ms  GET /swagger-ui.html :: (página HTML)
+PASS [200 esp 200]   878 ms  GET /api-docs (documentación OpenAPI) :: None
+PASS [200 esp 200]    98 ms  GET /swagger-ui.html :: (página HTML)
 
 --- Base de datos (Neon) y catálogo ---
-PASS [200 esp 200]    50 ms  GET catálogo de nacionalidades :: Catálogo de nacionalidades obtenido correctamente
+PASS [200 esp 200]    59 ms  GET catálogo de nacionalidades :: Catálogo de nacionalidades obtenido correctamente
 
 --- Registro ---
-PASS [201 esp 201]    81 ms  Alta de cliente válida :: Cliente registrado correctamente
+PASS [201 esp 201]    94 ms  Alta de cliente válida :: Cliente registrado correctamente
 
 --- Sesión (token para las operaciones protegidas) ---
-PASS [200 esp 200]    74 ms  Inicio de sesión del ejecutivo :: Inicio de sesión exitoso
+PASS [200 esp 200]    89 ms  Inicio de sesión del ejecutivo :: Inicio de sesión exitoso
 
 --- Autenticación ---
-PASS [401 esp 401]    36 ms  Sin token: consulta (bandera 4) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
+PASS [401 esp 401]    37 ms  Sin token: consulta (bandera 4) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
 PASS [401 esp 401]    47 ms  Sin token: actualización (bandera 2) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
-PASS [401 esp 401]    47 ms  Sin token: baja (bandera 3) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
-PASS [401 esp 401]    48 ms  Token inventado -> 401 :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 401]    46 ms  Sin token: baja (bandera 3) -> 401 :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/l
+PASS [401 esp 401]    43 ms  Token inventado -> 401 :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
 
 --- Registro: duplicados ---
-PASS [409 esp 409]    76 ms  Alta duplicada (misma CURP) :: Ya existe un cliente registrado con la CURP: DQLB900310HGTRLT09
-PASS [400 esp 400]    47 ms  Datos inválidos (nombre corto, sexo en minúsculas, CURP con mes 13) :: Datos no validos{datosPersonales.curp=Formato de CURP no válido, datosPersonales.nombre=El nombre debe tener e
-PASS [400 esp 400]    44 ms  Bandera como texto :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una c
-PASS [400 esp 400]    46 ms  Contraseña débil (sin mayúscula ni carácter especial) :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con a
-PASS [200 esp 200]    59 ms  Actualizar por CURP (sin ID) :: Cliente actualizado correctamente
+PASS [409 esp 409]    87 ms  Alta duplicada (misma CURP) :: Ya existe un cliente registrado con la CURP: SMFD900310HGTWLX09
+PASS [400 esp 400]    61 ms  Datos inválidos (nombre corto, sexo en minúsculas, CURP con mes 13) :: Datos no validos{datosPersonales.curp=Formato de CURP no válido, datosPersonales.nombre=El nombre debe tener e
+PASS [400 esp 400]    48 ms  Bandera como texto :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una c
+PASS [400 esp 400]    35 ms  Contraseña débil (sin mayúscula ni carácter especial) :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con a
+PASS [200 esp 200]    49 ms  Actualizar por CURP (sin ID) :: Cliente actualizado correctamente
 PASS [400 esp 400]    32 ms  Actualizar con llave incompleta :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de
-PASS [400 esp 400]    32 ms  Actualizar con clienteId (ya no se usa) :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifiq
+PASS [400 esp 400]    33 ms  Actualizar con clienteId (ya no se usa) :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifiq
 
 --- Login ---
-PASS [200 esp 200]    80 ms  Login correcto :: Inicio de sesión exitoso
-PASS [401 esp 401]    79 ms  Login con contraseña incorrecta :: Credenciales inválidas.
-PASS [401 esp 401]    71 ms  Login con usuario inexistente (mismo 401) :: Credenciales inválidas.
+PASS [200 esp 200]    83 ms  Login correcto :: Inicio de sesión exitoso
+PASS [401 esp 401]    99 ms  Login con contraseña incorrecta :: Credenciales inválidas.
+PASS [401 esp 401]    94 ms  Login con usuario inexistente (mismo 401) :: Credenciales inválidas.
 
 --- Consulta (bandera 4) ---
-PASS [200 esp 200]    56 ms  Consulta por parte de la CURP :: Consulta realizada correctamente
-PASS [200 esp 200]   226 ms  Consulta sin filtros (todos los clientes) :: Consulta realizada correctamente
-PASS [400 esp 400]    48 ms  Filtro sin comillas :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni bool
-PASS [400 esp 400]    45 ms  Filtro en blanco :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 le
-PASS [400 esp 400]    45 ms  Filtro no permitido (nombre) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y n
+PASS [200 esp 200]    63 ms  Consulta por parte de la CURP :: Consulta realizada correctamente
+PASS [200 esp 200]   396 ms  Consulta sin filtros (todos los clientes) :: Consulta realizada correctamente
+PASS [400 esp 400]    47 ms  Filtro sin comillas :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "valor"), no como número, boolean
+PASS [400 esp 400]    46 ms  Filtro en blanco :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 le
+PASS [400 esp 400]    53 ms  Filtro no permitido (nombre) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y n
 
 --- Limpieza: baja lógica del cliente de prueba ---
-PASS [200 esp 200]    63 ms  Baja lógica del cliente de prueba (por CURP) :: Cliente dado de baja correctamente
+PASS [200 esp 200]    69 ms  Baja lógica del cliente de prueba (por CURP) :: Cliente dado de baja correctamente
 
 TOTAL 25  PASS 25  FAIL 0

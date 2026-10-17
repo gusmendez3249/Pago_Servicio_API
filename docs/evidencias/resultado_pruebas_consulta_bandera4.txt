@@ -20,11 +20,11 @@ PASS [200 esp 200] no expone biometricos ni credenciales :: Consulta realizada c
 PASS [200 esp 200] trae nombre completo, correo, activo y cuenta :: Consulta realizada correctamente
 PASS [400 esp 400] respuesta de otras banderas NO trae campos de consulta :: Datos no validos{datosContacto=Los datos de contacto son obligatorios para el registro (bandera = 1)., datosPersonales=Los datos personales son obliga
 ===== COMILLAS =====
-PASS [400 esp 400] curp numerico -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
-PASS [400 esp 400] rfc numerico -> 400 :: El campo 'filtros.rfc' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
-PASS [400 esp 400] numeroCuenta sin comillas -> 400 :: El campo 'filtros.numeroCuenta' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
-PASS [400 esp 400] curp booleano -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
-PASS [400 esp 400] curp arreglo -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
+PASS [400 esp 400] curp numerico -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "valor"), no como número, booleano, arreglo ni objeto.
+PASS [400 esp 400] rfc numerico -> 400 :: El campo 'filtros.rfc' debe enviarse como texto entre comillas (por ejemplo "valor"), no como número, booleano, arreglo ni objeto.
+PASS [400 esp 400] numeroCuenta sin comillas -> 400 :: El campo 'filtros.numeroCuenta' debe enviarse como texto entre comillas (por ejemplo "valor"), no como número, booleano, arreglo ni objeto.
+PASS [400 esp 400] curp booleano -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "valor"), no como número, booleano, arreglo ni objeto.
+PASS [400 esp 400] curp arreglo -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "valor"), no como número, booleano, arreglo ni objeto.
 PASS [400 esp 400] clienteId entre comillas -> 400 :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 ===== EN BLANCO / FORMATO =====
 PASS [400 esp 400] curp vacia '' -> 400 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o números}
@@ -55,6 +55,6 @@ PASS [400 esp 400] bandera 5 -> 400 :: Datos no validos{bandera=La bandera de op
 PASS [200 esp 200] baja logica (bandera 3) sigue funcionando :: Cliente dado de baja correctamente
 PASS [200 esp 200] consulta muestra al cliente dado de baja como inactivo :: Consulta realizada correctamente
 ===== VOLUMEN: todos los clientes sin filtros =====
-PASS [200 esp 200] sin filtros con 33 clientes (62 ms) :: Consulta realizada correctamente
+PASS [200 esp 200] sin filtros con 33 clientes (80 ms) :: Consulta realizada correctamente
 
 TOTAL 48  PASS 48  FAIL 0

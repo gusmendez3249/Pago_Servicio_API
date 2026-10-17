@@ -623,7 +623,7 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 
 > El endpoint del catálogo solo consulta una tabla y no tiene un caso de error propio; los errores del servidor se manejan de forma centralizada (500/503) como se describe en la sección 7.
 
-### 9.2 Pruebas unitarias — 249 de 249 exitosas
+### 9.2 Pruebas unitarias — 258 de 258 exitosas
 
 `.\gradlew.bat test` (JUnit 5 + Mockito):
 
@@ -635,9 +635,10 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 | `ClienteLayawayServiceTest` | 23 | Reglas de negocio: alta, baja y actualización por llaves, consulta, cambio de contraseña, duplicados (`RegistroDuplicadoException`), registro inexistente (`ClienteNoEncontradoException`), cliente inactivo, **autenticación y autorización** |
 | `LayawayClienteRequestValidacionTest` | 21 | Validación del DTO con `@Valid`: bandera, secciones obligatorias del registro, llaves completas en las banderas 2 y 3, solo `filtros` en la consulta, `clienteId`, mayoría de edad y detalle por campo |
 | `SesionServiceTest` | 20 | Token vigente y renovación, encabezados ausentes o mal formados, token inexistente, vencido, sesión cerrada, cliente inactivo, solo se busca el hash |
-| `GlobalExceptionHandlerTest` | 17 | Manejo centralizado: validación con `codigo: 1` antes de llegar al servicio, un caso por cada excepción de negocio (401, 403, 404, 409, 400, 423), 415, JSON roto y 500 sin exponer SQL ni clases |
+| `GlobalExceptionHandlerTest` | 18 | Manejo centralizado: validación con `codigo: 1` antes de llegar al servicio, un caso por cada excepción de negocio (401, 403, 404, 409, 400, 423), XML y `Content-Type` incorrecto (415), JSON roto y 500 sin exponer SQL ni clases |
 | `AuthServiceTest` | 8 | Login por contraseña y Face ID, token de sesión (solo se guarda su hash), 401 uniforme, intentos fallidos, bloqueo |
 | `LoginRequestValidacionTest` | 6 | `@LoginValido`: contraseña con la bandera 1, Face ID con la bandera 2, bandera y usuario |
+| `TextoEstrictoOnboardingConfigTest` | 8 | Los campos de texto de los DTO de onboarding rechazan números y booleanos (`"nombre": true`, `"codigoPostal": 37800`, `"username": 123`); las clases de otros módulos no cambian |
 | `PasswordEncoderUtilTest` | 3 | Sal aleatoria (hashes distintos), compatibilidad con hashes antiguos, hashes malformados |
 | `ProductosServiceImplTest` | 10 | Módulo GestoPago (anexo) |
 
@@ -678,7 +679,29 @@ La expiración del token (5 minutos) se verificó además con datos reales: con 
 
 También se verificó el servicio contra una instancia publicada con [`docs/evidencias/pruebas_publicado.py`](docs/evidencias/pruebas_publicado.py) (25 casos; con `EJECUTIVO_USUARIO`/`EJECUTIVO_PASSWORD` prueba además la baja).
 
-### 9.5 Reglas en la base de datos — 12 de 12
+### 9.5 Validación extrema contra la API publicada — 239 de 239 exitosas
+
+Script: [`docs/evidencias/pruebas_validacion_extrema.py`](docs/evidencias/pruebas_validacion_extrema.py). Es secuencial y deja una pausa entre peticiones: busca romper las validaciones, no saturar Render. Ninguna respuesta puede ser 500 ni incluir trazas, clases o SQL.
+
+| Categoría | Ejemplos |
+|---|---|
+| JSON crudo y bandera | Cuerpo vacío, `null`, arreglo, BOM, UTF-16, bytes inválidos, byte nulo, comentarios, `NaN`; bandera `"1"`, `1.5`, `true`, `2147483648`, `1e0`, `0x1`, duplicada (`1` y `4`); anidamiento de 20,000 niveles, 70 KB, 300 KB *chunked* |
+| Cabeceras y métodos | `Content-Type` texto, XML, formulario, multipart o ausente; XML con XXE y *billion laughs*; `Accept: application/xml`; GET, PUT, DELETE, PATCH, TRACE; `/actuator` |
+| Registro, campo por campo (≈130 casos) | Nombres con dígitos, `<script>`, saltos de línea, doble espacio, caracteres invisibles, cirílico o emojis; fechas imposibles, futuras o con otro formato; CURP/RFC en minúsculas, con mes 13 o entidad inválida; catálogos con variantes; correos mal formados o con inyección de cabeceras; teléfonos como texto, decimales o `1e30`; ingreso `0.00`, `15000`, `15000.001`, `1e999999999`; contraseñas débiles; **números o booleanos en campos de texto** |
+| Campos del servidor y unicidad | Alta con `rol: EJECUTIVO`, `saldoInicial`, `activo`, `numeroCuenta` e `id` inyectados (se ignoran: el usuario es CLIENTE con saldo 1000.00); CURP, RFC, correo en mayúsculas y usuario duplicados |
+| Login y token | Inyección SQL, tipos incorrectos, contraseña de 10,000 caracteres; token alterado, de 8 KB, JWT `alg: none`, esquema Basic, CRLF |
+| Cliente autenticado | Comodines `%` y `_`, filtros que no son llave, filtros duplicados en el JSON, consultar o actualizar a otro cliente (también con su CURP en minúsculas), robar su correo, poner su CURP, baja como cliente |
+
+La primera ejecución contra Render ([`resultado_pruebas_validacion_extrema_render_antes.txt`](docs/evidencias/resultado_pruebas_validacion_extrema_render_antes.txt)) encontró dos fallos que ya están corregidos:
+
+- **Números y booleanos aceptados en campos de texto.** `"nombre": true` registraba un cliente llamado "true" y `"codigoPostal": 37800` o `"username": 123` se aceptaban. Ahora todo campo de texto de los DTO de onboarding exige un valor entre comillas (`TextoEstrictoOnboardingConfig`).
+- **La API aceptaba y respondía XML.** Los endpoints de onboarding ahora declaran `consumes`/`produces` `application/json`: un cuerpo XML responde 415.
+
+Resultado tras la corrección (API local con PostgreSQL): [`resultado_pruebas_validacion_extrema_local.txt`](docs/evidencias/resultado_pruebas_validacion_extrema_local.txt).
+
+> Nota: algunos valores con apariencia de ataque (p. ej. `'; DROP TABLE` o una entidad XML externa) los bloquea el firewall de Render antes de llegar a la API y devuelve una página HTML 403; no es una respuesta de la aplicación.
+
+### 9.6 Reglas en la base de datos — 12 de 12
 
 La base rechaza por sí misma los datos inválidos aunque se manipule por SQL directo (sexo en minúsculas, nacionalidad fuera del catálogo, menor de edad, saldo negativo, borrado físico, reactivar la cuenta de un cliente dado de baja…). Detalle: [`docs/evidencias/pruebas_reglas_base_de_datos.txt`](docs/evidencias/pruebas_reglas_base_de_datos.txt)
 
@@ -702,7 +725,7 @@ src/main/java/com/proyecto/servicios/
 ├── dto/onboarding/                     # DTO de petición/respuesta con Bean Validation (incluye CatNacionalidadResponse)
 ├── validation/                         # @MayorDeEdad, @DosDecimales, @OperacionClienteValida, @LoginValido, deserializadores estrictos
 ├── exception/                          # OnboardingException y sus 9 excepciones de negocio + GlobalExceptionHandler (manejo centralizado)
-└── config/                             # Pool de BD, Flyway, Jackson estricto, límite de tamaño, PasswordEncoderUtil, TokenUtil, usuario ejecutivo inicial, esquema de seguridad de Swagger
+└── config/                             # Pool de BD, Flyway, Jackson estricto (texto entre comillas en los DTO de onboarding), límite de tamaño, PasswordEncoderUtil, TokenUtil, usuario ejecutivo inicial, esquema de seguridad de Swagger
 src/main/resources/db/migration/        # Migraciones Flyway (V3, V8, V9 y V10 para onboarding)
 src/test/java/                          # Pruebas unitarias
 docs/

@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +26,7 @@ public class CatNacionalidadController {
 
     private final CatNacionalidadService catNacionalidadService;
 
-    @GetMapping("/nacionalidades")
+    @GetMapping(value = "/nacionalidades", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Obtener catálogo de nacionalidades activas de la BD", description = "Retorna la lista de nacionalidades registradas en la tabla cat_nacionalidad.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Catálogo de nacionalidades obtenido exitosamente", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
