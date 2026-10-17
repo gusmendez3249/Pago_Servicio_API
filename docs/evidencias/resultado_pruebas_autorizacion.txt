@@ -1,9 +1,9 @@
-Objetivo: http://localhost:8094
+Objetivo: http://localhost:8081
 
 ===== EJECUTIVO INICIAL Y REGISTRO PUBLICO =====
 PASS [200 esp 200] login del ejecutivo :: Inicio de sesión exitoso
 PASS [200 esp 200] la respuesta del login no expone el ID :: Inicio de sesión exitoso
-alta pública (sin token) de dos clientes: alicia.jbnpfdof y beto.yombcbgy
+alta pública (sin token) de dos clientes: alicia.wxxmshjv y beto.kkincbjn
 
 ===== SIN TOKEN / TOKEN INVALIDO =====
 PASS [401 esp 401] bandera 2 sin encabezado Authorization :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
@@ -41,7 +41,7 @@ PASS [403 esp 403] Alicia intenta darse de baja -> 403 (solo ejecutivos) :: Solo
 PASS [403 esp 403] Alicia intenta dar de baja a Beto -> 403 :: Solo un ejecutivo puede dar de baja clientes.
 
 ===== CAMBIO DE CONTRASENA CIERRA LA SESION =====
-PASS [400 esp 400] contraseña débil -> 400 con detalle por campo :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] contraseña débil -> 400 (codigo 1) con detalle por campo :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
 PASS [200 esp 200] Alicia cambia su contraseña :: Cliente actualizado correctamente
 PASS [401 esp 401] el token anterior de Alicia ya no sirve -> 401 :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
 PASS [200 esp 200] Alicia entra con la contraseña nueva :: Inicio de sesión exitoso
@@ -57,12 +57,14 @@ PASS [401 esp 401] el token de Beto deja de servir tras la baja -> 401 :: Token 
 PASS [403 esp 403] Beto ya no puede iniciar sesión (cliente inactivo) -> 403 :: El cliente asociado a este usuario se encuentra inactivo.
 
 ===== ERRORES CON FORMATO CONSISTENTE =====
-PASS [400 esp 400] validación: codigo = 400 y detalle por campo en data :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.apellidoPaterno=El 
+PASS [400 esp 400] validación (@Valid): codigo = 1, mensaje 'Datos no validos{...}' y detalle por campo en data :: Datos no validos{datosContacto=Los datos de contacto son obligatorios para el registro (bandera = 1)., datosPersonales.a
+PASS [400 esp 400] regla de la bandera (llave incompleta) -> codigo 1 en el campo 'filtros' :: Datos no validos{filtros=Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) use el valor COMPLETO de la llave: curp 
+PASS [403 esp 403] negocio: actualizar un cliente dado de baja -> 403 con codigo = 403 :: No se puede actualizar la información de un cliente inactivo.
 PASS [400 esp 400] JSON mal formado: codigo = 400 :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
 PASS [415 esp 415] Content-Type incorrecto: codigo = 415 :: Content-Type no soportado. Envíe la petición con 'Content-Type: application/json'.
 PASS [405 esp 405] método no permitido: codigo = 405 :: Método HTTP 'GET' no permitido para este endpoint.
 PASS [404 esp 404] recurso inexistente: codigo = 404 :: El recurso '/api/v1/no-existe' no existe.
-PASS [400 esp 400] /api/v1/layaway/cliente: todo error trae codigo, mensaje y data :: Los datos personales, de contacto, domicilio e información laboral son obligatorios para la creación.
-PASS [400 esp 400] /api/v1/auth/login: todo error trae codigo, mensaje y data :: Datos no validos{username=El nombre de usuario es SIEMPRE obligatorio}
+PASS [400 esp 400] /api/v1/layaway/cliente: todo error trae codigo, mensaje y data :: Datos no validos{datosContacto=Los datos de contacto son obligatorios para el registro (bandera = 1)., datosPersonales=L
+PASS [400 esp 400] /api/v1/auth/login: todo error trae codigo, mensaje y data :: Datos no validos{password=La contraseña es requerida para autenticación por contraseña (bandera = 1)., username=El nombr
 
-TOTAL 52  PASS 52  FAIL 0
+TOTAL 54  PASS 54  FAIL 0

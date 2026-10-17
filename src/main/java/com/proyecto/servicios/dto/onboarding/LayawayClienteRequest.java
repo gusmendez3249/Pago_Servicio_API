@@ -1,5 +1,6 @@
 package com.proyecto.servicios.dto.onboarding;
 
+import com.proyecto.servicios.validation.OperacionClienteValida;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -14,15 +15,16 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@OperacionClienteValida
 public class LayawayClienteRequest {
 
     @Schema(description = "Bandera de operación (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)", example = "1")
-    @NotNull(groups = GrupoBandera.class, message = "La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)")
-    @Min(groups = GrupoBandera.class, value = 1, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
-    @Max(groups = GrupoBandera.class, value = 4, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
+    @NotNull(message = "La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)")
+    @Min(value = 1, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
+    @Max(value = 4, message = "La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)")
     private Integer bandera;
 
-    // Ya no se usa: se conserva solo para rechazarlo con un mensaje claro en lugar de ignorarlo
+    // Ya no se usa: se conserva solo para rechazarlo con un mensaje claro (@OperacionClienteValida) en lugar de ignorarlo
     // (ignorarlo en una consulta devolvería todos los clientes). Para 2, 3 y 4 se usa 'filtros'.
     @Schema(hidden = true)
     private Long clienteId;

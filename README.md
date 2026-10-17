@@ -209,10 +209,11 @@ Contenido íntegro en [`docs/base_de_datos/script_creacion_bd.sql`](docs/base_de
 | `POST` | `/api/v1/auth/login` | Inicio de sesión: **1** = contraseña, **2** = Face ID. Devuelve el **token** de sesión y el rol |
 | `GET` | `/api/v1/cat/nacionalidades` | Catálogo de nacionalidades activas |
 
-Todas las respuestas —de éxito y de error— usan el mismo envoltorio, y en los errores `codigo` es siempre el estado HTTP:
+Todas las respuestas —de éxito y de error— usan el mismo envoltorio `{ codigo, mensaje, data }`: `codigo` es `0` en el éxito, `1` cuando falla la validación de un DTO (`@Valid`) y, en el resto de errores, el estado HTTP:
 
 ```json
 { "codigo": 0, "mensaje": "Cliente registrado correctamente", "data": { } }
+{ "codigo": 1, "mensaje": "Datos no validos{datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres}", "data": [ { "campo": "datosPersonales.nombre", "mensaje": "El nombre debe tener entre 3 y 50 caracteres" } ] }
 { "codigo": 404, "mensaje": "No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.", "data": null }
 ```
 
@@ -321,12 +322,12 @@ Pruebas: 48 casos contra la API real ([resultado](docs/evidencias/resultado_prue
 
 ### 5.4 Códigos de respuesta
 
-El campo `codigo` del cuerpo coincide con el estado HTTP en todos los errores del módulo de onboarding.
+En los errores de validación de los DTO el campo `codigo` vale **1** (estado HTTP 400); en todos los demás errores del módulo de onboarding coincide con el estado HTTP.
 
 | HTTP | Cuándo |
 |---|---|
 | 200 / 201 | Operación exitosa (201 en el registro) |
-| 400 | Error de validación (el detalle por campo viene en `data`), JSON mal formado, tipo de dato incorrecto, llave ausente o incompleta, intento de cambiar CURP/RFC |
+| 400 | Error de validación de un DTO (`codigo: 1`, el detalle por campo viene en `data`): formato, catálogos, bandera, secciones obligatorias, llave ausente o incompleta. Con `codigo: 400`: JSON mal formado, tipo de dato incorrecto o regla de negocio (intento de cambiar CURP/RFC o el usuario) |
 | 401 | **Falta el token**, el esquema no es `Bearer`, el token es inválido o la sesión expiró; o credenciales inválidas en el login (mismo mensaje si el usuario no existe o la contraseña es incorrecta). Incluye `WWW-Authenticate: Bearer` |
 | 403 | Un cliente intenta dar de baja (solo ejecutivos), actualizar un cliente dado de baja, o el cliente asociado al token está inactivo |
 | 404 | **El registro no existe o no está entre los que el usuario puede ver** (misma respuesta en ambos casos), o nacionalidad fuera del catálogo |
@@ -428,7 +429,7 @@ Ninguna operación usa el ID interno del cliente (ni en la URL, ni en el cuerpo,
 **Cómo se garantiza el acceso por recurso**
 
 - Para un `CLIENTE`, el servidor agrega a la búsqueda la condición *"el registro es el del propio usuario"* **antes** de consultar. Enviar la CURP, el RFC o la cuenta de otra persona devuelve **404**, exactamente igual que si no existiera: no se revela qué registros existen.
-- Orden de comprobaciones: **1)** token (401) → **2)** permiso por rol (403) → **3)** validación del cuerpo (400) → **4)** existencia del registro (404). Así, quien no presenta un token válido no recibe nunca el detalle de las reglas de validación.
+- Orden de comprobaciones: **1)** validación del cuerpo con `@Valid` en el controlador (400, `codigo: 1`) → **2)** token (401) → **3)** permiso por rol (403) → **4)** existencia del registro (404). La validación de formato no consulta datos, así que no revela información de ningún cliente.
 - La baja y el cambio de contraseña cierran la sesión del cliente afectado.
 
 **El token**
@@ -447,10 +448,10 @@ Cada escenario se probó con la API en ejecución (ver [sección 9](#9-evidencia
 
 | Código | Escenario | Mensaje (resumen) |
 |---|---|---|
-| 400 | Bandera ausente o fuera de 1–4; cuerpo inválido (nombre corto, catálogos, CURP/RFC, teléfono, contraseña débil…), con el detalle de cada campo en `data` | `Datos no validos{campo=motivo}` |
-| 400 | JSON mal formado, tipo incorrecto (bandera como texto, filtro sin comillas) | `Error de formato…` / `…debe enviarse como texto entre comillas` |
-| 400 | Bandera 2 o 3 sin llaves, con llave incompleta, con un filtro que no es llave o con `clienteId` | `…use el valor COMPLETO de la llave…` |
-| 400 | Se intenta cambiar CURP, RFC o el usuario | `La CURP no puede modificarse…` |
+| 400 · `codigo: 1` | Bandera ausente o fuera de 1–4; cuerpo inválido (nombre corto, catálogos, CURP/RFC, teléfono, contraseña débil…); en el registro, sección obligatoria ausente. El detalle de cada campo va en `data` | `Datos no validos{campo=motivo}` |
+| 400 · `codigo: 400` | JSON mal formado, tipo incorrecto (bandera como texto, filtro sin comillas) | `Error de formato…` / `…debe enviarse como texto entre comillas` |
+| 400 · `codigo: 1` | Bandera 2 o 3 sin llaves, con llave incompleta, con un filtro que no es llave o con `clienteId` (se reporta en el campo `filtros` o `clienteId`) | `…use el valor COMPLETO de la llave…` |
+| 400 · `codigo: 400` | Regla de negocio: se intenta cambiar CURP, RFC o el usuario (`ReglaNegocioException`) | `La CURP no puede modificarse…` |
 | 401 | Banderas 2, 3 y 4 sin token, con esquema distinto de Bearer, token inválido o sesión expirada | `Se requiere autenticación…` / `Token inválido o sesión expirada…` |
 | 403 | Un cliente intenta la baja; actualizar un cliente dado de baja; cliente del token inactivo | `Solo un ejecutivo puede dar de baja clientes.` |
 | 404 | Ningún cliente coincide con las llaves o filtros **entre los registros a los que se tiene acceso**; nacionalidad fuera del catálogo | `No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.` |
@@ -463,7 +464,7 @@ Cada escenario se probó con la API en ejecución (ver [sección 9](#9-evidencia
 | Código | Escenario |
 |---|---|
 | 200 | Credenciales correctas: devuelve token, tipo, vigencia y rol |
-| 400 | Formato inválido, bandera desconocida, falta la contraseña (bandera 1) o el Face ID (bandera 2) |
+| 400 | `codigo: 1`: formato inválido, bandera desconocida, falta la contraseña (bandera 1) o el Face ID (bandera 2). `codigo: 400`: JSON mal formado |
 | 401 | Usuario inexistente, contraseña o Face ID incorrectos (mismo mensaje y mismo tiempo de respuesta) |
 | 403 | Credenciales correctas pero el cliente está inactivo |
 | 423 | Cuenta bloqueada 15 minutos tras 5 intentos fallidos |
@@ -484,7 +485,7 @@ Cada regla se valida en el API **y** en la base de datos, para que no pueda salt
 
 | Regla | API | Base de datos |
 |---|---|---|
-| Mayor de edad (18 años o más) | `@MayorDeEdad` + validación en el servicio | Trigger `trg_cliente_mayor_edad` |
+| Mayor de edad (18 años o más) | `@MayorDeEdad` en el DTO | Trigger `trg_cliente_mayor_edad` |
 | CURP única | `existsByCurp` → 409 | `UNIQUE (curp)` |
 | RFC único | `existsByRfc` → 409 | `UNIQUE (rfc)` |
 | Correo único | `existsByCorreo` (en minúsculas) → 409 | `UNIQUE (correo)` + `CHECK` de minúsculas |
@@ -495,26 +496,58 @@ Cada regla se valida en el API **y** en la base de datos, para que no pueda salt
 | Baja lógica, sin borrado físico | Bandera 3 → `activo = false` | Todas las FK con `ON DELETE RESTRICT` |
 | CURP, RFC y número de cuenta inmutables | 400 si cambian en la actualización | — |
 
-## 7. Manejo de excepciones
+## 7. Manejo de excepciones y validación
 
-El manejo es **centralizado**: `GlobalExceptionHandler` (`@RestControllerAdvice`) traduce todas las excepciones al mismo envoltorio `{ codigo, mensaje, data }`, con `codigo` igual al estado HTTP, y nunca expone detalles internos (SQL, clases o trazas): esos solo se registran en el log. Las reglas de negocio se lanzan como `OnboardingException` (mensaje + estado HTTP) y los errores de validación del cuerpo como `ValidacionException`.
+El manejo es **centralizado**: `GlobalExceptionHandler` (`@RestControllerAdvice`) tiene un método `@ExceptionHandler` por cada tipo de excepción y traduce todas al mismo envoltorio `{ codigo, mensaje, data }`. Los controladores no tienen bloques `try-catch` ni validaciones manuales: reciben el DTO con `@Valid @RequestBody` y delegan en el servicio. Nunca se exponen detalles internos (SQL, clases o trazas): esos solo se registran en el log.
+
+**Validación de entrada (Bean Validation).** Cada DTO declara sus reglas con `@NotNull`, `@NotBlank`, `@Email`, `@Size`, `@Pattern`, `@Min`, `@Max`, `@Positive`, `@AssertTrue` y validaciones propias (`@MayorDeEdad`, `@DosDecimales`). Las reglas que dependen de la bandera también viven en el DTO, como restricciones de clase que reportan el error en el campo que lo provoca:
+
+- `@OperacionClienteValida` (en `LayawayClienteRequest`): secciones obligatorias en el registro, llaves completas para actualizar o dar de baja, solo `filtros` en la consulta y `clienteId` no permitido.
+- `@LoginValido` (en `LoginRequest`): contraseña obligatoria con la bandera 1 y Face ID con la bandera 2.
+
+Cuando una validación falla, Spring lanza `MethodArgumentNotValidException` y el manejador responde **400** con `codigo: 1`, el mensaje `Datos no validos{campo=motivo, …}` y en `data` la lista `[{ "campo": "...", "mensaje": "..." }]`.
+
+**Excepciones de negocio propias.** Todas heredan de `OnboardingException`, llevan su estado HTTP y `codigo` = estado HTTP:
+
+| Excepción | HTTP | Cuándo |
+|---|---|---|
+| `ClienteNoEncontradoException` | 404 | Ningún cliente coincide con las llaves o filtros entre los registros accesibles (incluye el registro de otro cliente) |
+| `NacionalidadNoValidaException` | 404 | La nacionalidad no existe o no está activa en `cat_nacionalidad` |
+| `RecursoNoEncontradoException` | 404 | Otro recurso inexistente (p. ej. cliente sin usuario de acceso) |
+| `RegistroDuplicadoException` | 409 | CURP, RFC, correo o usuario ya registrados |
+| `ReglaNegocioException` | 400 | Datos con formato válido que incumplen una regla (cambiar CURP, RFC o usuario; llaves de más de un cliente) |
+| `NoAutenticadoException` | 401 | Falta el token, es inválido o expiró; credenciales incorrectas (incluye `WWW-Authenticate: Bearer`) |
+| `AccesoDenegadoException` | 403 | El rol no permite la operación (un cliente intenta la baja) |
+| `ClienteInactivoException` | 403 | El cliente fue dado de baja |
+| `CuentaBloqueadaException` | 423 | 5 intentos fallidos de login |
+
+**Errores técnicos.**
 
 | Caso | Respuesta |
 |---|---|
-| Error de validación (bandera o cuerpo) | **400**, `codigo: 400`, `mensaje: "Datos no validos{campo=motivo…}"` y en `data` la lista `[{ "campo": "...", "mensaje": "..." }]` |
-| JSON mal formado o tipo de dato incorrecto | 400 con un mensaje específico (fecha, teléfono, bandera, filtro sin comillas…) |
-| Falta el token, token inválido o sesión expirada | **401** + `WWW-Authenticate: Bearer` |
-| Sin permiso por rol, cliente inactivo, actualizar un cliente dado de baja | **403** |
-| Registro inexistente o fuera de los registros accesibles | **404** `No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.` |
-| CURP duplicada | 409 `Ya existe un cliente registrado con la CURP: ...` |
-| RFC duplicado | 409 `Ya existe un cliente registrado con el RFC: ...` |
-| Correo o usuario ya registrados | 409 |
+| JSON mal formado o tipo de dato incorrecto | 400, `codigo: 400`, con un mensaje específico (fecha, teléfono, bandera, filtro sin comillas…) |
 | Duplicado por condición de carrera (dos altas simultáneas) | 409 (se traduce el error `23505` de PostgreSQL) |
 | Cuenta no encontrada | No ocurre en los endpoints actuales: la cuenta se crea en la misma transacción que el cliente; si un cliente no tuviera cuenta, la respuesta devuelve `numeroCuenta: "N/A"` |
-| Error al acceder a los datos durante una consulta u operación | **500** `Ocurrió un error al acceder a la información. Intente nuevamente…` (sin SQL) |
+| Error al acceder a los datos | 500 `Ocurrió un error al acceder a la información. Intente nuevamente…` (sin SQL) |
 | Base de datos saturada o no disponible | 503 + `Retry-After` |
 | Método, `Content-Type` o ruta no soportados | 405 / 415 / 404 |
-| Cualquier otro error no previsto | 500 genérico |
+| Cualquier otro error no previsto | 500 `Ocurrió un error inesperado al procesar la solicitud…` (el detalle solo va al log) |
+
+### 7.1 Cumplimiento de los lineamientos de la API
+
+| Lineamiento | Cómo se cumple |
+|---|---|
+| Capas Controller, Service, Repository, DTO y Entity | Los controladores solo reciben el DTO y llaman al servicio; la lógica está en `service/`, el acceso a datos en `repositorys/` (Spring Data JPA) |
+| Request DTO para recibir y Response DTO para devolver | `LayawayClienteRequest`/`LayawayClienteResponse`, `LoginRequest`/`LoginResponse`, `CatNacionalidadResponse`. Ninguna entidad JPA se recibe ni se devuelve |
+| Bean Validation + `@Valid` en los controladores | Anotaciones en todos los DTO y `@Valid @RequestBody` en los endpoints que reciben cuerpo |
+| `@RestControllerAdvice` con `@ExceptionHandler` específicos | `GlobalExceptionHandler`: un método por cada excepción de negocio y por cada error técnico |
+| Excepciones propias de negocio | Las 9 excepciones de la tabla anterior |
+| Búsqueda por varios criterios en un único endpoint, combinables | Bandera 4 con `filtros` (`curp`, `rfc`, `numeroCuenta`, combinables con AND) mediante `JpaSpecificationExecutor` |
+| Sin `@PathVariable` ni `@RequestParam` | Los criterios viajan en el cuerpo (`@RequestBody`); el único encabezado leído es `Authorization` |
+| Sin validaciones repetitivas ni `try-catch` en los controladores | Toda la validación está declarada en los DTO; los errores los procesa el manejador global |
+| Campos controlados por el servidor | `id`, `activo`, `fechaRegistro`, número de cuenta, saldo, estatus y `rol` no existen en los DTO de entrada; `clienteId` se rechaza |
+| Códigos de estado adecuados y estructura uniforme | 200/201 en éxito; 400, 401, 403, 404, 409, 413, 415, 423, 500 y 503 según el caso; siempre `{ codigo, mensaje, data }` |
+| Mensajes descriptivos sin detalles internos | Cada error explica el motivo; el 500 nunca incluye SQL, clases ni trazas |
 
 ## 8. Seguridad y resistencia a carga
 
@@ -534,7 +567,6 @@ El manejo es **centralizado**: `GlobalExceptionHandler` (`@RestControllerAdvice`
 | Enumerar qué registros existen | "No existe" y "no es tuyo" devuelven el mismo 404 con el mismo mensaje |
 | Operaciones sin autenticar | Token obligatorio en actualizar, baja y consulta; baja solo para ejecutivos |
 | Robo de tokens desde la base | Solo se guarda el hash SHA-256; vencen a los 5 min de inactividad; el cambio de contraseña y la baja los invalidan |
-| Sondeo de reglas de validación sin sesión | Primero se autentica (401) y después se valida el cuerpo (400) |
 
 ---
 
@@ -549,7 +581,7 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 | Endpoint | Caso | Petición | Resultado | Captura |
 |---|---|---|---|---|
 | `POST /api/v1/layaway/cliente` | ✅ Éxito | Registro (`bandera: 1`) con datos válidos | **201** · cliente creado, cuenta de 12 dígitos, saldo 1000, `ACTIVA`; sin ID en la respuesta | [01](docs/evidencias/swagger/01_cliente_exito_201.png) |
-| `POST /api/v1/layaway/cliente` | ❌ Error | Nombre de 2 letras, sexo `masculino`, CURP con mes 13, teléfono de 9 dígitos y contraseña débil | **400** · `codigo: 400` y el detalle de cada campo en `data` | [02](docs/evidencias/swagger/02_cliente_error_400.png) |
+| `POST /api/v1/layaway/cliente` | ❌ Error | Nombre de 2 letras, sexo `masculino`, CURP con mes 13, teléfono de 9 dígitos y contraseña débil | **400** · `codigo: 1` y el detalle de cada campo en `data` | [02](docs/evidencias/swagger/02_cliente_error_400.png) |
 | `POST /api/v1/auth/login` | ✅ Éxito | Usuario y contraseña del cliente registrado | **200** · `token`, `tipoToken`, `expiraEnMinutos` y `rol` | [03](docs/evidencias/swagger/03_login_exito_200.png) |
 | `POST /api/v1/auth/login` | ❌ Error | Contraseña incorrecta | **401** · `Credenciales inválidas.` | [04](docs/evidencias/swagger/04_login_error_401.png) |
 | `GET /api/v1/cat/nacionalidades` | ✅ Éxito | Consulta del catálogo | **200** · nacionalidades activas | [05](docs/evidencias/swagger/05_catalogo_nacionalidades_exito_200.png) |
@@ -591,7 +623,7 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 
 > El endpoint del catálogo solo consulta una tabla y no tiene un caso de error propio; los errores del servidor se manejan de forma centralizada (500/503) como se describe en la sección 7.
 
-### 9.2 Pruebas unitarias — 223 de 223 exitosas
+### 9.2 Pruebas unitarias — 249 de 249 exitosas
 
 `.\gradlew.bat test` (JUnit 5 + Mockito):
 
@@ -600,10 +632,12 @@ Peticiones reales ejecutadas desde **Swagger UI** (`http://localhost:8081/swagge
 | `DatosPersonalesDtoValidationTest` | 52 | Nombres (mínimo 3), catálogos estrictos de sexo y estado civil, formato de nacionalidad e intentos de inyección |
 | `LoginCredencialesDtoPasswordTest` | 52 | Política de contraseña: 8 a 72 caracteres, 1 mayúscula, 1 minúscula, 1 número, 1 carácter especial, sin espacios |
 | `FiltrosClienteDtoTest` | 37 | Llaves de la consulta: comillas, valores en blanco, comodines, longitud y campos no permitidos (incluido `clienteId`) |
-| `ClienteLayawayServiceTest` | 32 | Alta, baja y actualización por llaves, consulta, cambio de contraseña, 404 de registro inexistente, **autenticación y autorización** (sin token, cliente sin permiso de baja, orden 401 → 403 → 400) |
+| `ClienteLayawayServiceTest` | 23 | Reglas de negocio: alta, baja y actualización por llaves, consulta, cambio de contraseña, duplicados (`RegistroDuplicadoException`), registro inexistente (`ClienteNoEncontradoException`), cliente inactivo, **autenticación y autorización** |
+| `LayawayClienteRequestValidacionTest` | 21 | Validación del DTO con `@Valid`: bandera, secciones obligatorias del registro, llaves completas en las banderas 2 y 3, solo `filtros` en la consulta, `clienteId`, mayoría de edad y detalle por campo |
 | `SesionServiceTest` | 20 | Token vigente y renovación, encabezados ausentes o mal formados, token inexistente, vencido, sesión cerrada, cliente inactivo, solo se busca el hash |
-| `GlobalExceptionHandlerTest` | 9 | Manejo centralizado: 400 con detalle por campo, 401 con `WWW-Authenticate`, 403, 404, 415, 500 sin exponer SQL; `codigo` = estado HTTP |
+| `GlobalExceptionHandlerTest` | 17 | Manejo centralizado: validación con `codigo: 1` antes de llegar al servicio, un caso por cada excepción de negocio (401, 403, 404, 409, 400, 423), 415, JSON roto y 500 sin exponer SQL ni clases |
 | `AuthServiceTest` | 8 | Login por contraseña y Face ID, token de sesión (solo se guarda su hash), 401 uniforme, intentos fallidos, bloqueo |
+| `LoginRequestValidacionTest` | 6 | `@LoginValido`: contraseña con la bandera 1, Face ID con la bandera 2, bandera y usuario |
 | `PasswordEncoderUtilTest` | 3 | Sal aleatoria (hashes distintos), compatibilidad con hashes antiguos, hashes malformados |
 | `ProductosServiceImplTest` | 10 | Módulo GestoPago (anexo) |
 
@@ -622,7 +656,7 @@ Script reproducible (solo librería estándar de Python): [`docs/evidencias/prue
 | Login | 15 | Contraseña por defecto, fuerza bruta (bloqueo al 5.º intento), enumeración por código y por **tiempo** (51 ms contra 51 ms) |
 | Concurrencia y carga | 3 | 30 altas simultáneas con la misma CURP (1 creada, 29 rechazadas con 409); **600 altas con 100 hilos: 0 errores (134 altas/s)**; 400 logins concurrentes |
 
-### 9.4 Autenticación y autorización a nivel de recurso — 52 de 52 exitosas
+### 9.4 Autenticación y autorización a nivel de recurso — 54 de 54 exitosas
 
 Script: [`docs/evidencias/pruebas_autorizacion.py`](docs/evidencias/pruebas_autorizacion.py) · resultado: [`docs/evidencias/resultado_pruebas_autorizacion.txt`](docs/evidencias/resultado_pruebas_autorizacion.txt). Dos clientes (Alicia y Beto) y un ejecutivo contra PostgreSQL:
 
@@ -635,7 +669,9 @@ Script: [`docs/evidencias/pruebas_autorizacion.py`](docs/evidencias/pruebas_auto
 | Alicia intenta la baja (propia o de Beto) | **403** (solo ejecutivos) |
 | Alicia cambia su contraseña | Su token anterior deja de servir (401) y entra con la nueva |
 | El ejecutivo consulta, actualiza y da de baja a Beto | **200**; tras la baja el token de Beto da 401 y su login da 403 |
-| Errores: validación, JSON roto, `Content-Type` y método incorrectos, ruta inexistente | Todos con `codigo` = estado HTTP y `{codigo, mensaje, data}` |
+| Errores de validación (cuerpo inválido, llave incompleta) | **400** con `codigo: 1`, `Datos no validos{…}` y el campo que lo provoca en `data` |
+| Actualizar a un cliente dado de baja | **403** con `codigo: 403` |
+| JSON roto, `Content-Type` y método incorrectos, ruta inexistente | `codigo` = estado HTTP y `{codigo, mensaje, data}` |
 | Respuestas del alta, login, consulta y baja | Ninguna incluye el ID del cliente |
 
 La expiración del token (5 minutos) se verificó además con datos reales: con `token_expira` en el pasado la petición responde 401 y la sesión queda cerrada; en la base solo existe el hash del token (64 caracteres), nunca el token en claro.
@@ -653,18 +689,19 @@ La base rechaza por sí misma los datos inválidos aunque se manipule por SQL di
 ```
 src/main/java/com/proyecto/servicios/
 ├── controller/onboarding/
-│   ├── ClienteLayawayController.java   # POST /api/v1/layaway/cliente (banderas 1, 2, 3)
+│   ├── ClienteLayawayController.java   # POST /api/v1/layaway/cliente (banderas 1, 2, 3, 4)
 │   ├── AuthController.java             # POST /api/v1/auth/login
 │   └── CatNacionalidadController.java  # GET  /api/v1/cat/nacionalidades
 ├── service/onboarding/
 │   ├── ClienteLayawayService.java      # Lógica de negocio: alta + cuenta automática, actualización, baja lógica, consulta; autorización por recurso
 │   ├── AuthService.java                # Login (emite el token), bloqueo por intentos, expiración de sesión
-│   └── SesionService.java              # Autenticación de cada petición protegida por token (Bearer)
+│   ├── SesionService.java              # Autenticación de cada petición protegida por token (Bearer)
+│   └── CatNacionalidadService.java     # Catálogo de nacionalidades convertido a DTO
 ├── entity/onboarding/                  # Entidades JPA: Cliente, Domicilio, Cuenta, UsuarioLogin, CatNacionalidad
 ├── repositorys/onboarding/             # Repositorios Spring Data JPA (incluye las consultas solicitadas)
-├── dto/onboarding/                     # DTO de petición/respuesta con Bean Validation
-├── validation/                         # @MayorDeEdad, @DosDecimales, FechaEstrictaDeserializer
-├── exception/                          # OnboardingException, ValidacionException + GlobalExceptionHandler (manejo centralizado)
+├── dto/onboarding/                     # DTO de petición/respuesta con Bean Validation (incluye CatNacionalidadResponse)
+├── validation/                         # @MayorDeEdad, @DosDecimales, @OperacionClienteValida, @LoginValido, deserializadores estrictos
+├── exception/                          # OnboardingException y sus 9 excepciones de negocio + GlobalExceptionHandler (manejo centralizado)
 └── config/                             # Pool de BD, Flyway, Jackson estricto, límite de tamaño, PasswordEncoderUtil, TokenUtil, usuario ejecutivo inicial, esquema de seguridad de Swagger
 src/main/resources/db/migration/        # Migraciones Flyway (V3, V8, V9 y V10 para onboarding)
 src/test/java/                          # Pruebas unitarias

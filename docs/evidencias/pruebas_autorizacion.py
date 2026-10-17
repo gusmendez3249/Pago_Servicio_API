@@ -6,7 +6,8 @@ Comprueba que:
   * un CLIENTE solo ve y modifica SU propio registro, aunque envíe las llaves de otro cliente;
   * solo un EJECUTIVO puede dar de baja y operar sobre cualquier cliente;
   * la baja y el cambio de contraseña invalidan la sesión;
-  * las respuestas no exponen el ID interno y los errores comparten un mismo formato.
+  * las respuestas no exponen el ID interno y los errores comparten un mismo formato
+    (validación de DTO: codigo 1; reglas de negocio y errores HTTP: codigo = estado HTTP).
 
 Uso (la API debe arrancar con APP_EJECUTIVO_USUARIO y APP_EJECUTIVO_PASSWORD definidos):
     set EJECUTIVO_USUARIO=ejecutivo.admin
@@ -170,8 +171,8 @@ check("Alicia intenta dar de baja a Beto -> 403", 403, estado, j)
 
 print("\n===== CAMBIO DE CONTRASENA CIERRA LA SESION =====")
 estado, j, _ = llamar(CLI, {"bandera": 2, **clave(curp=A["curp"]), "loginCredenciales": {"username": A["usuario"], "password": "debil"}}, token=T_A)
-check("contraseña débil -> 400 con detalle por campo", 400, estado, j,
-      lambda c: c["codigo"] == 400 and any(e["campo"] == "loginCredenciales.password" for e in c["data"]))
+check("contraseña débil -> 400 (codigo 1) con detalle por campo", 400, estado, j,
+      lambda c: c["codigo"] == 1 and any(e["campo"] == "loginCredenciales.password" for e in c["data"]))
 estado, j, _ = llamar(CLI, {"bandera": 2, **clave(curp=A["curp"]), "loginCredenciales": {"username": A["usuario"], "password": "NuevaClave#2026"}}, token=T_A)
 check("Alicia cambia su contraseña", 200, estado, j)
 estado, j, _ = llamar(CLI, {"bandera": 4}, token=T_A)
@@ -201,8 +202,14 @@ check("Beto ya no puede iniciar sesión (cliente inactivo) -> 403", 403, estado,
 
 print("\n===== ERRORES CON FORMATO CONSISTENTE =====")
 estado, j, _ = llamar(CLI, {"bandera": 1, "datosPersonales": {"nombre": "Li"}})
-check("validación: codigo = 400 y detalle por campo en data", 400, estado, j,
-      lambda c: c["codigo"] == 400 and isinstance(c["data"], list) and {"campo", "mensaje"} <= set(c["data"][0]))
+check("validación (@Valid): codigo = 1, mensaje 'Datos no validos{...}' y detalle por campo en data", 400, estado, j,
+      lambda c: c["codigo"] == 1 and c["mensaje"].startswith("Datos no validos{")
+      and isinstance(c["data"], list) and {"campo", "mensaje"} <= set(c["data"][0]))
+estado, j, _ = llamar(CLI, {"bandera": 3, **clave(curp=A["curp"][:6])}, token=T_EJ)
+check("regla de la bandera (llave incompleta) -> codigo 1 en el campo 'filtros'", 400, estado, j,
+      lambda c: c["codigo"] == 1 and c["data"][0]["campo"] == "filtros")
+estado, j, _ = llamar(CLI, {"bandera": 2, **clave(curp=B["curp"]), "datosContacto": {"correo": B["correo"], "telefonoMovil": 4180001122}}, token=T_EJ)
+check("negocio: actualizar un cliente dado de baja -> 403 con codigo = 403", 403, estado, j, lambda c: c["codigo"] == 403)
 estado, j, _ = llamar(CLI, "{")
 check("JSON mal formado: codigo = 400", 400, estado, j, lambda c: c["codigo"] == 400)
 estado, j, _ = llamar(CLI, {"bandera": 4}, encabezados={"Content-Type": "text/plain"}, token=T_EJ)

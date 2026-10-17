@@ -3,7 +3,8 @@ package com.proyecto.servicios.service.onboarding;
 import com.proyecto.servicios.config.onboarding.TokenUtil;
 import com.proyecto.servicios.entity.onboarding.ClienteEntity;
 import com.proyecto.servicios.entity.onboarding.UsuarioLoginEntity;
-import com.proyecto.servicios.exception.OnboardingException;
+import com.proyecto.servicios.exception.ClienteInactivoException;
+import com.proyecto.servicios.exception.NoAutenticadoException;
 import com.proyecto.servicios.repositorys.onboarding.UsuarioLoginRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,14 +88,14 @@ class SesionServiceTest {
     @ValueSource(strings = {"", "   ", "Bearer", "Bearer ", "Basic dXNlcjpwYXNz", "Token abc", "Bearer corto",
             "Bearer con espacios dentro del token", "Bearer <script>alert(1)</script>aaaaaaaaaaaaaaaaaaaa", "Bearer AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"})
     void encabezadoAusenteOMalFormado_Lanza401SinConsultarLaBase(String encabezado) {
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> sesionService.autenticar(encabezado));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> sesionService.autenticar(encabezado));
         assertEquals(401, ex.getCodigo());
         verifyNoInteractions(usuarioLoginRepository);
     }
 
     @Test
     void sinEncabezado_Lanza401() {
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> sesionService.autenticar(null));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> sesionService.autenticar(null));
         assertEquals(401, ex.getCodigo());
         assertTrue(ex.getMessage().contains("Authorization"));
     }
@@ -102,7 +103,7 @@ class SesionServiceTest {
     @Test
     void tokenInexistente_Lanza401() {
         when(usuarioLoginRepository.findByTokenHash(any())).thenReturn(Optional.empty());
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
         assertEquals(401, ex.getCodigo());
     }
 
@@ -111,7 +112,7 @@ class SesionServiceTest {
         usuario.setTokenExpira(LocalDateTime.now().minusSeconds(1));
         when(usuarioLoginRepository.findByTokenHash(TokenUtil.hash(TOKEN))).thenReturn(Optional.of(usuario));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
 
         assertEquals(401, ex.getCodigo());
         assertNull(usuario.getTokenHash());
@@ -124,7 +125,7 @@ class SesionServiceTest {
         usuario.setIsLoggedIn(false); // p. ej. cerrada por el proceso automático o por cambio de contraseña
         when(usuarioLoginRepository.findByTokenHash(TokenUtil.hash(TOKEN))).thenReturn(Optional.of(usuario));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
 
         assertEquals(401, ex.getCodigo());
     }
@@ -134,7 +135,7 @@ class SesionServiceTest {
         cliente.setActivo(false);
         when(usuarioLoginRepository.findByTokenHash(TokenUtil.hash(TOKEN))).thenReturn(Optional.of(usuario));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
+        ClienteInactivoException ex = assertThrows(ClienteInactivoException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
 
         assertEquals(403, ex.getCodigo());
     }
@@ -142,7 +143,7 @@ class SesionServiceTest {
     @Test
     void elTokenEnClaroNuncaSeBuscaEnLaBase_SoloSuHash() {
         when(usuarioLoginRepository.findByTokenHash(any())).thenReturn(Optional.empty());
-        assertThrows(OnboardingException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
+        assertThrows(NoAutenticadoException.class, () -> sesionService.autenticar("Bearer " + TOKEN));
         verify(usuarioLoginRepository).findByTokenHash(TokenUtil.hash(TOKEN));
         verify(usuarioLoginRepository, never()).findByTokenHash(TOKEN);
     }

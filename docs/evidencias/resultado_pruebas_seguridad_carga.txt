@@ -17,7 +17,7 @@ PASS [400 exp 400] nombre con <script> :: Datos no validos{datosPersonales.nombr
 PASS [400 exp (201, 400)] nombre unicode combinante (e + acento) :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
 PASS [400 exp 400] sin apellido materno :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio}
 PASS [400 exp (400, 201)] CURP minusculas :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
-PASS [400 exp 400] CURP 17 chars :: Datos no validos{datosPersonales.curp=La CURP debe tener exactamente 18 caracteres}
+PASS [400 exp 400] CURP 17 chars :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
 PASS [400 exp 400] CURP mes 13 :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
 PASS [400 exp 400] CURP dia 32 :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
 PASS [400 exp 400] CURP estado inexistente XX :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
@@ -26,9 +26,9 @@ PASS [400 exp 400] RFC 11 chars :: Datos no validos{datosPersonales.rfc=Formato 
 PASS [400 exp 400] RFC mes 13 :: Datos no validos{datosPersonales.rfc=Formato de RFC no válido}
 PASS [400 exp 400] RFC 14 chars :: Datos no validos{datosPersonales.rfc=El RFC debe tener 12 o 13 caracteres}
 PASS [400 exp 400] correo sin TLD a@b :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
-PASS [400 exp 400] correo invalido :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
-PASS [400 exp 400] correo 101 chars :: Datos no validos{datosContacto.correo=El correo electrónico no puede superar los 100 caracteres}
-PASS [400 exp 400] correo con espacios :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [400 exp 400] correo invalido :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [400 exp 400] correo 101 chars :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [400 exp 400] correo con espacios :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
 PASS [400 exp 400] fecha futura :: Datos no validos{datosPersonales.fechaNacimiento=El cliente debe ser mayor de edad (mínimo 18 años) y la fecha de nacimiento debe ser válida (máximo 120 años).}
 PASS [400 exp 400] 17 anios 364 dias :: Datos no validos{datosPersonales.fechaNacimiento=El cliente debe ser mayor de edad (mínimo 18 años) y la fecha de nacimiento debe ser válida (máximo 120 años).}
 PASS [201 exp 201] exactamente 18 anios hoy :: Cliente registrado correctamente
@@ -49,7 +49,7 @@ PASS [400 exp 400] CP 6 digitos :: Datos no validos{domicilio.codigoPostal=El c�
 PASS [400 exp 400] CP con letras :: Datos no validos{domicilio.codigoPostal=El código postal debe contener exactamente 5 dígitos}
 PASS [400 exp (400, 201)] CP numerico (sin comillas) :: Datos no validos{domicilio.codigoPostal=El código postal debe contener exactamente 5 dígitos}
 PASS [400 exp 400] CP con salto de linea al final :: Datos no validos{domicilio.codigoPostal=El código postal debe contener exactamente 5 dígitos}
-PASS [400 exp 400] sin domicilio :: Los datos personales, de contacto, domicilio e información laboral son obligatorios para la creación.
+PASS [400 exp 400] sin domicilio :: Datos no validos{domicilio=El domicilio es obligatorio para el registro (bandera = 1).}
 PASS [400 exp (400, 201)] calle con <script> :: Datos no validos{domicilio.calle=La calle contiene caracteres no permitidos (control, < o >)}
 PASS [400 exp 400] calle con caracteres de control :: Datos no validos{domicilio.calle=La calle contiene caracteres no permitidos (control, < o >)}
 PASS [400 exp 400] ingreso 0.00 :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe ser mayor a cero}
@@ -57,8 +57,8 @@ PASS [400 exp 400] ingreso negativo :: Datos no validos{informacionLaboral.ingre
 PASS [400 exp (400, 201)] ingreso 1e2 :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe incluir obligatoriamente exactamente 2 decimales (ejemplo: 100.00, no 100 ni 100.0000)}
 PASS [400 exp 400] ingreso como string :: Error de tipo de dato en el campo 'informacionLaboral.ingresoMensual': Se esperaba el tipo BigDecimal.
 PASS [400 exp 400] ingreso 13 enteros :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual no puede tener más de 2 posiciones decimales}
-PASS [400 exp 400] ingreso 1e999999999 (DoS BigDecimal) 0.0s :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual no puede tener más de 2 posiciones decimales}
-PASS [400 exp 400] ingreso 1e-999999999 0.0s :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual no puede tener más de 2 posiciones decimales}
+PASS [400 exp 400] ingreso 1e999999999 (DoS BigDecimal) 0.0s :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe incluir obligatoriamente exactamente 2 decimales (ejemplo: 100.00, no 100 ni 100.0000)}
+PASS [400 exp 400] ingreso 1e-999999999 0.0s :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe ser mayor a cero}
 PASS [400 exp 400] sexo invalido :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO}
 PASS [400 exp 400] estado civil invalido :: Datos no validos{datosPersonales.estadoCivil=El estado civil debe ser exactamente uno de los valores del catálogo: SOLTERO, CASADO, DIVORCIADO, VIUDO o UNION LIBRE}
 PASS [404 exp 404] nacionalidad no catalogo :: La nacionalidad 'MARCIANA' no es válida. Debe ser exactamente uno de los nombres activos del catálogo cat_nacionalidad (consulte GET /api/v1/cat/nacionalidades).
@@ -85,12 +85,12 @@ PASS [201 exp 201] catalogo: estado civil 'DIVORCIADO' :: Cliente registrado cor
 PASS [201 exp 201] catalogo: estado civil 'VIUDO' :: Cliente registrado correctamente
 PASS [201 exp 201] catalogo: estado civil 'UNION LIBRE' :: Cliente registrado correctamente
 ===== UNICIDAD =====
-PASS [409 exp 409] CURP duplicada :: Ya existe un cliente registrado con la CURP: TWDH820417HDFHJM05
-PASS [409 exp 409] RFC duplicado :: Ya existe un cliente registrado con el RFC: TWDH8204176PT
-PASS [409 exp 409] correo duplicado :: Ya existe un cliente registrado con el correo: ejfwnobptg@mail.com
-PASS [409 exp 409] correo duplicado en MAYUSCULAS :: Ya existe un cliente registrado con el correo: EJFWNOBPTG@MAIL.COM
-PASS [400 exp (409, 400)] correo duplicado con espacios :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
-PASS [409 exp 409] username duplicado :: El nombre de usuario 'ejfwnobptg' ya se encuentra en uso.
+PASS [409 exp 409] CURP duplicada :: Ya existe un cliente registrado con la CURP: SKFM790819HDFZSZ05
+PASS [409 exp 409] RFC duplicado :: Ya existe un cliente registrado con el RFC: SKFM7908196XM
+PASS [409 exp 409] correo duplicado :: Ya existe un cliente registrado con el correo: bmyuadzpzb@mail.com
+PASS [409 exp 409] correo duplicado en MAYUSCULAS :: Ya existe un cliente registrado con el correo: BMYUADZPZB@MAIL.COM
+PASS [400 exp (409, 400)] correo duplicado con espacios :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [409 exp 409] username duplicado :: El nombre de usuario 'bmyuadzpzb' ya se encuentra en uso.
 PASS [400 exp 400] username con salto de linea :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto, guion o guion bajo}
 PASS [400 exp 400] username con espacios :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto, guion o guion bajo}
 PASS [400 exp 400] password '1' (debil) :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter espe
@@ -109,9 +109,9 @@ PASS [201 exp 201] password 72 caracteres :: Cliente registrado correctamente
 ===== BANDERA / JSON =====
 PASS [400 exp 400] bandera como string '1' :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de texto (String) ni un decimal.
 PASS [400 exp 400] bandera 1.0 :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de texto (String) ni un decimal.
-PASS [400 exp 400] bandera 4 :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
+PASS [400 exp 400] bandera 4 :: Datos no validos{datosContacto=Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes., d
 PASS [400 exp 400] bandera null :: Datos no validos{bandera=La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar)}
-PASS [400 exp 400] bandera 1 con clienteId 5 :: Para la operación INSERTAR (bandera = 1), el clienteId debe ser nulo o 0. No se permite enviar un ID preexistente o arbitrario.
+PASS [400 exp 400] bandera 1 con clienteId 5 :: Datos no validos{clienteId=Para la operación INSERTAR (bandera = 1), el clienteId debe ser nulo o 0. No se permite enviar un ID preexistente o arbitrario.}
 PASS [400 exp 400] cuerpo vacio :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
 PASS [400 exp 400] JSON roto :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
 PASS [400 exp 400] JSON arreglo :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
@@ -120,9 +120,9 @@ PASS [415 exp 415] content-type text/plain :: Content-Type no soportado. Envíe 
 PASS [405 exp 405] GET no permitido :: Método HTTP 'GET' no permitido para este endpoint.
 PASS [400 exp 400] anidamiento 5000 :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
 PASS [413 exp 413] cuerpo 200KB con Content-Length :: El cuerpo de la petición excede el tamaño máximo permitido (65536 bytes).
-PASS [400 exp 400] clave 'bandera' duplicada en JSON :: Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
+PASS [400 exp 400] clave 'bandera' duplicada en JSON :: Datos no validos{filtros=Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).}
 PASS [413 exp 413] cuerpo chunked 2MB sin Content-Length (0.0s) :: oding: chunked
-Date: Sat, 10 Oct 2026 20:46:18 GMT
+Date: Sat, 17 Oct 2026 21:31:03 GMT
 Connection: close
 
 73
@@ -136,14 +136,14 @@ PASS [200 exp 200] bandera 2 actualiza por RFC :: Cliente actualizado correctame
 PASS [200 exp 200] bandera 2 actualiza por numero de cuenta :: Cliente actualizado correctamente
 PASS [200 exp 200] bandera 2 solo domicilio :: Cliente actualizado correctamente
 PASS [404 exp 404] bandera 2 llave inexistente :: No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.
-PASS [400 exp 400] bandera 2 sin llaves :: Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
-PASS [400 exp 400] bandera 2 con filtros vacio :: Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
-PASS [400 exp 400] bandera 2 con clienteId (ya no se usa) :: El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
-PASS [400 exp 400] bandera 2 solo con clienteId :: El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
-PASS [400 exp 400] bandera 2 con llave incompleta (curp parcial) :: Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
-PASS [400 exp 400] bandera 2 con llave incompleta (rfc parcial) :: Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
-PASS [400 exp 400] bandera 2 con llave incompleta (cuenta parcial) :: Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
-PASS [400 exp 400] bandera 2 con filtro que no es llave :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
+PASS [400 exp 400] bandera 2 sin llaves :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).}
+PASS [400 exp 400] bandera 2 con filtros vacio :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).}
+PASS [400 exp 400] bandera 2 con clienteId (ya no se usa) :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCue
+PASS [400 exp 400] bandera 2 solo con clienteId :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCue
+PASS [400 exp 400] bandera 2 con llave incompleta (curp parcial) :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
+PASS [400 exp 400] bandera 2 con llave incompleta (rfc parcial) :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
+PASS [400 exp 400] bandera 2 con llave incompleta (cuenta parcial) :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
+PASS [400 exp 400] bandera 2 con filtro que no es llave :: Datos no validos{filtros=Para la operación ACTUALIZAR (bandera = 2) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta)., filtros.sinCamposDesconoci
 PASS [400 exp 400] bandera 2 con llave sin comillas :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
 PASS [201 exp 201] alta para probar correo ajeno :: Cliente registrado correctamente
 PASS [404 exp 404] bandera 2 con llaves de clientes distintos (AND) :: No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.
@@ -160,9 +160,9 @@ PASS [200 exp 200] editar password valida :: Cliente actualizado correctamente
 PASS [200 exp 200] login con la contrasena NUEVA :: Inicio de sesión exitoso
 PASS [401 exp 401] login con la contrasena VIEJA (ya no sirve) :: Credenciales inválidas.
 ===== BAJA LOGICA (por llaves) =====
-PASS [400 exp 400] bandera 3 sin llaves :: Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
-PASS [400 exp 400] bandera 3 con clienteId (ya no se usa) :: El clienteId ya no se utiliza. Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).
-PASS [400 exp 400] bandera 3 con llave incompleta :: Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.
+PASS [400 exp 400] bandera 3 sin llaves :: Datos no validos{filtros=Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).}
+PASS [400 exp 400] bandera 3 con clienteId (ya no se usa) :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) identifique al cliente con el objeto 'filtros' (curp, rfc
+PASS [400 exp 400] bandera 3 con llave incompleta :: Datos no validos{filtros=Para la operación ELIMINAR / BAJA LÓGICA (bandera = 3) use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de
 PASS [404 exp 404] bandera 3 llave inexistente :: No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.
 PASS [200 exp 200] bandera 3 baja logica por CURP :: Cliente dado de baja correctamente
 PASS [200 exp 200]   y la respuesta no trae el id :: Cliente dado de baja correctamente
@@ -179,14 +179,14 @@ PASS [423 exp (423, 429)] fuerza bruta 12 intentos -> [401, 401, 401, 401, 423, 
 PASS [423 exp (423, 429)] login tras bloqueo (debe seguir bloqueado) :: Cuenta bloqueada temporalmente por exceso de intentos fallidos. Intente de nuevo en 14 minuto(s).
 PASS [400 exp 400] login bandera 3 :: Datos no validos{bandera=La bandera de autenticación solo permite los enteros 1 (Contraseña) o 2 (Biométrico Face ID)}
 PASS [400 exp 400] login bandera string :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de texto (String) ni un decimal.
-PASS [400 exp 400] login sin password :: La contraseña es requerida para autenticación por contraseña.
-PASS [400 exp 400] login sin faceId :: El identificador biométrico Face ID es requerido para autenticación por biométrico.
+PASS [400 exp 400] login sin password :: Datos no validos{password=La contraseña es requerida para autenticación por contraseña (bandera = 1).}
+PASS [400 exp 400] login sin faceId :: Datos no validos{faceIdBiometrico=El identificador biométrico Face ID es requerido para autenticación por biométrico (bandera = 2).}
 PASS [400 exp (400, 401)] login username con salto de linea :: Datos no validos{username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto, guion o guion bajo}
 PASS [201 exp 201] alta para prueba de tiempos :: Cliente registrado correctamente
-PASS [0 exp 0] enumeracion por tiempo: inexistente 103 ms vs pw incorrecta 84 ms (ratio 1.23) :: None
+PASS [0 exp 0] enumeracion por tiempo: inexistente 43 ms vs pw incorrecta 59 ms (ratio 0.73) :: None
 ===== CONCURRENCIA =====
 PASS [0 exp 0] 30 altas simultaneas misma CURP -> 201:1 409:29 otros:[] :: None
-PASS [0 exp 0] carga 600 altas / 100 hilos en 6.1s (98 req/s) no-201: [] x0 :: None
+PASS [0 exp 0] carga 600 altas / 100 hilos en 4.6s (132 req/s) no-201: [] x0 :: None
 PASS [0 exp 0] carga 400 logins -> [401] :: None
 
 TOTAL 177  PASS 177  FAIL 0

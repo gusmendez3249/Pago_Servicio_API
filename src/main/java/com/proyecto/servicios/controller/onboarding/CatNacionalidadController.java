@@ -1,8 +1,8 @@
 package com.proyecto.servicios.controller.onboarding;
 
-import com.proyecto.servicios.entity.onboarding.CatNacionalidadEntity;
+import com.proyecto.servicios.dto.onboarding.CatNacionalidadResponse;
 import com.proyecto.servicios.model.GenericResponse;
-import com.proyecto.servicios.repositorys.onboarding.CatNacionalidadRepository;
+import com.proyecto.servicios.service.onboarding.CatNacionalidadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,7 +23,7 @@ import java.util.List;
 @Tag(name = "Catálogo Nacionalidades", description = "Endpoints para consultar el catálogo de nacionalidades registrado en la base de datos")
 public class CatNacionalidadController {
 
-    private final CatNacionalidadRepository catNacionalidadRepository;
+    private final CatNacionalidadService catNacionalidadService;
 
     @GetMapping("/nacionalidades")
     @Operation(summary = "Obtener catálogo de nacionalidades activas de la BD", description = "Retorna la lista de nacionalidades registradas en la tabla cat_nacionalidad.")
@@ -32,10 +32,8 @@ public class CatNacionalidadController {
             @ApiResponse(responseCode = "500", description = "Internal Server Error: Error interno al consultar el catálogo en la base de datos", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "503", description = "Service Unavailable: base de datos saturada o no disponible; incluye `Retry-After`", content = @Content(schema = @Schema(implementation = GenericResponse.class)))
     })
-    public ResponseEntity<GenericResponse<List<CatNacionalidadEntity>>> obtenerNacionalidades() {
-        List<CatNacionalidadEntity> lista = catNacionalidadRepository.findByActivoTrue();
+    public ResponseEntity<GenericResponse<List<CatNacionalidadResponse>>> obtenerNacionalidades() {
+        List<CatNacionalidadResponse> lista = catNacionalidadService.obtenerActivas();
         return ResponseEntity.ok(GenericResponse.success("Catálogo de nacionalidades obtenido correctamente", lista));
     }
 }
-
-

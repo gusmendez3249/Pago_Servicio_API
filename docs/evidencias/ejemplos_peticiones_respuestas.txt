@@ -49,32 +49,32 @@
     "rfc": "TOVL920821KJ3",
     "correo": "laura.torres@example.com",
     "activo": true,
-    "numeroCuenta": "993062645556",
+    "numeroCuenta": "489766609390",
     "saldoInicial": 1000.00,
     "estatusCuenta": "ACTIVA",
     "username": "laura.torres",
     "operacionRealizada": "INSERTAR",
-    "fechaOperacion": "2026-10-10T14:57:12.4899061"
+    "fechaOperacion": "2026-10-17T15:33:01.9587579"
   }
 }
 ### ALTA DUPLICADA -> HTTP 409
 {"codigo": 409, "mensaje": "Ya existe un cliente registrado con la CURP: TOVL920821MGTRRR04", "data": null}
 ### VALIDACION (nombre de 2 letras, sexo en minúsculas, contraseña débil) -> HTTP 400
 {
-  "codigo": 400,
+  "codigo": 1,
   "mensaje": "Datos no validos{datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres, datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO, loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial}",
   "data": [
     {
-      "mensaje": "El nombre debe tener entre 3 y 50 caracteres",
-      "campo": "datosPersonales.nombre"
+      "campo": "datosPersonales.nombre",
+      "mensaje": "El nombre debe tener entre 3 y 50 caracteres"
     },
     {
-      "mensaje": "El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO",
-      "campo": "datosPersonales.sexo"
+      "campo": "datosPersonales.sexo",
+      "mensaje": "El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO"
     },
     {
-      "mensaje": "La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial",
-      "campo": "loginCredenciales.password"
+      "campo": "loginCredenciales.password",
+      "mensaje": "La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial"
     }
   ]
 }
@@ -86,16 +86,16 @@
     "username": "laura.torres",
     "nombreCliente": "Laura Torres",
     "isLoggedIn": true,
-    "ultimaActividad": "2026-10-10T14:57:13.0095581",
+    "ultimaActividad": "2026-10-17T15:33:02.197539",
     "mensaje": "Inicio de sesión exitoso (Por Contraseña)",
-    "token": "bqeKjc…(token de 43 caracteres)",
+    "token": "w5jo8R…(token de 43 caracteres)",
     "tipoToken": "Bearer",
     "expiraEnMinutos": 5,
     "rol": "CLIENTE"
   }
 }
 ### LOGIN DEL EJECUTIVO -> HTTP 200
-{"codigo": 0, "mensaje": "Inicio de sesión exitoso", "data": {"username": "ejecutivo.admin", "nombreCliente": "ejecutivo.admin", "isLoggedIn": true, "ultimaActividad": "2026-10-10T14:57:13.1331687", "mensaje": "Inicio de sesión exitoso (Por Contraseña)", "token": "BhmMQn…(token de 43 caracteres)", "tipoToken": "Bearer", "expiraEnMinutos": 5, "rol": "EJECUTIVO"}}
+{"codigo": 0, "mensaje": "Inicio de sesión exitoso", "data": {"username": "ejecutivo.admin", "nombreCliente": "ejecutivo.admin", "isLoggedIn": true, "ultimaActividad": "2026-10-17T15:33:02.2549864", "mensaje": "Inicio de sesión exitoso (Por Contraseña)", "token": "PoAyvQ…(token de 43 caracteres)", "tipoToken": "Bearer", "expiraEnMinutos": 5, "rol": "EJECUTIVO"}}
 ### LOGIN CONTRASENA INCORRECTA -> HTTP 401
 {"codigo": 401, "mensaje": "Credenciales inválidas.", "data": null}
 ### LOGIN USUARIO INEXISTENTE (mismo mensaje) -> HTTP 401
@@ -112,7 +112,7 @@ WWW-Authenticate: Bearer realm="onboarding"
   "mensaje": "Consulta realizada correctamente",
   "data": {
     "operacionRealizada": "CONSULTAR",
-    "fechaOperacion": "2026-10-10T14:57:13.5933182",
+    "fechaOperacion": "2026-10-17T15:33:02.4600394",
     "clientes": [
       {
         "nombreCompleto": "Laura Elena Torres Vargas",
@@ -121,10 +121,10 @@ WWW-Authenticate: Bearer realm="onboarding"
         "correo": "laura.torres@example.com",
         "telefonoMovil": "4181234567",
         "activo": true,
-        "fechaRegistro": "2026-10-10T14:57:12.454235",
+        "fechaRegistro": "2026-10-17T15:33:01.944686",
         "cuentas": [
           {
-            "numeroCuenta": "993062645556",
+            "numeroCuenta": "489766609390",
             "saldo": 1000.00,
             "estatus": "ACTIVA"
           }
@@ -145,7 +145,7 @@ WWW-Authenticate: Bearer realm="onboarding"
   "mensaje": "Consulta realizada correctamente",
   "data": {
     "operacionRealizada": "CONSULTAR",
-    "fechaOperacion": "2026-10-10T14:57:13.7243561",
+    "fechaOperacion": "2026-10-17T15:33:02.5347915",
     "clientes": [
       {
         "nombreCompleto": "Laura Elena Torres Vargas",
@@ -154,10 +154,10 @@ WWW-Authenticate: Bearer realm="onboarding"
         "correo": "laura.torres@example.com",
         "telefonoMovil": "4181234567",
         "activo": true,
-        "fechaRegistro": "2026-10-10T14:57:12.454235",
+        "fechaRegistro": "2026-10-17T15:33:01.944686",
         "cuentas": [
           {
-            "numeroCuenta": "993062645556",
+            "numeroCuenta": "489766609390",
             "saldo": 1000.00,
             "estatus": "ACTIVA"
           }
@@ -170,10 +170,10 @@ WWW-Authenticate: Bearer realm="onboarding"
         "correo": "pedro.torres@example.com",
         "telefonoMovil": "4181234567",
         "activo": true,
-        "fechaRegistro": "2026-10-10T14:57:12.725106",
+        "fechaRegistro": "2026-10-17T15:33:02.059917",
         "cuentas": [
           {
-            "numeroCuenta": "499620150046",
+            "numeroCuenta": "399442562018",
             "saldo": 1000.00,
             "estatus": "ACTIVA"
           }
@@ -187,7 +187,7 @@ WWW-Authenticate: Bearer realm="onboarding"
 ### FILTRO SIN COMILLAS -> HTTP 400
 {"codigo": 400, "mensaje": "El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo \"MERG95\"), no como número ni booleano.", "data": null}
 ### FILTRO QUE NO ES LLAVE -> HTTP 400
-{"codigo": 400, "mensaje": "Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}", "data": [{"mensaje": "El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta", "campo": "filtros.sinCamposDesconocidos"}]}
+{"codigo": 1, "mensaje": "Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}", "data": [{"campo": "filtros.sinCamposDesconocidos", "mensaje": "El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta"}]}
 ### ACTUALIZAR SU PROPIO REGISTRO (bandera 2, por CURP) -> HTTP 200
 {
   "codigo": 0,
@@ -198,11 +198,11 @@ WWW-Authenticate: Bearer realm="onboarding"
     "rfc": "TOVL920821KJ3",
     "correo": "laura.torres@example.com",
     "activo": true,
-    "numeroCuenta": "993062645556",
+    "numeroCuenta": "489766609390",
     "saldoInicial": 1000.00,
     "estatusCuenta": "ACTIVA",
     "operacionRealizada": "ACTUALIZAR",
-    "fechaOperacion": "2026-10-10T14:57:13.8056559"
+    "fechaOperacion": "2026-10-17T15:33:02.5771024"
   }
 }
 ### EL CLIENTE INTENTA ACTUALIZAR A OTRO CLIENTE -> HTTP 404
@@ -210,7 +210,7 @@ WWW-Authenticate: Bearer realm="onboarding"
 ### ACTUALIZAR INTENTANDO CAMBIAR LA CURP -> HTTP 400
 {"codigo": 400, "mensaje": "La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.", "data": null}
 ### CAMBIAR LA CONTRASENA (política: 8+, mayúscula, minúscula, número y especial) -> HTTP 200
-{"codigo": 0, "mensaje": "Cliente actualizado correctamente", "data": {"nombreCompleto": "Laura Elena Torres Vargas", "curp": "TOVL920821MGTRRR04", "rfc": "TOVL920821KJ3", "correo": "laura.torres@example.com", "activo": true, "numeroCuenta": "993062645556", "saldoInicial": 1000.00, "estatusCuenta": "ACTIVA", "operacionRealizada": "ACTUALIZAR", "fechaOperacion": "2026-10-10T14:57:13.9768323"}}
+{"codigo": 0, "mensaje": "Cliente actualizado correctamente", "data": {"nombreCompleto": "Laura Elena Torres Vargas", "curp": "TOVL920821MGTRRR04", "rfc": "TOVL920821KJ3", "correo": "laura.torres@example.com", "activo": true, "numeroCuenta": "489766609390", "saldoInicial": 1000.00, "estatusCuenta": "ACTIVA", "operacionRealizada": "ACTUALIZAR", "fechaOperacion": "2026-10-17T15:33:02.6639871"}}
 ### EL TOKEN ANTERIOR YA NO SIRVE TRAS CAMBIAR LA CONTRASENA -> HTTP 401
 WWW-Authenticate: Bearer realm="onboarding"
 {"codigo": 401, "mensaje": "Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.", "data": null}
@@ -226,11 +226,11 @@ WWW-Authenticate: Bearer realm="onboarding"
     "rfc": "TOVL920821KJ3",
     "correo": "laura.torres@example.com",
     "activo": false,
-    "numeroCuenta": "993062645556",
+    "numeroCuenta": "489766609390",
     "saldoInicial": 1000.00,
     "estatusCuenta": "INACTIVA",
     "operacionRealizada": "ELIMINAR_BAJA_LOGICA",
-    "fechaOperacion": "2026-10-10T14:57:14.1353992"
+    "fechaOperacion": "2026-10-17T15:33:02.7478508"
   }
 }
 ### EL TOKEN DEL CLIENTE DADO DE BAJA YA NO SIRVE -> HTTP 401
