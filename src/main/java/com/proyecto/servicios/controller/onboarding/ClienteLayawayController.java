@@ -1,6 +1,5 @@
 package com.proyecto.servicios.controller.onboarding;
 
-import com.proyecto.servicios.dto.onboarding.GrupoBandera;
 import com.proyecto.servicios.dto.onboarding.LayawayClienteRequest;
 import com.proyecto.servicios.dto.onboarding.LayawayClienteResponse;
 import com.proyecto.servicios.model.GenericResponse;
@@ -14,11 +13,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -56,11 +55,11 @@ public class ClienteLayawayController {
             @ApiResponse(responseCode = "200", description = "Operación realizada con éxito (banderas 2, 3 o 4)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "201", description = "Cliente registrado exitosamente (bandera 1)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
             @ApiResponse(responseCode = "400", description = """
-                    Bad Request. Escenarios: datos inválidos (el detalle por campo viene en `data`); JSON mal formado o tipo incorrecto (p. ej. bandera como texto o un filtro sin comillas); \
+                    Bad Request. Escenarios: datos inválidos según las anotaciones de Bean Validation del DTO (`codigo: 1`, mensaje `Datos no validos{campo=motivo}` y el detalle por campo en `data`; incluye la bandera ausente o fuera de 1–4, las secciones obligatorias del registro y las llaves de las banderas 2 y 3); los demás casos responden `codigo: 400`: JSON mal formado o tipo incorrecto (p. ej. bandera como texto o un filtro sin comillas); \
                     filtro en blanco, con caracteres no permitidos o que no es una llave; llave incompleta o ausente en las banderas 2 y 3; \
                     `clienteId` enviado (ya no se utiliza); intento de modificar CURP, RFC o usuario; contraseña que incumple la política.""",
                     content = @Content(schema = @Schema(implementation = GenericResponse.class),
-                            examples = @ExampleObject(name = "Validación", value = "{\"codigo\":400,\"mensaje\":\"Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO}\",\"data\":[{\"campo\":\"datosPersonales.sexo\",\"mensaje\":\"El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO\"}]}"))),
+                            examples = @ExampleObject(name = "Validación", value = "{\"codigo\":1,\"mensaje\":\"Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO}\",\"data\":[{\"campo\":\"datosPersonales.sexo\",\"mensaje\":\"El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO u OTRO\"}]}"))),
             @ApiResponse(responseCode = "401", description = "Unauthorized (banderas 2, 3 y 4). Falta el encabezado Authorization, el esquema no es Bearer, el token es inválido o la sesión expiró (5 minutos de inactividad). La respuesta incluye `WWW-Authenticate: Bearer`.",
                     content = @Content(schema = @Schema(implementation = GenericResponse.class),
                             examples = @ExampleObject(value = "{\"codigo\":401,\"mensaje\":\"Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.\",\"data\":null}"))),
@@ -79,7 +78,7 @@ public class ClienteLayawayController {
             @ApiResponse(responseCode = "503", description = "Service Unavailable: base de datos saturada o no disponible; incluye el encabezado `Retry-After`.", content = @Content(schema = @Schema(implementation = GenericResponse.class)))
     })
     public ResponseEntity<GenericResponse<LayawayClienteResponse>> procesarCliente(
-            @Validated(GrupoBandera.class) @RequestBody LayawayClienteRequest request,
+            @Valid @RequestBody LayawayClienteRequest request,
             @Parameter(hidden = true) @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
 
         LayawayClienteResponse response = clienteLayawayService.procesarOperacion(request, authorization);

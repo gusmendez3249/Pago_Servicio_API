@@ -18,7 +18,7 @@ PASS [200 esp 200] los 4 filtros a la vez (AND) -> 1 :: Consulta realizada corre
 ===== DATOS DEVUELTOS =====
 PASS [200 esp 200] no expone biometricos ni credenciales :: Consulta realizada correctamente
 PASS [200 esp 200] trae nombre completo, correo, activo y cuenta :: Consulta realizada correctamente
-PASS [400 esp 400] respuesta de otras banderas NO trae campos de consulta :: Los datos personales, de contacto, domicilio e información laboral son obligatorios para la creación.
+PASS [400 esp 400] respuesta de otras banderas NO trae campos de consulta :: Datos no validos{datosContacto=Los datos de contacto son obligatorios para el registro (bandera = 1)., datosPersonales=Los datos personales son obliga
 ===== COMILLAS =====
 PASS [400 esp 400] curp numerico -> 400 :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
 PASS [400 esp 400] rfc numerico -> 400 :: El campo 'filtros.rfc' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
@@ -47,14 +47,14 @@ PASS [400 esp 400] filtro 'telefonoMovil' no permitido -> 400 (no devuelve todos
 PASS [400 esp 400] filtro 'clienteId' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 PASS [400 esp 400] filtro 'curp valida + nombre' no permitido -> 400 (no devuelve todos) :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuenta}
 ===== OTRAS SECCIONES CON BANDERA 4 =====
-PASS [400 esp 400] clienteId de nivel superior -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
-PASS [400 esp 400] datosPersonales -> 400 (no devuelve todos) :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.apellidoPaterno=El apellido paterno es obligatori
-PASS [400 esp 400] loginCredenciales -> 400 (no devuelve todos) :: Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.
+PASS [400 esp 400] clienteId de nivel superior -> 400 (no devuelve todos) :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación CONSULTAR (bandera = 4) identifique al cliente con el objeto 'filtros' (cu
+PASS [400 esp 400] datosPersonales -> 400 (no devuelve todos) :: Datos no validos{datosPersonales=Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener 
+PASS [400 esp 400] loginCredenciales -> 400 (no devuelve todos) :: Datos no validos{loginCredenciales=Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtene
 ===== OTRAS BANDERAS SIGUEN IGUAL =====
 PASS [400 esp 400] bandera 5 -> 400 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar)}
 PASS [200 esp 200] baja logica (bandera 3) sigue funcionando :: Cliente dado de baja correctamente
 PASS [200 esp 200] consulta muestra al cliente dado de baja como inactivo :: Consulta realizada correctamente
 ===== VOLUMEN: todos los clientes sin filtros =====
-PASS [200 esp 200] sin filtros con 33 clientes (58 ms) :: Consulta realizada correctamente
+PASS [200 esp 200] sin filtros con 33 clientes (62 ms) :: Consulta realizada correctamente
 
 TOTAL 48  PASS 48  FAIL 0

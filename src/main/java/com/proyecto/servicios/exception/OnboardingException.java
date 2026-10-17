@@ -3,21 +3,22 @@ package com.proyecto.servicios.exception;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Base de las excepciones de negocio del onboarding. Cada situación tiene su propia subclase
+ * (cliente no encontrado, registro duplicado, regla de negocio, etc.) con su estado HTTP;
+ * el {@code codigo} de la respuesta coincide con ese estado.
+ */
 @Getter
-public class OnboardingException extends RuntimeException {
+public abstract class OnboardingException extends RuntimeException {
 
     private final HttpStatus status;
-    private final int codigo;
 
-    public OnboardingException(String message) {
-        super(message);
-        this.status = HttpStatus.BAD_REQUEST;
-        this.codigo = 400;
-    }
-
-    public OnboardingException(String message, HttpStatus status, int codigo) {
+    protected OnboardingException(String message, HttpStatus status) {
         super(message);
         this.status = status;
-        this.codigo = codigo;
+    }
+
+    public int getCodigo() {
+        return status.value();
     }
 }

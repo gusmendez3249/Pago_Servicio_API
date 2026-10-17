@@ -19,6 +19,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -31,62 +32,111 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(OnboardingException.class)
-    public ResponseEntity<GenericResponse<Void>> handleOnboardingException(
-            OnboardingException exception) {
+    /** Código de la respuesta cuando falla la validación de un DTO (como en el ValidadorCampos de referencia). */
+    public static final int CODIGO_VALIDACION = 1;
 
-        ResponseEntity.BodyBuilder respuesta = ResponseEntity.status(exception.getStatus());
-        if (exception.getStatus() == HttpStatus.UNAUTHORIZED) {
-            // RFC 9110: toda respuesta 401 debe indicar el esquema de autenticación esperado
-            respuesta.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"onboarding\"");
-        }
-        return respuesta.body(GenericResponse.error(
-                exception.getCodigo(),
-                exception.getMessage()
-        ));
-    }
+    // ---------- Validación de los DTO (@Valid + Bean Validation) ----------
 
+    /**
+     * En caso de que alguna validación de un DTO no se cumpla se lanza MethodArgumentNotValidException:
+     * se responde 400 con {@code codigo: 1}, el mensaje "Datos no validos{campo=motivo, ...}" y en {@code data}
+     * la lista de campos inválidos con su mensaje.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<GenericResponse<List<Map<String, String>>>> dtoValidation(MethodArgumentNotValidException errors) {
-        Map<String, String> campos = new LinkedHashMap<>();
+        Map<String, String> campos = new TreeMap<>();
         for (FieldError fieldError : errors.getFieldErrors()) {
             campos.put(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+        for (ObjectError error : errors.getGlobalErrors()) {
+            campos.put(error.getObjectName(), error.getDefaultMessage());
         }
         return respuestaValidacion(campos);
     }
 
-    /** Validación del cuerpo hecha en el servicio, después de autenticar al usuario. */
-    @ExceptionHandler(ValidacionException.class)
-    public ResponseEntity<GenericResponse<List<Map<String, String>>>> handleValidacion(ValidacionException exception) {
-        return respuestaValidacion(exception.getErrores());
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<GenericResponse<List<Map<String, String>>>> handleConstraintViolation(
+            ConstraintViolationException exception) {
+
+        Map<String, String> campos = new TreeMap<>();
+        exception.getConstraintViolations().forEach(v -> campos.put(v.getPropertyPath().toString(), v.getMessage()));
+        return respuestaValidacion(campos);
     }
 
-    /** El código coincide con el estado HTTP (como en el resto de errores) y 'data' detalla cada campo inválido. */
     private ResponseEntity<GenericResponse<List<Map<String, String>>>> respuestaValidacion(Map<String, String> campos) {
         List<Map<String, String>> detalle = new ArrayList<>();
         campos.forEach((campo, mensaje) -> detalle.add(Map.of("campo", campo, "mensaje", String.valueOf(mensaje))));
-        return ResponseEntity.badRequest().body(GenericResponse.error(400, "Datos no validos" + campos, detalle));
+        return ResponseEntity.badRequest().body(GenericResponse.error(CODIGO_VALIDACION, "Datos no validos" + campos, detalle));
     }
 
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<GenericResponse<Void>> handleConstraintViolation(
-            ConstraintViolationException exception) {
+    // ---------- Excepciones de negocio (el código coincide con el estado HTTP) ----------
 
-        String detalle = exception.getConstraintViolations().stream()
-                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
-                .collect(Collectors.joining(", "));
+    @ExceptionHandler(ClienteNoEncontradoException.class)
+    public ResponseEntity<GenericResponse<Void>> handleClienteNoEncontrado(ClienteNoEncontradoException exception) {
+        return negocio(exception);
+    }
 
-        return build(HttpStatus.BAD_REQUEST, 400, "Datos no validos: " + detalle);
+    @ExceptionHandler(NacionalidadNoValidaException.class)
+    public ResponseEntity<GenericResponse<Void>> handleNacionalidadNoValida(NacionalidadNoValidaException exception) {
+        return negocio(exception);
+    }
+
+    @ExceptionHandler(RecursoNoEncontradoException.class)
+    public ResponseEntity<GenericResponse<Void>> handleRecursoNoEncontrado(RecursoNoEncontradoException exception) {
+        return negocio(exception);
+    }
+
+    @ExceptionHandler(RegistroDuplicadoException.class)
+    public ResponseEntity<GenericResponse<Void>> handleRegistroDuplicado(RegistroDuplicadoException exception) {
+        return negocio(exception);
+    }
+
+    @ExceptionHandler(ReglaNegocioException.class)
+    public ResponseEntity<GenericResponse<Void>> handleReglaNegocio(ReglaNegocioException exception) {
+        return negocio(exception);
+    }
+
+    /** RFC 9110: toda respuesta 401 debe indicar el esquema de autenticación esperado. */
+    @ExceptionHandler(NoAutenticadoException.class)
+    public ResponseEntity<GenericResponse<Void>> handleNoAutenticado(NoAutenticadoException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"onboarding\"")
+                .body(GenericResponse.error(exception.getCodigo(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(AccesoDenegadoException.class)
+    public ResponseEntity<GenericResponse<Void>> handleAccesoDenegado(AccesoDenegadoException exception) {
+        return negocio(exception);
+    }
+
+    @ExceptionHandler(ClienteInactivoException.class)
+    public ResponseEntity<GenericResponse<Void>> handleClienteInactivo(ClienteInactivoException exception) {
+        return negocio(exception);
+    }
+
+    @ExceptionHandler(CuentaBloqueadaException.class)
+    public ResponseEntity<GenericResponse<Void>> handleCuentaBloqueada(CuentaBloqueadaException exception) {
+        return negocio(exception);
+    }
+
+    /** Cualquier otra excepción de negocio que se agregue en el futuro. */
+    @ExceptionHandler(OnboardingException.class)
+    public ResponseEntity<GenericResponse<Void>> handleOnboardingException(OnboardingException exception) {
+        return negocio(exception);
+    }
+
+    private ResponseEntity<GenericResponse<Void>> negocio(OnboardingException exception) {
+        return build(exception.getStatus(), exception.getCodigo(), exception.getMessage());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -276,16 +326,14 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    /** El mensaje original puede contener detalles internos: solo se registra en el log. */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<GenericResponse<Void>> handleIllegalArgument(
             IllegalArgumentException exception) {
 
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(GenericResponse.error(
-                        400,
-                        exception.getMessage()
-                ));
+        log.warn("Argumento no válido: {}", exception.getMessage());
+        return build(HttpStatus.BAD_REQUEST, 400,
+                "La petición contiene un valor que no se puede procesar. Revise los datos enviados e intente nuevamente.");
     }
 
     @ExceptionHandler(Exception.class)
@@ -294,12 +342,8 @@ public class GlobalExceptionHandler {
 
         // Se registra el detalle en el log, pero NO se expone al cliente (evita filtrar SQL, clases, rutas, etc.)
         log.error("Error no controlado", exception);
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(GenericResponse.error(
-                        ErrorCode.INTERNAL_ERROR.getCode(),
-                        ErrorCode.INTERNAL_ERROR.getMessage()
-                ));
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, 500,
+                "Ocurrió un error inesperado al procesar la solicitud. Intente nuevamente; si el problema continúa, contacte al administrador.");
     }
 
     private ResponseEntity<GenericResponse<Void>> build(HttpStatus status, int codigo, String mensaje) {

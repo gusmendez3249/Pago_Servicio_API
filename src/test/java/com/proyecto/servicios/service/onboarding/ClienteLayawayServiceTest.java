@@ -3,23 +3,19 @@ package com.proyecto.servicios.service.onboarding;
 import com.proyecto.servicios.config.onboarding.PasswordEncoderUtil;
 import com.proyecto.servicios.dto.onboarding.*;
 import com.proyecto.servicios.entity.onboarding.*;
-import com.proyecto.servicios.exception.OnboardingException;
+import com.proyecto.servicios.exception.*;
 import com.proyecto.servicios.repositorys.onboarding.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.Spy;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.data.domain.PageImpl;
-import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -63,10 +59,6 @@ class ClienteLayawayServiceTest {
     @Mock
     private SesionService sesionService;
 
-    // Validador real: el cuerpo se valida en el servicio, después de autenticar
-    @Spy
-    private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-
     @InjectMocks
     private ClienteLayawayService clienteLayawayService;
 
@@ -74,7 +66,10 @@ class ClienteLayawayServiceTest {
     private static final SesionUsuario CLIENTE = new SesionUsuario(2L, "juan", "CLIENTE", 10L);
     private static final String TOKEN = "Bearer token-de-prueba";
 
-    /** Por omisión las pruebas actúan como ejecutivo autenticado (sin restricción de recurso). */
+    /**
+     * Por omisión las pruebas actúan como ejecutivo autenticado (sin restricción de recurso). El formato del cuerpo
+     * lo valida @Valid en el controlador (ver LayawayClienteRequestValidacionTest); aquí se prueban las reglas de negocio.
+     */
     private LayawayClienteResponse procesar(LayawayClienteRequest request) {
         return clienteLayawayService.procesarOperacion(request, TOKEN);
     }
@@ -200,64 +195,6 @@ class ClienteLayawayServiceTest {
     }
 
     @Test
-    void procesarOperacion_Bandera1_ConClienteIdInvalido_LanzaBadRequest() {
-        requestInsertar.setClienteId(10L); // Postura B: bandera 1 solo admite null o 0
-
-        OnboardingException exception = assertThrows(OnboardingException.class, () ->
-                procesar(requestInsertar)
-        );
-
-        assertEquals(400, exception.getCodigo());
-        assertTrue(exception.getMessage().contains("clienteId debe ser nulo o 0"));
-    }
-
-    @Test
-    void procesarOperacion_Bandera2y3_SinLlaves_LanzaBadRequestSinTocarNada() {
-        for (int bandera : new int[]{2, 3}) {
-            LayawayClienteRequest[] invalidas = {
-                    LayawayClienteRequest.builder().bandera(bandera).build(),
-                    LayawayClienteRequest.builder().bandera(bandera).filtros(new FiltrosClienteDto()).build(),
-            };
-            for (LayawayClienteRequest req : invalidas) {
-                OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(req));
-                assertEquals(400, ex.getCodigo());
-                assertTrue(ex.getMessage().contains("'filtros'"), ex.getMessage());
-            }
-        }
-        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
-        verify(clienteRepository, never()).save(any());
-    }
-
-    @Test
-    void procesarOperacion_Bandera2y3_ConClienteId_SeRechazaPorqueYaNoSeUsa() {
-        for (int bandera : new int[]{2, 3}) {
-            LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera).clienteId(5L)
-                    .filtros(FiltrosClienteDto.builder().curp("LOPS900101MDFRMN02").build()).build();
-            OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(req));
-            assertEquals(400, ex.getCodigo());
-            assertTrue(ex.getMessage().contains("clienteId ya no se utiliza"));
-        }
-    }
-
-    @Test
-    void procesarOperacion_Bandera2y3_LlaveIncompleta_ExigeValorCompleto() {
-        FiltrosClienteDto[] incompletos = {
-                FiltrosClienteDto.builder().curp("LOPS90").build(),
-                FiltrosClienteDto.builder().rfc("LOPS").build(),
-                FiltrosClienteDto.builder().numeroCuenta("3001").build(),
-        };
-        for (int bandera : new int[]{2, 3}) {
-            for (FiltrosClienteDto f : incompletos) {
-                LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera).filtros(f).build();
-                OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(req));
-                assertEquals(400, ex.getCodigo());
-                assertTrue(ex.getMessage().contains("COMPLETO"));
-            }
-        }
-        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    @Test
     @SuppressWarnings("unchecked")
     void procesarOperacion_Bandera2y3_LlaveSinCoincidencia_Lanza404() {
         when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
@@ -265,18 +202,10 @@ class ClienteLayawayServiceTest {
         for (int bandera : new int[]{2, 3}) {
             LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera)
                     .filtros(FiltrosClienteDto.builder().curp("ZZZZ900101MDFRMN02").build()).build();
-            OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(req));
+            ClienteNoEncontradoException ex = assertThrows(ClienteNoEncontradoException.class, () -> procesar(req));
             assertEquals(404, ex.getCodigo());
         }
         verify(clienteRepository, never()).save(any());
-    }
-
-    @Test
-    void procesarOperacion_Bandera1_ConFiltros_LanzaBadRequest() {
-        requestInsertar.setFiltros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build());
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(requestInsertar));
-        assertEquals(400, ex.getCodigo());
-        assertTrue(ex.getMessage().contains("filtros"));
     }
 
     @Test
@@ -311,7 +240,7 @@ class ClienteLayawayServiceTest {
                 .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
         when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class, () -> procesar(
                 LayawayClienteRequest.builder().bandera(2)
                         .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
                         .loginCredenciales(LoginCredencialesDto.builder().username("otro_usuario").build()).build()));
@@ -338,22 +267,11 @@ class ClienteLayawayServiceTest {
         requestInsertar.getDatosPersonales().setNacionalidad("MEX");
         when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEX")).thenReturn(false);
 
-        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+        NacionalidadNoValidaException exception = assertThrows(NacionalidadNoValidaException.class, () ->
                 procesar(requestInsertar)
         );
 
         assertEquals(404, exception.getCodigo());
-        verify(clienteRepository, never()).save(any());
-    }
-
-    @Test
-    void procesarOperacion_Bandera1_NacionalidadEnMinusculas_SeRechazaPorValidacion() {
-        for (String variante : new String[]{"Mexicana", "mexicana"}) {
-            requestInsertar.getDatosPersonales().setNacionalidad(variante);
-            com.proyecto.servicios.exception.ValidacionException ex = assertThrows(
-                    com.proyecto.servicios.exception.ValidacionException.class, () -> procesar(requestInsertar), variante);
-            assertTrue(ex.getErrores().containsKey("datosPersonales.nacionalidad"), variante);
-        }
         verify(clienteRepository, never()).save(any());
     }
 
@@ -382,7 +300,7 @@ class ClienteLayawayServiceTest {
                 .datosPersonales(requestInsertar.getDatosPersonales())
                 .build();
 
-        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+        ReglaNegocioException exception = assertThrows(ReglaNegocioException.class, () ->
                 procesar(requestActualizar)
         );
 
@@ -398,7 +316,7 @@ class ClienteLayawayServiceTest {
         requestInsertar.getDatosPersonales().setNacionalidad("MARCIANA");
         when(catNacionalidadRepository.existsByNombreAndActivoTrue("MARCIANA")).thenReturn(false);
 
-        OnboardingException exception = assertThrows(OnboardingException.class, () ->
+        NacionalidadNoValidaException exception = assertThrows(NacionalidadNoValidaException.class, () ->
                 procesar(requestInsertar)
         );
 
@@ -418,6 +336,32 @@ class ClienteLayawayServiceTest {
 
         verify(clienteRepository).save(argThat(c -> "FEMENINO".equals(c.getSexo())
                 && "UNION LIBRE".equals(c.getEstadoCivil()) && "MEXICANA".equals(c.getNacionalidad())));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_ClienteDadoDeBaja_LanzaClienteInactivo() {
+        ClienteEntity inactivo = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").activo(false).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(inactivo), PageRequest.of(0, 2), 1));
+
+        ClienteInactivoException ex = assertThrows(ClienteInactivoException.class, () -> procesar(LayawayClienteRequest.builder().bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build()).build()));
+
+        assertEquals(403, ex.getCodigo());
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_CurpDuplicada_LanzaRegistroDuplicado() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.existsByCurp("PERJ950515HDFRMN01")).thenReturn(true);
+
+        RegistroDuplicadoException ex = assertThrows(RegistroDuplicadoException.class, () -> procesar(requestInsertar));
+
+        assertEquals(409, ex.getCodigo());
+        assertTrue(ex.getMessage().contains("CURP"));
+        verify(clienteRepository, never()).save(any());
     }
 
     // ---------- Bandera 4: consulta ----------
@@ -481,36 +425,18 @@ class ClienteLayawayServiceTest {
         assertTrue(r.getResultadosTruncados());
     }
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void procesarOperacion_Bandera4_ConOtrasSeccionesOClienteId_LanzaBadRequestSinConsultar() {
-        LayawayClienteRequest[] invalidas = {
-                LayawayClienteRequest.builder().bandera(4).clienteId(5L).build(),
-                LayawayClienteRequest.builder().bandera(4).datosPersonales(requestInsertar.getDatosPersonales()).build(),
-                LayawayClienteRequest.builder().bandera(4).datosContacto(requestInsertar.getDatosContacto()).build(),
-                LayawayClienteRequest.builder().bandera(4).loginCredenciales(requestInsertar.getLoginCredenciales()).build(),
-        };
-        for (LayawayClienteRequest req : invalidas) {
-            OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(req));
-            assertEquals(400, ex.getCodigo());
-            assertTrue(ex.getMessage().contains("'filtros'"));
-        }
-        verifyNoInteractions(cuentaRepository);
-        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
-    }
-
     // ---------- Autenticación y autorización a nivel de recurso ----------
 
     @Test
     @SuppressWarnings("unchecked")
     void banderas2_3_4_SinToken_Lanzan401SinTocarLosDatos() {
         when(sesionService.autenticar(isNull()))
-                .thenThrow(new OnboardingException("Se requiere autenticación", HttpStatus.UNAUTHORIZED, 401));
+                .thenThrow(new NoAutenticadoException("Se requiere autenticación"));
         FiltrosClienteDto llaves = FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build();
 
         for (int bandera : new int[]{2, 3, 4}) {
             LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera).filtros(llaves).build();
-            OnboardingException ex = assertThrows(OnboardingException.class, () -> clienteLayawayService.procesarOperacion(req, null));
+            NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> clienteLayawayService.procesarOperacion(req, null));
             assertEquals(401, ex.getCodigo(), "bandera " + bandera);
         }
         verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
@@ -534,7 +460,7 @@ class ClienteLayawayServiceTest {
     void bandera3_Baja_UnClienteNoPuedeDarDeBaja_Lanza403() {
         when(sesionService.autenticar(any())).thenReturn(CLIENTE);
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(LayawayClienteRequest.builder().bandera(3)
+        AccesoDenegadoException ex = assertThrows(AccesoDenegadoException.class, () -> procesar(LayawayClienteRequest.builder().bandera(3)
                 .filtros(FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build()).build()));
 
         assertEquals(403, ex.getCodigo());
@@ -549,7 +475,7 @@ class ClienteLayawayServiceTest {
         for (int bandera : new int[]{2, 4}) {
             LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera)
                     .filtros(FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build()).build();
-            OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(req));
+            AccesoDenegadoException ex = assertThrows(AccesoDenegadoException.class, () -> procesar(req));
             assertEquals(403, ex.getCodigo(), "bandera " + bandera);
         }
         verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
@@ -580,7 +506,7 @@ class ClienteLayawayServiceTest {
         when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1000), 0));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(LayawayClienteRequest.builder().bandera(4)
+        ClienteNoEncontradoException ex = assertThrows(ClienteNoEncontradoException.class, () -> procesar(LayawayClienteRequest.builder().bandera(4)
                 .filtros(FiltrosClienteDto.builder().curp("ZZZZ").build()).build()));
 
         assertEquals(404, ex.getCodigo());
@@ -600,55 +526,4 @@ class ClienteLayawayServiceTest {
         assertEquals(0L, r.getTotalCoincidencias());
     }
 
-    // ---------- Orden: autenticación -> permiso -> validación ----------
-
-    private static LayawayClienteRequest cuerpoInvalido(int bandera) {
-        // nombre de 2 letras y sexo en minúsculas: incumple las reglas de validación
-        DatosPersonalesDto dp = DatosPersonalesDto.builder().nombre("Li").sexo("masculino").build();
-        return LayawayClienteRequest.builder().bandera(bandera)
-                .filtros(FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build())
-                .datosPersonales(dp).build();
-    }
-
-    @Test
-    void sinToken_ConCuerpoInvalido_Responde401YNoElDetalleDeValidacion() {
-        when(sesionService.autenticar(isNull()))
-                .thenThrow(new OnboardingException("Se requiere autenticación", HttpStatus.UNAUTHORIZED, 401));
-
-        for (int bandera : new int[]{2, 3, 4}) {
-            OnboardingException ex = assertThrows(OnboardingException.class,
-                    () -> clienteLayawayService.procesarOperacion(cuerpoInvalido(bandera), null));
-            assertEquals(401, ex.getCodigo(), "bandera " + bandera);
-        }
-    }
-
-    @Test
-    void conToken_ConCuerpoInvalido_Responde400ConDetalleDeCadaCampo() {
-        com.proyecto.servicios.exception.ValidacionException ex = assertThrows(
-                com.proyecto.servicios.exception.ValidacionException.class, () -> procesar(cuerpoInvalido(2)));
-
-        assertTrue(ex.getErrores().containsKey("datosPersonales.nombre"));
-        assertTrue(ex.getErrores().containsKey("datosPersonales.sexo"));
-        verify(clienteRepository, never()).save(any());
-    }
-
-    @Test
-    void clienteQueIntentaBaja_ConCuerpoInvalido_Responde403YNoElDetalleDeValidacion() {
-        when(sesionService.autenticar(any())).thenReturn(CLIENTE);
-
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> procesar(cuerpoInvalido(3)));
-
-        assertEquals(403, ex.getCodigo());
-    }
-
-    @Test
-    void bandera1_RegistroConCuerpoInvalido_SigueRespondiendo400() {
-        com.proyecto.servicios.exception.ValidacionException ex = assertThrows(
-                com.proyecto.servicios.exception.ValidacionException.class,
-                () -> clienteLayawayService.procesarOperacion(
-                        LayawayClienteRequest.builder().bandera(1).datosPersonales(DatosPersonalesDto.builder().nombre("Li").build()).build(), null));
-
-        assertFalse(ex.getErrores().isEmpty());
-        verifyNoInteractions(sesionService);
-    }
 }

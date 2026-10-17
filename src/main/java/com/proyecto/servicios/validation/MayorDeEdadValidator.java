@@ -15,7 +15,7 @@ public class MayorDeEdadValidator implements ConstraintValidator<MayorDeEdad, Lo
     @Override
     public boolean isValid(LocalDate fechaNacimiento, ConstraintValidatorContext context) {
         if (fechaNacimiento == null) {
-            return false;
+            return true; // la ausencia la reporta @NotNull con su propio mensaje
         }
 
         LocalDate hoy = LocalDate.now();

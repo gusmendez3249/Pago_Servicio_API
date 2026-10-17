@@ -5,7 +5,8 @@ import com.proyecto.servicios.dto.onboarding.LoginRequest;
 import com.proyecto.servicios.dto.onboarding.LoginResponse;
 import com.proyecto.servicios.entity.onboarding.ClienteEntity;
 import com.proyecto.servicios.entity.onboarding.UsuarioLoginEntity;
-import com.proyecto.servicios.exception.OnboardingException;
+import com.proyecto.servicios.exception.CuentaBloqueadaException;
+import com.proyecto.servicios.exception.NoAutenticadoException;
 import com.proyecto.servicios.repositorys.onboarding.UsuarioLoginRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -144,7 +145,7 @@ class AuthServiceTest {
 
         when(usuarioLoginRepository.findByUsername("inexistente")).thenReturn(Optional.empty());
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> authService.login(request));
         // Mismo código y mensaje que una contraseña incorrecta: no revela si el usuario existe
         assertEquals(401, ex.getCodigo());
         assertEquals("Credenciales inválidas.", ex.getMessage());
@@ -157,7 +158,7 @@ class AuthServiceTest {
         when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
         when(passwordEncoderUtil.matches("mala", "encoded_hash")).thenReturn(false);
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> authService.login(request));
 
         assertEquals(401, ex.getCodigo());
         assertEquals("Credenciales inválidas.", ex.getMessage());
@@ -171,7 +172,7 @@ class AuthServiceTest {
                 .bandera(1).username("juan_perez").password("Password123!").build();
         when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+        CuentaBloqueadaException ex = assertThrows(CuentaBloqueadaException.class, () -> authService.login(request));
 
         assertEquals(423, ex.getCodigo());
         verify(passwordEncoderUtil, never()).matches(any(), any());
@@ -184,7 +185,7 @@ class AuthServiceTest {
                 .bandera(1).username("juan_perez").password("mala").build();
         when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
 
-        OnboardingException ex = assertThrows(OnboardingException.class, () -> authService.login(request));
+        NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> authService.login(request));
 
         assertEquals(401, ex.getCodigo());
     }

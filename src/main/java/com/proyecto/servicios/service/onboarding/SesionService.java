@@ -3,10 +3,10 @@ package com.proyecto.servicios.service.onboarding;
 import com.proyecto.servicios.config.onboarding.TokenUtil;
 import com.proyecto.servicios.entity.onboarding.ClienteEntity;
 import com.proyecto.servicios.entity.onboarding.UsuarioLoginEntity;
-import com.proyecto.servicios.exception.OnboardingException;
+import com.proyecto.servicios.exception.ClienteInactivoException;
+import com.proyecto.servicios.exception.NoAutenticadoException;
 import com.proyecto.servicios.repositorys.onboarding.UsuarioLoginRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -36,8 +36,8 @@ public class SesionService {
 
     /**
      * @return el usuario dueño del token
-     * @throws OnboardingException 401 si falta, está mal formado, no existe o expiró; 403 si el cliente
-     *                             asociado fue dado de baja
+     * @throws NoAutenticadoException   401 si falta, está mal formado, no existe o expiró
+     * @throws ClienteInactivoException 403 si el cliente asociado fue dado de baja
      */
     public SesionUsuario autenticar(String authorization) {
         String token = extraerToken(authorization);
@@ -61,7 +61,7 @@ public class SesionService {
 
             ClienteEntity cliente = usuario.getCliente();
             if (cliente != null && Boolean.FALSE.equals(cliente.getActivo())) {
-                throw new OnboardingException("El cliente asociado a este usuario se encuentra inactivo.", HttpStatus.FORBIDDEN, 403);
+                throw new ClienteInactivoException("El cliente asociado a este usuario se encuentra inactivo.");
             }
 
             // Renovación de la sesión por actividad
@@ -74,22 +74,22 @@ public class SesionService {
         });
 
         if (sesion == null) {
-            throw new OnboardingException(MENSAJE_TOKEN_INVALIDO, HttpStatus.UNAUTHORIZED, 401);
+            throw new NoAutenticadoException(MENSAJE_TOKEN_INVALIDO);
         }
         return sesion;
     }
 
     private static String extraerToken(String authorization) {
         if (authorization == null || authorization.isBlank()) {
-            throw new OnboardingException(MENSAJE_SIN_TOKEN, HttpStatus.UNAUTHORIZED, 401);
+            throw new NoAutenticadoException(MENSAJE_SIN_TOKEN);
         }
         String valor = authorization.trim();
         if (!valor.toLowerCase(Locale.ROOT).startsWith("bearer ")) {
-            throw new OnboardingException("Esquema de autenticación no soportado: use 'Authorization: Bearer <token>'.", HttpStatus.UNAUTHORIZED, 401);
+            throw new NoAutenticadoException("Esquema de autenticación no soportado: use 'Authorization: Bearer <token>'.");
         }
         String token = valor.substring(7).trim();
         if (!TOKEN_VALIDO.matcher(token).matches()) {
-            throw new OnboardingException(MENSAJE_TOKEN_INVALIDO, HttpStatus.UNAUTHORIZED, 401);
+            throw new NoAutenticadoException(MENSAJE_TOKEN_INVALIDO);
         }
         return token;
     }

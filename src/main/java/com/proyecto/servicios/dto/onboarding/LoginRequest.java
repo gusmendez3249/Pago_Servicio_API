@@ -1,5 +1,6 @@
 package com.proyecto.servicios.dto.onboarding;
 
+import com.proyecto.servicios.validation.LoginValido;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -17,6 +18,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@LoginValido
 public class LoginRequest {
 
     @Schema(description = "Bandera de autenticación (1 = Contraseña, 2 = Biométrico Face ID)", example = "1")

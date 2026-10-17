@@ -6,12 +6,13 @@ import com.proyecto.servicios.dto.onboarding.LoginRequest;
 import com.proyecto.servicios.dto.onboarding.LoginResponse;
 import com.proyecto.servicios.entity.onboarding.ClienteEntity;
 import com.proyecto.servicios.entity.onboarding.UsuarioLoginEntity;
-import com.proyecto.servicios.exception.OnboardingException;
+import com.proyecto.servicios.exception.ClienteInactivoException;
+import com.proyecto.servicios.exception.CuentaBloqueadaException;
+import com.proyecto.servicios.exception.NoAutenticadoException;
 import com.proyecto.servicios.repositorys.onboarding.UsuarioLoginRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,27 +38,9 @@ public class AuthService {
     // Mismo mensaje para usuario inexistente y credencial incorrecta: no revela qué usuarios existen
     private static final String CREDENCIALES_INVALIDAS = "Credenciales inválidas.";
 
+    /** La petición ya llega validada por @Valid (formato del usuario, bandera 1 o 2 y la credencial que exige, ver @LoginValido). */
     public LoginResponse login(LoginRequest request) {
-        if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
-            throw new OnboardingException("El nombre de usuario es obligatorio.", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        // Validaciones de forma antes de consultar la BD
         Integer bandera = request.getBandera();
-        if (bandera == null) {
-            throw new OnboardingException("La bandera de autenticación es obligatoria (1 = Contraseña, 2 = Biométrico Face ID).", HttpStatus.BAD_REQUEST, 400);
-        }
-        if (bandera == 1) {
-            if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
-                throw new OnboardingException("La contraseña es requerida para autenticación por contraseña.", HttpStatus.BAD_REQUEST, 400);
-            }
-        } else if (bandera == 2) {
-            if (request.getFaceIdBiometrico() == null) {
-                throw new OnboardingException("El identificador biométrico Face ID es requerido para autenticación por biométrico.", HttpStatus.BAD_REQUEST, 400);
-            }
-        } else {
-            throw new OnboardingException("Bandera de autenticación no válida: " + bandera + ". Use 1 (Contraseña) o 2 (Biométrico).", HttpStatus.BAD_REQUEST, 400);
-        }
 
         LocalDateTime ahora = LocalDateTime.now();
 
@@ -69,7 +52,7 @@ public class AuthService {
             if (bandera == 1) {
                 passwordEncoderUtil.simularVerificacion(request.getPassword());
             }
-            throw new OnboardingException(CREDENCIALES_INVALIDAS, HttpStatus.UNAUTHORIZED, 401);
+            throw new NoAutenticadoException(CREDENCIALES_INVALIDAS);
         }
 
         // Fase 2 (sin transacción): la verificación PBKDF2 es costosa a propósito y no debe retener
@@ -81,13 +64,13 @@ public class AuthService {
         if (!credencialValida) {
             transactionTemplate.executeWithoutResult(status -> usuarioLoginRepository.registrarIntentoFallido(
                     usuario.getId(), MAX_INTENTOS_FALLIDOS, ahora.plusMinutes(BLOQUEO_MINUTOS)));
-            throw new OnboardingException(CREDENCIALES_INVALIDAS, HttpStatus.UNAUTHORIZED, 401);
+            throw new NoAutenticadoException(CREDENCIALES_INVALIDAS);
         }
 
         // Solo tras validar la credencial se informa que el cliente está inactivo (evita revelar el estado a terceros)
         ClienteEntity cliente = usuario.getCliente();
         if (cliente != null && Boolean.FALSE.equals(cliente.getActivo())) {
-            throw new OnboardingException("El cliente asociado a este usuario se encuentra inactivo.", HttpStatus.FORBIDDEN, 403);
+            throw new ClienteInactivoException("El cliente asociado a este usuario se encuentra inactivo.");
         }
 
         // Migra hashes del esquema antiguo (SHA-256 con sal fija) a PBKDF2 (también fuera de la transacción)
@@ -130,7 +113,7 @@ public class AuthService {
 
         if (usuario.getBloqueadoHasta() != null && usuario.getBloqueadoHasta().isAfter(ahora)) {
             long minutos = Math.max(1, Duration.between(ahora, usuario.getBloqueadoHasta()).toMinutes());
-            throw new OnboardingException("Cuenta bloqueada temporalmente por exceso de intentos fallidos. Intente de nuevo en " + minutos + " minuto(s).", HttpStatus.LOCKED, 423);
+            throw new CuentaBloqueadaException("Cuenta bloqueada temporalmente por exceso de intentos fallidos. Intente de nuevo en " + minutos + " minuto(s).");
         }
 
         // Verificar inactividad previa de 5 minutos si ya estaba logueado
@@ -146,29 +129,6 @@ public class AuthService {
         // La relación con el cliente es LAZY: se inicializa mientras la sesión de Hibernate sigue abierta
         Hibernate.initialize(usuario.getCliente());
         return usuario;
-    }
-
-    @Transactional
-    public void validarActividadYSesion(String username) {
-        UsuarioLoginEntity usuario = usuarioLoginRepository.findByUsername(username)
-                .orElseThrow(() -> new OnboardingException("Usuario no encontrado", HttpStatus.NOT_FOUND, 404));
-
-        if (!Boolean.TRUE.equals(usuario.getIsLoggedIn())) {
-            throw new OnboardingException("Debe iniciar sesión primero", HttpStatus.UNAUTHORIZED, 401);
-        }
-
-        if (usuario.getUltimaActividad() != null) {
-            long minutos = Duration.between(usuario.getUltimaActividad(), LocalDateTime.now()).toMinutes();
-            if (minutos >= INACTIVIDAD_MINUTOS_MAX) {
-                usuario.setIsLoggedIn(false);
-                usuarioLoginRepository.save(usuario);
-                throw new OnboardingException("Sesión cerrada por inactividad superior a 5 minutos", HttpStatus.UNAUTHORIZED, 401);
-            }
-        }
-
-        // Actualizar actividad
-        usuario.setUltimaActividad(LocalDateTime.now());
-        usuarioLoginRepository.save(usuario);
     }
 
     @Transactional

@@ -3,31 +3,29 @@ package com.proyecto.servicios.service.onboarding;
 import com.proyecto.servicios.config.onboarding.PasswordEncoderUtil;
 import com.proyecto.servicios.dto.onboarding.*;
 import com.proyecto.servicios.entity.onboarding.*;
-import com.proyecto.servicios.exception.OnboardingException;
-import com.proyecto.servicios.exception.ValidacionException;
+import com.proyecto.servicios.exception.AccesoDenegadoException;
+import com.proyecto.servicios.exception.ClienteInactivoException;
+import com.proyecto.servicios.exception.ClienteNoEncontradoException;
+import com.proyecto.servicios.exception.NacionalidadNoValidaException;
+import com.proyecto.servicios.exception.RecursoNoEncontradoException;
+import com.proyecto.servicios.exception.RegistroDuplicadoException;
+import com.proyecto.servicios.exception.ReglaNegocioException;
 import com.proyecto.servicios.repositorys.onboarding.*;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Period;
 import java.util.ArrayList;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,7 +45,6 @@ public class ClienteLayawayService {
     private final PasswordEncoderUtil passwordEncoderUtil;
     private final TransactionTemplate transactionTemplate;
     private final SesionService sesionService;
-    private final Validator validator;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -61,21 +58,16 @@ public class ClienteLayawayService {
      * (bajo carga con JMeter eso agotaba el pool y producía respuestas 503).
      */
     public LayawayClienteResponse procesarOperacion(LayawayClienteRequest request, String authorization) {
-        Integer bandera = request.getBandera();
-        if (bandera == null) {
-            throw new OnboardingException("La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica, 4 = Consultar).", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        // Orden de las comprobaciones: 1) autenticación (401), 2) autorización por rol (403), 3) validación del
-        // cuerpo (400) y 4) operación. Así quien no presenta un token válido nunca recibe el detalle de validación.
+        // El cuerpo ya llega validado por @Valid en el controlador (anotaciones del DTO y @OperacionClienteValida).
+        // Aquí: 1) autenticación (401), 2) autorización por rol (403) y 3) reglas de negocio contra la base de datos.
         // El registro (bandera 1) es público: no requiere token.
+        Integer bandera = request.getBandera();
         SesionUsuario sesion = (bandera >= 2 && bandera <= 4) ? sesionService.autenticar(authorization) : null;
         if (bandera == 3 && !sesion.esEjecutivo()) {
-            throw new OnboardingException("Solo un ejecutivo puede dar de baja clientes.", HttpStatus.FORBIDDEN, 403);
+            throw new AccesoDenegadoException("Solo un ejecutivo puede dar de baja clientes.");
         }
         // Autorización a nivel de recurso: un cliente solo accede a SU registro; el ejecutivo, a cualquiera (null)
         Long propietario = (bandera == 2 || bandera == 4) ? propietarioPermitido(sesion) : null;
-        validarCuerpo(request);
 
         return switch (bandera) {
             case 1 -> {
@@ -90,20 +82,8 @@ public class ClienteLayawayService {
             }
             case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
             case 4 -> transactionTemplate.execute(status -> consultarClientes(request, propietario));
-            default -> throw new OnboardingException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).", HttpStatus.BAD_REQUEST, 400);
+            default -> throw new ReglaNegocioException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).");
         };
-    }
-
-    /** Valida el cuerpo completo (la bandera ya se validó al recibir la petición). */
-    private void validarCuerpo(LayawayClienteRequest request) {
-        Set<ConstraintViolation<LayawayClienteRequest>> violaciones = validator.validate(request);
-        if (!violaciones.isEmpty()) {
-            Map<String, String> errores = new TreeMap<>();
-            for (ConstraintViolation<LayawayClienteRequest> v : violaciones) {
-                errores.put(v.getPropertyPath().toString(), v.getMessage());
-            }
-            throw new ValidacionException(errores);
-        }
     }
 
     /**
@@ -115,7 +95,7 @@ public class ClienteLayawayService {
             return null;
         }
         if (sesion.clienteId() == null) {
-            throw new OnboardingException("El usuario no tiene un cliente asociado.", HttpStatus.FORBIDDEN, 403);
+            throw new AccesoDenegadoException("El usuario no tiene un cliente asociado.");
         }
         return sesion.clienteId();
     }
@@ -127,35 +107,19 @@ public class ClienteLayawayService {
         InformacionLaboralDto infoLab = request.getInformacionLaboral();
         LoginCredencialesDto loginDto = request.getLoginCredenciales();
 
-        // Validación estricta Postura B: Para bandera = 1 (Insertar), clienteId debe ser null o 0
-        if (request.getClienteId() != null && request.getClienteId() != 0) {
-            throw new OnboardingException("Para la operación INSERTAR (bandera = 1), el clienteId debe ser nulo o 0. No se permite enviar un ID preexistente o arbitrario.", HttpStatus.BAD_REQUEST, 400);
-        }
-        if (request.getFiltros() != null) {
-            throw new OnboardingException("Para la operación INSERTAR (bandera = 1) no se usa el objeto 'filtros'.", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        if (dp == null || dc == null || dom == null || infoLab == null) {
-            throw new OnboardingException("Los datos personales, de contacto, domicilio e información laboral son obligatorios para la creación.", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        // 1. Validar mayoría de edad
-        if (dp.getFechaNacimiento() == null || Period.between(dp.getFechaNacimiento(), LocalDate.now()).getYears() < 18) {
-            throw new OnboardingException("El cliente debe ser mayor de edad (18 años o más).", HttpStatus.BAD_REQUEST, 400);
-        }
-
-        // 1.1 Validar catálogo de nacionalidad en la base de datos (coincidencia exacta)
+        // El formato, las secciones obligatorias y la mayoría de edad (@MayorDeEdad) ya se validaron en el DTO.
+        // 1. Validar catálogo de nacionalidad en la base de datos (coincidencia exacta)
         validarNacionalidadEnBD(dp.getNacionalidad());
 
         // 2. Validar Unicidad de CURP, RFC, Correo
         if (clienteRepository.existsByCurp(dp.getCurp().trim().toUpperCase())) {
-            throw new OnboardingException("Ya existe un cliente registrado con la CURP: " + dp.getCurp(), HttpStatus.CONFLICT, 409);
+            throw new RegistroDuplicadoException("Ya existe un cliente registrado con la CURP: " + dp.getCurp());
         }
         if (clienteRepository.existsByRfc(dp.getRfc().trim().toUpperCase())) {
-            throw new OnboardingException("Ya existe un cliente registrado con el RFC: " + dp.getRfc(), HttpStatus.CONFLICT, 409);
+            throw new RegistroDuplicadoException("Ya existe un cliente registrado con el RFC: " + dp.getRfc());
         }
         if (clienteRepository.existsByCorreo(dc.getCorreo().trim().toLowerCase())) {
-            throw new OnboardingException("Ya existe un cliente registrado con el correo: " + dc.getCorreo(), HttpStatus.CONFLICT, 409);
+            throw new RegistroDuplicadoException("Ya existe un cliente registrado con el correo: " + dc.getCorreo());
         }
 
         String username = (loginDto != null && loginDto.getUsername() != null && !loginDto.getUsername().trim().isEmpty())
@@ -163,7 +127,7 @@ public class ClienteLayawayService {
                 : dp.getCurp().trim().toLowerCase();
 
         if (usuarioLoginRepository.existsByUsername(username)) {
-            throw new OnboardingException("El nombre de usuario '" + username + "' ya se encuentra en uso.", HttpStatus.CONFLICT, 409);
+            throw new RegistroDuplicadoException("El nombre de usuario '" + username + "' ya se encuentra en uso.");
         }
 
         // 3. Crear Domicilio
@@ -254,10 +218,10 @@ public class ClienteLayawayService {
     }
 
     private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash, Long soloClienteId) {
-        ClienteEntity cliente = localizarCliente(request, "ACTUALIZAR (bandera = 2)", soloClienteId);
+        ClienteEntity cliente = localizarCliente(request, soloClienteId);
 
         if (Boolean.FALSE.equals(cliente.getActivo())) {
-            throw new OnboardingException("No se puede actualizar la información de un cliente inactivo.", HttpStatus.FORBIDDEN, 403);
+            throw new ClienteInactivoException("No se puede actualizar la información de un cliente inactivo.");
         }
 
         // Actualizar datos personales (PRESERVANDO INMUTABILIDAD DE CURP Y RFC)
@@ -265,21 +229,16 @@ public class ClienteLayawayService {
             DatosPersonalesDto dp = request.getDatosPersonales();
             // CURP y RFC no son modificables: si se envían deben coincidir con los registrados
             if (dp.getCurp() != null && !dp.getCurp().trim().equalsIgnoreCase(cliente.getCurp())) {
-                throw new OnboardingException("La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.", HttpStatus.BAD_REQUEST, 400);
+                throw new ReglaNegocioException("La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.");
             }
             if (dp.getRfc() != null && !dp.getRfc().trim().equalsIgnoreCase(cliente.getRfc())) {
-                throw new OnboardingException("El RFC no puede modificarse. Envíe el RFC registrado o omita el campo.", HttpStatus.BAD_REQUEST, 400);
+                throw new ReglaNegocioException("El RFC no puede modificarse. Envíe el RFC registrado o omita el campo.");
             }
             if (dp.getNombre() != null) cliente.setNombre(limpiar(dp.getNombre()));
             if (dp.getSegundoNombre() != null) cliente.setSegundoNombre(limpiar(dp.getSegundoNombre()));
             if (dp.getApellidoPaterno() != null) cliente.setApellidoPaterno(limpiar(dp.getApellidoPaterno()));
             if (dp.getApellidoMaterno() != null) cliente.setApellidoMaterno(limpiar(dp.getApellidoMaterno()));
-            if (dp.getFechaNacimiento() != null) {
-                if (Period.between(dp.getFechaNacimiento(), LocalDate.now()).getYears() < 18) {
-                    throw new OnboardingException("El cliente debe ser mayor de edad (18 años o más).", HttpStatus.BAD_REQUEST, 400);
-                }
-                cliente.setFechaNacimiento(dp.getFechaNacimiento());
-            }
+            if (dp.getFechaNacimiento() != null) cliente.setFechaNacimiento(dp.getFechaNacimiento());
             if (dp.getSexo() != null) cliente.setSexo(dp.getSexo());
             if (dp.getNacionalidad() != null) {
                 validarNacionalidadEnBD(dp.getNacionalidad());
@@ -297,7 +256,7 @@ public class ClienteLayawayService {
             DatosContactoDto dc = request.getDatosContacto();
             if (dc.getCorreo() != null && !dc.getCorreo().trim().equalsIgnoreCase(cliente.getCorreo())) {
                 if (clienteRepository.existsByCorreo(dc.getCorreo().trim().toLowerCase())) {
-                    throw new OnboardingException("El nuevo correo ya está registrado por otro cliente.", HttpStatus.CONFLICT, 409);
+                    throw new RegistroDuplicadoException("El nuevo correo ya está registrado por otro cliente.");
                 }
                 cliente.setCorreo(dc.getCorreo().trim().toLowerCase());
             }
@@ -335,9 +294,9 @@ public class ClienteLayawayService {
         LoginCredencialesDto credenciales = request.getLoginCredenciales();
         if (credenciales != null) {
             UsuarioLoginEntity usuario = usuarioLoginRepository.findByClienteId(cliente.getId())
-                    .orElseThrow(() -> new OnboardingException("El cliente no tiene un usuario de acceso registrado.", HttpStatus.NOT_FOUND, 404));
+                    .orElseThrow(() -> new RecursoNoEncontradoException("El cliente no tiene un usuario de acceso registrado."));
             if (credenciales.getUsername() != null && !credenciales.getUsername().equals(usuario.getUsername())) {
-                throw new OnboardingException("El nombre de usuario no puede modificarse. Envíe el usuario registrado u omita 'loginCredenciales'.", HttpStatus.BAD_REQUEST, 400);
+                throw new ReglaNegocioException("El nombre de usuario no puede modificarse. Envíe el usuario registrado u omita 'loginCredenciales'.");
             }
             if (passwordHash != null) {
                 usuario.setPasswordHash(passwordHash);
@@ -377,7 +336,7 @@ public class ClienteLayawayService {
     }
 
     private LayawayClienteResponse darDeBajaCliente(LayawayClienteRequest request) {
-        ClienteEntity cliente = localizarCliente(request, "ELIMINAR / BAJA LÓGICA (bandera = 3)", null);
+        ClienteEntity cliente = localizarCliente(request, null);
 
         // 1. Marcar cliente como inactivo
         cliente.setActivo(false);
@@ -427,14 +386,7 @@ public class ClienteLayawayService {
      * Sin filtros devuelve todos los clientes (hasta MAX_RESULTADOS; se indica si hubo más).
      */
     private LayawayClienteResponse consultarClientes(LayawayClienteRequest request, Long soloClienteId) {
-        // Para la consulta solo se usa "filtros": cualquier otra sección enviada se rechaza en lugar de
-        // ignorarla, porque ignorarla devolvería todos los clientes como si no hubiera filtro.
-        if (request.getClienteId() != null || request.getDatosPersonales() != null || request.getDatosContacto() != null
-                || request.getDomicilio() != null || request.getInformacionLaboral() != null
-                || request.getLoginCredenciales() != null) {
-            throw new OnboardingException("Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.", HttpStatus.BAD_REQUEST, 400);
-        }
-
+        // Que solo se envíe 'filtros' ya lo garantiza @OperacionClienteValida en el DTO.
         FiltrosClienteDto filtros = request.getFiltros() != null ? request.getFiltros() : new FiltrosClienteDto();
         Specification<ClienteEntity> spec = especificacionConsulta(filtros, false, soloClienteId);
 
@@ -442,7 +394,7 @@ public class ClienteLayawayService {
 
         // Se buscó un cliente concreto y no existe (o no está entre los registros a los que se tiene acceso)
         if (!filtros.estaVacio() && pagina.isEmpty()) {
-            throw new OnboardingException("No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.", HttpStatus.NOT_FOUND, 404);
+            throw new ClienteNoEncontradoException("No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.");
         }
 
         List<Long> ids = pagina.getContent().stream().map(ClienteEntity::getId).toList();
@@ -511,29 +463,17 @@ public class ClienteLayawayService {
     /**
      * Localiza a UN cliente para actualizarlo (bandera 2) o darlo de baja (bandera 3) usando solo llaves
      * que no cambian (curp, rfc, numeroCuenta) con el valor COMPLETO. Nunca se usa el ID interno.
-     * Sin llaves se rechaza: de lo contrario la operación podría afectar a un cliente cualquiera.
+     * Que las llaves vengan y estén completas ya lo valida @OperacionClienteValida en el DTO.
      */
-    private ClienteEntity localizarCliente(LayawayClienteRequest request, String operacion, Long soloClienteId) {
-        if (request.getClienteId() != null) {
-            throw new OnboardingException("El clienteId ya no se utiliza. Para la operación " + operacion + " identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).", HttpStatus.BAD_REQUEST, 400);
-        }
+    private ClienteEntity localizarCliente(LayawayClienteRequest request, Long soloClienteId) {
         FiltrosClienteDto filtros = request.getFiltros();
-        if (filtros == null || filtros.estaVacio()) {
-            throw new OnboardingException("Para la operación " + operacion + " identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).", HttpStatus.BAD_REQUEST, 400);
-        }
-        if ((filtros.getCurp() != null && filtros.getCurp().length() != 18)
-                || (filtros.getRfc() != null && filtros.getRfc().length() < 12)
-                || (filtros.getNumeroCuenta() != null && filtros.getNumeroCuenta().length() < 12)) {
-            throw new OnboardingException("Para la operación " + operacion + " use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.", HttpStatus.BAD_REQUEST, 400);
-        }
-
         List<ClienteEntity> encontrados = clienteRepository
                 .findAll(especificacionConsulta(filtros, true, soloClienteId), PageRequest.of(0, 2, Sort.by("id"))).getContent();
         if (encontrados.isEmpty()) {
-            throw new OnboardingException("No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.", HttpStatus.NOT_FOUND, 404);
+            throw new ClienteNoEncontradoException("No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.");
         }
         if (encontrados.size() > 1) {
-            throw new OnboardingException("Las llaves indicadas corresponden a más de un cliente.", HttpStatus.BAD_REQUEST, 400);
+            throw new ReglaNegocioException("Las llaves indicadas corresponden a más de un cliente.");
         }
         return encontrados.get(0);
     }
@@ -559,11 +499,8 @@ public class ClienteLayawayService {
      * de un registro activo de cat_nacionalidad. No se aceptan claves ("MEX") ni variantes ("mexicana").
      */
     private void validarNacionalidadEnBD(String nacionalidad) {
-        if (nacionalidad == null || nacionalidad.isEmpty()) {
-            throw new OnboardingException("La nacionalidad es obligatoria.", HttpStatus.BAD_REQUEST, 400);
-        }
         if (!catNacionalidadRepository.existsByNombreAndActivoTrue(nacionalidad)) {
-            throw new OnboardingException("La nacionalidad '" + nacionalidad + "' no es válida. Debe ser exactamente uno de los nombres activos del catálogo cat_nacionalidad (consulte GET /api/v1/cat/nacionalidades).", HttpStatus.NOT_FOUND, 404);
+            throw new NacionalidadNoValidaException("La nacionalidad '" + nacionalidad + "' no es válida. Debe ser exactamente uno de los nombres activos del catálogo cat_nacionalidad (consulte GET /api/v1/cat/nacionalidades).");
         }
     }
 
