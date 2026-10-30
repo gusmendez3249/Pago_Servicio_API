@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,6 +19,9 @@ import java.time.LocalDateTime;
 // curp, rfc y correo no llevan @Index propio: su restricción UNIQUE ya crea un índice
 @Table(name = "tb_cliente")
 public class ClienteEntity {
+
+    /** Longitud exacta (en caracteres) del teléfono móvil; coincide con el CHECK chk_cliente_tel_movil de la BD. */
+    public static final int LONGITUD_TELEFONO = 10;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,7 +60,7 @@ public class ClienteEntity {
     @Column(name = "correo", nullable = false, unique = true, length = 100)
     private String correo;
 
-    @Column(name = "telefono_movil", nullable = false, length = 10)
+    @Column(name = "telefono_movil", nullable = false, length = LONGITUD_TELEFONO)
     private String telefonoMovil;
 
     @Column(name = "telefono_alt", length = 10)
@@ -73,6 +77,18 @@ public class ClienteEntity {
 
     @Column(name = "datos_biometricos")
     private Long datosBiometricos;
+
+    /** Hash PBKDF2 del PIN de seguridad del cliente, usado como segundo factor (2FA) para autorizar pagos. */
+    @Column(name = "pin", length = 100)
+    @ToString.Exclude
+    private String pin;
+
+    @Column(name = "pin_intentos_fallidos", nullable = false)
+    @Builder.Default
+    private Short pinIntentosFallidos = 0;
+
+    @Column(name = "pin_bloqueado_hasta")
+    private LocalDateTime pinBloqueadoHasta;
 
     @Column(name = "activo", nullable = false)
     @Builder.Default

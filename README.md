@@ -38,7 +38,16 @@ API REST en Java / Spring Boot para registrar clientes personas físicas, valida
    CREATE DATABASE pago_servicios_db;
    ```
    Las tablas las crea **Flyway automáticamente** al arrancar (migraciones `V3`, `V8`, `V9` y `V10`). Para crearla manualmente se puede usar [`docs/base_de_datos/script_creacion_bd.sql`](docs/base_de_datos/script_creacion_bd.sql).
-2. **Configurar la conexión** en `src/main/resources/application.properties` (`spring.datasource.url`, `username`, `password`). El puerto de la API es `8081`.
+2. **Configurar credenciales y secretos con variables de entorno** (nunca en el código ni en `application.properties`; en producción, desde un gestor de secretos). El puerto de la API es `8081`.
+   ```powershell
+   $env:DB_PASSWORD                  = "<contraseña de PostgreSQL>"   # opcionales: DB_URL, DB_USERNAME
+   $env:GESTOPAGO_ID_DISTRIBUIDOR    = "<id de distribuidor>"
+   $env:GESTOPAGO_CODIGO_DISPOSITIVO = "<código de dispositivo>"
+   $env:GESTOPAGO_PASSWORD           = "<contraseña de GestoPago>"
+   $env:GESTOPAGO_SECRET_KEY         = "<llave AES-256 en Base64 (32 bytes)>"
+   $env:GESTOPAGO_IV                 = "<IV en Base64 (16 bytes)>"
+   $env:GESTOPAGO_API_KEY            = "<X-API-Key, opcional>"
+   ```
 3. **Definir el usuario ejecutivo inicial** con variables de entorno (nunca en el código ni en `application.properties`):
    ```powershell
    $env:APP_EJECUTIVO_USUARIO  = "ejecutivo.admin"

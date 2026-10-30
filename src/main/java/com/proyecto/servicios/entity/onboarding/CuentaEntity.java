@@ -20,6 +20,9 @@ import java.time.LocalDateTime;
 })
 public class CuentaEntity {
 
+    /** Longitud estándar del número de cuenta en el sistema (12 dígitos). */
+    public static final int LONGITUD_NUMERO_CUENTA = 12;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
