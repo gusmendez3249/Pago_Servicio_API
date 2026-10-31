@@ -30,6 +30,9 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
     @Value("${gestopago.auth.password}")
     private String password;
 
+    @Value("${gestopago.api-key:}")
+    private String apiKey;
+
     public GestoPagoTokenServiceImpl(GestoPagoAuthClient gestoPagoAuthClient,
                                      GestoPagoTokenRepository tokenRepository,
                                      GestoPagoTokenMapper tokenMapper) {
@@ -44,7 +47,8 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         log.info("Renovando token GestoPago para distribuidor={}", idDistribuidor);
         try {
             GestoPagoAuthResponse response = gestoPagoAuthClient.authenticate(
-                    idDistribuidor, codigoDispositivo, password);
+                    idDistribuidor, codigoDispositivo, password,
+                    apiKey == null || apiKey.isBlank() ? null : apiKey.trim());
 
             if (response == null || response.getToken() == null) {
                 log.error("La respuesta de GestoPago no contiene token");
@@ -69,7 +73,9 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
             log.info("Token GestoPago renovado correctamente");
 
         } catch (Exception e) {
-            log.error("Error al renovar token GestoPago: {}", e.getMessage(), e);
+            // Sin e.getMessage() ni stack trace: el mensaje de Feign incluye la URL con la contraseña como parámetro
+            log.error("Error al renovar token GestoPago. causa={} status={}", e.getClass().getSimpleName(),
+                    e instanceof feign.FeignException feign ? feign.status() : -1);
         }
     }
     @Override

@@ -3,6 +3,7 @@ package com.proyecto.servicios.client;
 import com.proyecto.servicios.model.gestopago.GestoPagoAuthResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @FeignClient(
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
     GestoPagoAuthResponse authenticate(
             @RequestParam("idDistribuidor") Integer idDistribuidor,
             @RequestParam("codigoDispositivo") String codigoDispositivo,
-            @RequestParam("password") String password
+            @RequestParam("password") String password,
+            @RequestHeader(value = "X-API-Key", required = false) String apiKey
     );
 }

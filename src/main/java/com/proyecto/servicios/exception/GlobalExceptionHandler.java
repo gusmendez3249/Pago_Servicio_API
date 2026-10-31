@@ -372,9 +372,9 @@ public class GlobalExceptionHandler {
         }
 
         return switch (errorCode) {
-            case AUTHENTICATION_ERROR -> HttpStatus.UNAUTHORIZED;
+            // Falla de las credenciales del servidor ante GestoPago, no de quien llama: no es un 401 del cliente
+            case AUTHENTICATION_ERROR, HTTP_ERROR, COMMUNICATION_ERROR, INVALID_RESPONSE -> HttpStatus.BAD_GATEWAY;
             case TIMEOUT_ERROR -> HttpStatus.GATEWAY_TIMEOUT;
-            case HTTP_ERROR, COMMUNICATION_ERROR, INVALID_RESPONSE -> HttpStatus.BAD_GATEWAY;
             case CONFIGURATION_ERROR, INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
             case NO_DATA -> HttpStatus.NOT_FOUND;
             case SUCCESS -> HttpStatus.OK;
