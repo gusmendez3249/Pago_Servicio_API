@@ -36,8 +36,9 @@ class CatalogoPagoServiceTest {
         return PagoServicioRequest.builder().idSer(1).idProd(2).monto(new BigDecimal(monto)).build();
     }
 
-    private void producto(String precio) {
+    private void producto(int tipoFront, String precio) {
         ProductoPostgresEntity p = new ProductoPostgresEntity();
+        p.setTipoFront(tipoFront);
         p.setPrecio(precio == null ? null : new BigDecimal(precio));
         when(productoRepository.findFirstByIdServicioAndIdProducto(1, 2)).thenReturn(Optional.of(p));
     }
@@ -50,8 +51,8 @@ class CatalogoPagoServiceTest {
     }
 
     @Test
-    void precioFijo_ExigeElMontoExacto() {
-        producto("100");
+    void recargaDePrecioFijo_ExigeElMontoExacto() {
+        producto(1, "100");
 
         assertDoesNotThrow(() -> service.validar(request("100.00")));
         assertThrows(ReglaNegocioException.class, () -> service.validar(request("99.99")));
@@ -59,18 +60,25 @@ class CatalogoPagoServiceTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"1.00", "10.00", "523.47", "10000.00"})
+    void pagoDeServicio_MontoAbiertoAunqueElPrecioSeaLaComision(String monto) {
+        producto(2, "10.0");
+
+        assertDoesNotThrow(() -> service.validar(request(monto)));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"0.99", "10000.01", "50000.00"})
-    void montoAbiertoFueraDeLimites_SeRechaza(String monto) {
-        producto("0");
+    void pagoDeServicioFueraDeLimites_SeRechaza(String monto) {
+        producto(2, "0");
 
         assertThrows(ReglaNegocioException.class, () -> service.validar(request(monto)));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"1.00", "523.47", "10000.00"})
-    void montoAbiertoDentroDeLimites_SeAcepta(String monto) {
-        producto(null);
+    @Test
+    void consultaDeSaldo_NoAdmitePagos() {
+        producto(4, "0");
 
-        assertDoesNotThrow(() -> service.validar(request(monto)));
+        assertThrows(ReglaNegocioException.class, () -> service.validar(request("100.00")));
     }
 }

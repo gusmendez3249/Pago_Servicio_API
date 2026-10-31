@@ -184,6 +184,8 @@ public class PagoServicioService {
             throw new OperacionDuplicadaException(
                     "La Idempotency-Key ya se utilizó con datos distintos. Genere una nueva para cada pago.");
         }
+        log.info("Solicitud repetida con la misma Idempotency-Key: se devuelve el resultado registrado sin "
+                + "volver a cobrar ni llamar a GestoPago. upc={} estatus={}", previa.getUpc(), previa.getEstatus());
         CuentaEntity cuenta = previa.getCuenta();
         return switch (previa.getEstatus()) {
             case CONFIRMADA -> respuesta(previa, cuenta.getNumeroCuenta(), cuenta.getId(), EstatusTransaccionPago.CONFIRMADA,
