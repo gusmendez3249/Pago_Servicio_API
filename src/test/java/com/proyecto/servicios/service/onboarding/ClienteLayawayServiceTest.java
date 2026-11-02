@@ -116,6 +116,7 @@ class ClienteLayawayServiceTest {
                 .username("juan_perez")
                 .password("Password123!")
                 .faceIdBiometrico(987654321L)
+                .pin("4831")
                 .build();
 
         requestInsertar = LayawayClienteRequest.builder()
@@ -150,6 +151,43 @@ class ClienteLayawayServiceTest {
         assertEquals("ACTIVA", response.getEstatusCuenta());
         assertEquals(new BigDecimal("1000.00"), response.getSaldoInicial());
         verify(cuentaRepository, times(1)).save(any(CuentaEntity.class));
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_GuardaElPinComoHash() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(passwordEncoderUtil.encode("Password123!")).thenReturn("hash_pass");
+        when(passwordEncoderUtil.encode("4831")).thenReturn("pbkdf2$hash_pin");
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        procesar(requestInsertar);
+
+        verify(clienteRepository).save(argThat((ClienteEntity c) -> "pbkdf2$hash_pin".equals(c.getPin())));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarPin_GuardaHashYLevantaElBloqueo() {
+        ClienteEntity existente = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").rfc("PERJ9505151A2")
+                .nombre("Juan").apellidoPaterno("Perez").apellidoMaterno("Gomez").activo(true)
+                .pin("pbkdf2$hash_viejo").pinIntentosFallidos((short) 2)
+                .pinBloqueadoHasta(java.time.LocalDateTime.now().plusMinutes(10)).build();
+        UsuarioLoginEntity usuario = UsuarioLoginEntity.builder().id(3L).username("juan_perez").cliente(existente).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+        when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
+        when(cuentaRepository.findByClienteId(7L)).thenReturn(List.of());
+        when(passwordEncoderUtil.encode("5072")).thenReturn("pbkdf2$hash_nuevo");
+
+        procesar(LayawayClienteRequest.builder().bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").pin("5072").build())
+                .build());
+
+        assertEquals("pbkdf2$hash_nuevo", existente.getPin());
+        assertEquals((short) 0, existente.getPinIntentosFallidos());
+        assertNull(existente.getPinBloqueadoHasta());
+        verify(clienteRepository).save(existente);
     }
 
     @Test

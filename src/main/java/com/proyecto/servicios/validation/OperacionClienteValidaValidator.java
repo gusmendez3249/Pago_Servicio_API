@@ -2,6 +2,8 @@ package com.proyecto.servicios.validation;
 
 import com.proyecto.servicios.dto.onboarding.FiltrosClienteDto;
 import com.proyecto.servicios.dto.onboarding.LayawayClienteRequest;
+import com.proyecto.servicios.dto.onboarding.LoginCredencialesDto;
+import com.proyecto.servicios.dto.onboarding.PagoServicioRequest;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
@@ -38,8 +40,17 @@ public class OperacionClienteValidaValidator implements ConstraintValidator<Oper
                 obligatoria(errores, request.getDatosContacto(), "datosContacto", "Los datos de contacto son obligatorios para el registro (bandera = 1).");
                 obligatoria(errores, request.getDomicilio(), "domicilio", "El domicilio es obligatorio para el registro (bandera = 1).");
                 obligatoria(errores, request.getInformacionLaboral(), "informacionLaboral", "La información laboral es obligatoria para el registro (bandera = 1).");
+                // Sin PIN el cliente no podría autorizar ningún pago de servicios
+                LoginCredencialesDto login = request.getLoginCredenciales();
+                obligatoria(errores, login == null ? null : login.getPin(), "loginCredenciales.pin",
+                        "El PIN de seguridad (loginCredenciales.pin, 4 dígitos) es obligatorio para el registro (bandera = 1): autoriza los pagos de servicios.");
+                validarPin(errores, login);
             }
-            case 2, 3 -> validarLlaves(errores, request.getFiltros(), operacion);
+            case 2 -> {
+                validarLlaves(errores, request.getFiltros(), operacion);
+                validarPin(errores, request.getLoginCredenciales());
+            }
+            case 3 -> validarLlaves(errores, request.getFiltros(), operacion);
             default -> {
                 // Consulta: solo 'filtros'. Ignorar otra sección devolvería todos los clientes como si no hubiera filtro
                 String mensaje = "Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroCuenta) o ninguno para obtener todos los clientes.";
@@ -64,6 +75,27 @@ public class OperacionClienteValidaValidator implements ConstraintValidator<Oper
                 || (filtros.getNumeroCuenta() != null && filtros.getNumeroCuenta().length() < 12)) {
             errores.agregar("filtros", "Para la operación " + operacion + " use el valor COMPLETO de la llave: curp de 18 caracteres, rfc de 12 o 13 y numeroCuenta de 12 dígitos.");
         }
+    }
+
+    /** El formato (4 dígitos) lo valida @Pattern; aquí se rechazan los PIN triviales, los primeros que se prueban. */
+    private static void validarPin(Errores errores, LoginCredencialesDto login) {
+        String pin = login == null ? null : login.getPin();
+        if (pin != null && pin.matches(PagoServicioRequest.PATRON_PIN) && esPinTrivial(pin)) {
+            errores.agregar("loginCredenciales.pin", "El PIN no puede tener todos los dígitos iguales (1111) ni ser consecutivo (1234 o 4321).");
+        }
+    }
+
+    static boolean esPinTrivial(String pin) {
+        boolean iguales = true;
+        boolean ascendente = true;
+        boolean descendente = true;
+        for (int i = 1; i < pin.length(); i++) {
+            int diferencia = pin.charAt(i) - pin.charAt(i - 1);
+            iguales &= diferencia == 0;
+            ascendente &= diferencia == 1;
+            descendente &= diferencia == -1;
+        }
+        return iguales || ascendente || descendente;
     }
 
     private static void obligatoria(Errores errores, Object seccion, String campo, String mensaje) {

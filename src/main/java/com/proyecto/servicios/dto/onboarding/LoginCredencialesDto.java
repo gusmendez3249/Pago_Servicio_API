@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @Builder
@@ -33,5 +34,11 @@ public class LoginCredencialesDto {
     @Schema(description = "Identificador biométrico Face ID (opcional)", example = "987654321")
     @Positive(message = "El identificador biométrico debe ser un número positivo")
     private Long faceIdBiometrico;
+
+    // Segundo factor (2FA) que autoriza cada pago de servicios (twoFA de /api/v1/pagos/servicio); se guarda con PBKDF2
+    @Schema(description = "PIN de seguridad (2FA) para autorizar pagos: exactamente 4 dígitos, sin repetidos (1111) ni consecutivos (1234). Obligatorio al registrar; opcional al actualizar", example = "4831")
+    @Pattern(regexp = PagoServicioRequest.PATRON_PIN, message = "El PIN debe tener exactamente 4 dígitos numéricos")
+    @ToString.Exclude
+    private String pin;
 }
 

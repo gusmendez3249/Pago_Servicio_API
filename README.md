@@ -327,6 +327,7 @@ Pruebas: 48 casos contra la API real ([resultado](docs/evidencias/resultado_prue
 | `ingresoMensual` | Mayor a cero, exactamente 2 decimales, máximo 12 enteros |
 | `loginCredenciales.username` | 3 a 50 caracteres: letras, números, `.`, `_`, `-` |
 | `loginCredenciales.password` | Al registrar **y** al editar: 8 a 72 caracteres, sin espacios, con al menos **1 mayúscula, 1 minúscula, 1 número y 1 carácter especial** (`! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~`) |
+| `loginCredenciales.pin` | PIN de seguridad (2FA) que autoriza los pagos (`twoFA`): exactamente 4 dígitos, entre comillas, sin dígitos repetidos (`1111`) ni consecutivos (`1234`, `4321`). **Obligatorio al registrar**; al editar es opcional y reemplaza el anterior (reinicia los intentos fallidos y el bloqueo). Se guarda con hash PBKDF2 |
 | `bandera` | Número entero 1, 2, 3 o 4; se rechaza `"1"` (texto) o `1.5` |
 
 ### 5.4 Códigos de respuesta
@@ -369,7 +370,7 @@ Capturados de la API en ejecución. Salida completa: [`docs/evidencias/ejemplos_
     "municipio": "Dolores Hidalgo", "estado": "Guanajuato", "codigoPostal": "37800", "pais": "MEXICO"
   },
   "informacionLaboral": { "ocupacion": "Contadora", "empresa": "Tech Corp", "ingresoMensual": 15000.00 },
-  "loginCredenciales": { "username": "laura.torres", "password": "Password123!", "faceIdBiometrico": 987654321 }
+  "loginCredenciales": { "username": "laura.torres", "password": "Password123!", "faceIdBiometrico": 987654321, "pin": "4831" }
 }
 ```
 

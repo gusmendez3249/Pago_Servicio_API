@@ -43,7 +43,7 @@ class LayawayClienteRequestValidacionTest {
                         .municipio("Cuauhtémoc").estado("CDMX").codigoPostal("06000").pais("México").build())
                 .informacionLaboral(InformacionLaboralDto.builder().ocupacion("Desarrollador").empresa("Empresa X")
                         .ingresoMensual(new BigDecimal("30000.00")).build())
-                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").password("Password123!").build())
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").password("Password123!").pin("4831").build())
                 .build();
     }
 
@@ -106,8 +106,47 @@ class LayawayClienteRequestValidacionTest {
     @Test
     void alta_SinSecciones_ReportaCadaSeccionObligatoria() {
         Map<String, String> e = errores(LayawayClienteRequest.builder().bandera(1).build());
-        assertEquals(Set.of("datosPersonales", "datosContacto", "domicilio", "informacionLaboral"), e.keySet());
+        assertEquals(Set.of("datosPersonales", "datosContacto", "domicilio", "informacionLaboral", "loginCredenciales.pin"), e.keySet());
         assertTrue(e.get("domicilio").contains("obligatorio"));
+    }
+
+    @Test
+    void alta_SinPin_SeRechazaPorqueAutorizaLosPagos() {
+        alta.getLoginCredenciales().setPin(null);
+        assertTrue(errores(alta).get("loginCredenciales.pin").contains("obligatorio"));
+
+        alta.setLoginCredenciales(null);
+        assertTrue(errores(alta).containsKey("loginCredenciales.pin"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"123", "12345", "12a4", " 483", ""})
+    void alta_PinConFormatoInvalido_SeRechaza(String pin) {
+        alta.getLoginCredenciales().setPin(pin);
+        assertEquals("El PIN debe tener exactamente 4 dígitos numéricos", errores(alta).get("loginCredenciales.pin"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0000", "7777", "1234", "6789", "4321", "9876"})
+    void pinTrivial_SeRechazaAlRegistrarYAlActualizar(String pin) {
+        alta.getLoginCredenciales().setPin(pin);
+        assertTrue(errores(alta).get("loginCredenciales.pin").contains("consecutivo"), pin);
+
+        LayawayClienteRequest actualizar = LayawayClienteRequest.builder().bandera(2).filtros(curp("PERJ950515HDFRMN01"))
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").pin(pin).build()).build();
+        assertTrue(errores(actualizar).containsKey("loginCredenciales.pin"), pin);
+    }
+
+    @Test
+    void actualizar_SinPin_EsValido() {
+        LayawayClienteRequest actualizar = LayawayClienteRequest.builder().bandera(2).filtros(curp("PERJ950515HDFRMN01"))
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").password("NuevaClave#2026").build()).build();
+        assertTrue(errores(actualizar).isEmpty(), () -> errores(actualizar).toString());
+    }
+
+    @Test
+    void pin_NoApareceEnToString() {
+        assertFalse(alta.getLoginCredenciales().toString().contains("4831"));
     }
 
     @Test
