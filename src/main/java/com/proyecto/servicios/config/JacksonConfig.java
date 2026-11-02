@@ -1,5 +1,6 @@
 package com.proyecto.servicios.config;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
@@ -15,6 +16,8 @@ public class JacksonConfig {
     public Jackson2ObjectMapperBuilderCustomizer disableCoercionCustomizer() {
         return builder -> {
             builder.featuresToEnable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+            // Una clave repetida ({"monto":1,"monto":9999}) es ambigua: se rechaza en lugar de quedarse con la última
+            builder.featuresToEnable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
             builder.postConfigurer(objectMapper -> {
                 // Desactivar la conversión/coerción automática de String ("1") a números enteros (1)
                 objectMapper.coercionConfigFor(LogicalType.Integer)

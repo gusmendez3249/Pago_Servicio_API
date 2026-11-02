@@ -48,6 +48,10 @@ API REST en Java / Spring Boot para registrar clientes personas físicas, valida
    $env:GESTOPAGO_IV                 = "<IV en Base64 (16 bytes)>"
    $env:GESTOPAGO_API_KEY            = "<X-API-Key, opcional>"
    ```
+   Variables opcionales de seguridad:
+   - `CLIENT_IP_HEADER` (por defecto `CF-Connecting-IP`): encabezado con la IP real del cliente, usado por el límite de 10 intentos de login por minuto e IP (`429`). En Render lo fija Cloudflare; si la API no está detrás de un proxy que lo sobrescriba, déjelo vacío (`CLIENT_IP_HEADER=`) para usar la IP de la conexión, porque de lo contrario un cliente podría inventar su IP.
+   - `SWAGGER_ENABLED` (por defecto `true`): con `false` se ocultan `/swagger-ui.html` y `/api-docs` en producción.
+   - `/personas`, `/personasActualiza` y `/personasElimina` requieren sesión de un usuario `EJECUTIVO` (`401` sin token, `403` con token de cliente).
 3. **Definir el usuario ejecutivo inicial** con variables de entorno (nunca en el código ni en `application.properties`):
    ```powershell
    $env:APP_EJECUTIVO_USUARIO  = "ejecutivo.admin"
