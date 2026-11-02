@@ -73,17 +73,24 @@ public class ClienteLayawayService {
             case 1 -> {
                 LoginCredencialesDto login = request.getLoginCredenciales();
                 String passwordHash = login != null ? passwordEncoderUtil.encode(login.getPassword()) : null;
-                yield transactionTemplate.execute(status -> registrarCliente(request, passwordHash));
+                String pinHash = hashPin(login);
+                yield transactionTemplate.execute(status -> registrarCliente(request, passwordHash, pinHash));
             }
             case 2 -> {
                 LoginCredencialesDto login = request.getLoginCredenciales();
                 String passwordHash = (login != null && login.getPassword() != null) ? passwordEncoderUtil.encode(login.getPassword()) : null;
-                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash, propietario));
+                String pinHash = hashPin(login);
+                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash, pinHash, propietario));
             }
             case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
             case 4 -> transactionTemplate.execute(status -> consultarClientes(request, propietario));
             default -> throw new ReglaNegocioException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).");
         };
+    }
+
+    /** El PIN (2FA de los pagos) se guarda con PBKDF2, igual que la contraseña: nunca en claro. */
+    private String hashPin(LoginCredencialesDto login) {
+        return (login != null && login.getPin() != null) ? passwordEncoderUtil.encode(login.getPin()) : null;
     }
 
     /**
@@ -100,7 +107,7 @@ public class ClienteLayawayService {
         return sesion.clienteId();
     }
 
-    private LayawayClienteResponse registrarCliente(LayawayClienteRequest request, String passwordHash) {
+    private LayawayClienteResponse registrarCliente(LayawayClienteRequest request, String passwordHash, String pinHash) {
         DatosPersonalesDto dp = request.getDatosPersonales();
         DatosContactoDto dc = request.getDatosContacto();
         DomicilioDto dom = request.getDomicilio();
@@ -163,6 +170,7 @@ public class ClienteLayawayService {
                 .empresa(limpiar(infoLab.getEmpresa()))
                 .ingresoMensual(infoLab.getIngresoMensual())
                 .datosBiometricos(dp.getDatosBiometricos() != null ? dp.getDatosBiometricos() : (loginDto != null ? loginDto.getFaceIdBiometrico() : null))
+                .pin(pinHash)
                 .activo(true)
                 .fechaRegistro(LocalDateTime.now())
                 .domicilio(domicilioEntity)
@@ -217,7 +225,7 @@ public class ClienteLayawayService {
                 .build();
     }
 
-    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash, Long soloClienteId) {
+    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash, String pinHash, Long soloClienteId) {
         ClienteEntity cliente = localizarCliente(request, soloClienteId);
 
         if (Boolean.FALSE.equals(cliente.getActivo())) {
@@ -308,6 +316,12 @@ public class ClienteLayawayService {
                 usuario.setFaceIdBiometrico(credenciales.getFaceIdBiometrico());
             }
             usuarioLoginRepository.save(usuario);
+            if (pinHash != null) {
+                // Un PIN nuevo reinicia el contador de intentos y levanta el bloqueo del anterior
+                cliente.setPin(pinHash);
+                cliente.setPinIntentosFallidos((short) 0);
+                cliente.setPinBloqueadoHasta(null);
+            }
         }
 
         clienteRepository.save(cliente);
