@@ -102,6 +102,12 @@ class PagoServicioControllerIntegrationTest {
 
     // ---------------------------------------------------------------- entrada estricta (400 sin llegar al servicio)
 
+    @Test
+    void claveDuplicadaEnElJson_400SinLlegarAlServicio() throws Exception {
+        pagar(VALIDO.replace("\"monto\":100.50", "\"monto\":1.00,\"monto\":99999.99")).andExpect(status().isBadRequest());
+        verifyNoInteractions(pagoServicioService);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             // campos extra
