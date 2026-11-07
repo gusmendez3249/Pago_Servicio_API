@@ -43,3 +43,6 @@ bin/
 .DS_Store
 ### Credenciales locales ###
 secretos.properties
+
+### Redis ###
+*.rdb
