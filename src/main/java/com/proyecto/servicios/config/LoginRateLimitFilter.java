@@ -1,24 +1,21 @@
 package com.proyecto.servicios.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.proyecto.servicios.model.GenericResponse;
+import com.proyecto.servicios.exception.DemasiadosIntentosException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
@@ -45,7 +42,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private final int maxIntentos;
     private final String encabezadoIp;
-    private final ObjectMapper objectMapper;
+    /** Delega la respuesta de error a GlobalExceptionHandler (el filtro corre fuera de los controladores). */
+    private final HandlerExceptionResolver resolver;
     private final LongSupplier reloj;
     private final Map<String, Ventana> ventanas = new ConcurrentHashMap<>();
 
@@ -53,14 +51,14 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     public LoginRateLimitFilter(
             @Value("${app.auth.login.max-intentos-por-minuto:10}") int maxIntentos,
             @Value("${app.http.client-ip-header:}") String encabezadoIp,
-            ObjectMapper objectMapper) {
-        this(maxIntentos, encabezadoIp, objectMapper, System::currentTimeMillis);
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
+        this(maxIntentos, encabezadoIp, resolver, System::currentTimeMillis);
     }
 
-    LoginRateLimitFilter(int maxIntentos, String encabezadoIp, ObjectMapper objectMapper, LongSupplier reloj) {
+    LoginRateLimitFilter(int maxIntentos, String encabezadoIp, HandlerExceptionResolver resolver, LongSupplier reloj) {
         this.maxIntentos = maxIntentos;
         this.encabezadoIp = encabezadoIp == null ? "" : encabezadoIp.trim();
-        this.objectMapper = objectMapper;
+        this.resolver = resolver;
         this.reloj = reloj;
     }
 
@@ -82,12 +80,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         if (ventana.intentos > maxIntentos) {
             long segundos = Math.max(1, (ventana.inicio + VENTANA_MS - ahora + 999) / 1000);
             log.warn("Límite de intentos de login por IP alcanzado; se responde 429");
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(segundos));
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            objectMapper.writeValue(response.getOutputStream(), GenericResponse.error(429,
-                    "Demasiados intentos de inicio de sesión. Intente de nuevo en " + segundos + " segundo(s)."));
+            resolver.resolveException(request, response, null, new DemasiadosIntentosException(segundos));
             return;
         }
         filterChain.doFilter(request, response);

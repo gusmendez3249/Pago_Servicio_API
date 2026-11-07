@@ -1,7 +1,5 @@
 package com.proyecto.servicios.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.proyecto.servicios.model.GenericResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
@@ -9,13 +7,13 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -31,13 +29,14 @@ import java.nio.charset.StandardCharsets;
 public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
     private final long maxBytes;
-    private final ObjectMapper objectMapper;
+    /** Delega la respuesta de error a GlobalExceptionHandler (el filtro corre fuera de los controladores). */
+    private final HandlerExceptionResolver resolver;
 
     public RequestSizeLimitFilter(
             @Value("${app.http.max-request-body-bytes:65536}") long maxBytes,
-            ObjectMapper objectMapper) {
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
         this.maxBytes = maxBytes;
-        this.objectMapper = objectMapper;
+        this.resolver = resolver;
     }
 
     @Override
@@ -47,10 +46,7 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
         long contentLength = request.getContentLengthLong();
         if (contentLength > maxBytes) {
-            response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            objectMapper.writeValue(response.getOutputStream(), GenericResponse.error(413, mensaje(maxBytes)));
+            resolver.resolveException(request, response, null, new BodyTooLargeException(maxBytes));
             return;
         }
 

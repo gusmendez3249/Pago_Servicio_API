@@ -81,29 +81,14 @@ public class GlobalExceptionHandler {
 
     // ---------- Excepciones de negocio (el código coincide con el estado HTTP) ----------
 
-    @ExceptionHandler(ClienteNoEncontradoException.class)
-    public ResponseEntity<GenericResponse<Void>> handleClienteNoEncontrado(ClienteNoEncontradoException exception) {
-        return negocio(exception);
-    }
-
-    @ExceptionHandler(NacionalidadNoValidaException.class)
-    public ResponseEntity<GenericResponse<Void>> handleNacionalidadNoValida(NacionalidadNoValidaException exception) {
-        return negocio(exception);
-    }
-
-    @ExceptionHandler(RecursoNoEncontradoException.class)
-    public ResponseEntity<GenericResponse<Void>> handleRecursoNoEncontrado(RecursoNoEncontradoException exception) {
-        return negocio(exception);
-    }
-
-    @ExceptionHandler(RegistroDuplicadoException.class)
-    public ResponseEntity<GenericResponse<Void>> handleRegistroDuplicado(RegistroDuplicadoException exception) {
-        return negocio(exception);
-    }
-
-    @ExceptionHandler(ReglaNegocioException.class)
-    public ResponseEntity<GenericResponse<Void>> handleReglaNegocio(ReglaNegocioException exception) {
-        return negocio(exception);
+    /**
+     * Todas las excepciones de negocio heredan de OnboardingException y cada una trae su estado HTTP,
+     * así que un solo manejador las cubre (cliente no encontrado, duplicado, regla de negocio, acceso
+     * denegado, cuenta bloqueada, pago rechazado, etc.). Solo las que agregan encabezados tienen el suyo.
+     */
+    @ExceptionHandler(OnboardingException.class)
+    public ResponseEntity<GenericResponse<Void>> handleNegocio(OnboardingException exception) {
+        return build(exception.getStatus(), exception.getCodigo(), exception.getMessage());
     }
 
     /** RFC 9110: toda respuesta 401 debe indicar el esquema de autenticación esperado. */
@@ -114,29 +99,12 @@ public class GlobalExceptionHandler {
                 .body(GenericResponse.error(exception.getCodigo(), exception.getMessage()));
     }
 
-    @ExceptionHandler(AccesoDenegadoException.class)
-    public ResponseEntity<GenericResponse<Void>> handleAccesoDenegado(AccesoDenegadoException exception) {
-        return negocio(exception);
-    }
-
-    @ExceptionHandler(ClienteInactivoException.class)
-    public ResponseEntity<GenericResponse<Void>> handleClienteInactivo(ClienteInactivoException exception) {
-        return negocio(exception);
-    }
-
-    @ExceptionHandler(CuentaBloqueadaException.class)
-    public ResponseEntity<GenericResponse<Void>> handleCuentaBloqueada(CuentaBloqueadaException exception) {
-        return negocio(exception);
-    }
-
-    /** Cualquier otra excepción de negocio que se agregue en el futuro. */
-    @ExceptionHandler(OnboardingException.class)
-    public ResponseEntity<GenericResponse<Void>> handleOnboardingException(OnboardingException exception) {
-        return negocio(exception);
-    }
-
-    private ResponseEntity<GenericResponse<Void>> negocio(OnboardingException exception) {
-        return build(exception.getStatus(), exception.getCodigo(), exception.getMessage());
+    /** Límite de intentos de login por IP (LoginRateLimitFilter): 429 + Retry-After. */
+    @ExceptionHandler(DemasiadosIntentosException.class)
+    public ResponseEntity<GenericResponse<Void>> handleDemasiadosIntentos(DemasiadosIntentosException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getSegundos()))
+                .body(GenericResponse.error(exception.getCodigo(), exception.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

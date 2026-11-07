@@ -1,11 +1,16 @@
 package com.proyecto.servicios.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.proyecto.servicios.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.context.support.StaticWebApplicationContext;
+import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -14,8 +19,22 @@ class LoginRateLimitFilterTest {
 
     private final AtomicLong reloj = new AtomicLong(1_000_000);
 
+    /** Resolver real con GlobalExceptionHandler: el 429 lo arma el manejador central, igual que en la app. */
+    private static final HandlerExceptionResolver RESOLVER = resolverConManejadorGlobal();
+
+    private static HandlerExceptionResolver resolverConManejadorGlobal() {
+        StaticWebApplicationContext contexto = new StaticWebApplicationContext();
+        contexto.registerSingleton("globalExceptionHandler", GlobalExceptionHandler.class);
+        contexto.refresh();
+        ExceptionHandlerExceptionResolver resolver = new ExceptionHandlerExceptionResolver();
+        resolver.setApplicationContext(contexto);
+        resolver.setMessageConverters(List.of(new MappingJackson2HttpMessageConverter()));
+        resolver.afterPropertiesSet();
+        return resolver;
+    }
+
     private LoginRateLimitFilter filtro(String encabezadoIp) {
-        return new LoginRateLimitFilter(3, encabezadoIp, new ObjectMapper(), reloj::get);
+        return new LoginRateLimitFilter(3, encabezadoIp, RESOLVER, reloj::get);
     }
 
     private static MockHttpServletResponse ejecutar(LoginRateLimitFilter filtro, String metodo, String ruta,
