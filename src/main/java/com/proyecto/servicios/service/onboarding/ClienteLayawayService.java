@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.security.SecureRandom;
 
@@ -246,97 +247,11 @@ public class ClienteLayawayService {
             throw new ClienteInactivoException("No se puede actualizar la información de un cliente inactivo.");
         }
 
-        // Actualizar datos personales (PRESERVANDO INMUTABILIDAD DE CURP Y RFC)
-        if (request.getDatosPersonales() != null) {
-            DatosPersonalesDto dp = request.getDatosPersonales();
-            // CURP y RFC no son modificables: si se envían deben coincidir con los registrados
-            if (dp.getCurp() != null && !dp.getCurp().trim().equalsIgnoreCase(cliente.getCurp())) {
-                throw new ReglaNegocioException("La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.");
-            }
-            if (dp.getRfc() != null && !dp.getRfc().trim().equalsIgnoreCase(cliente.getRfc())) {
-                throw new ReglaNegocioException("El RFC no puede modificarse. Envíe el RFC registrado o omita el campo.");
-            }
-            if (dp.getNombre() != null) cliente.setNombre(limpiar(dp.getNombre()));
-            if (dp.getSegundoNombre() != null) cliente.setSegundoNombre(limpiar(dp.getSegundoNombre()));
-            if (dp.getApellidoPaterno() != null) cliente.setApellidoPaterno(limpiar(dp.getApellidoPaterno()));
-            if (dp.getApellidoMaterno() != null) cliente.setApellidoMaterno(limpiar(dp.getApellidoMaterno()));
-            if (dp.getFechaNacimiento() != null) cliente.setFechaNacimiento(dp.getFechaNacimiento());
-            if (dp.getSexo() != null) cliente.setSexo(dp.getSexo());
-            if (dp.getNacionalidad() != null) {
-                validarNacionalidadEnBD(dp.getNacionalidad());
-                cliente.setNacionalidad(dp.getNacionalidad());
-            }
-            if (dp.getEstadoCivil() != null) cliente.setEstadoCivil(dp.getEstadoCivil());
-            if (dp.getDatosBiometricos() != null) cliente.setDatosBiometricos(dp.getDatosBiometricos());
-
-            // NOTA: Intencionalmente NO se actualizan CURP ni RFC para proteger la inmutabilidad de negocio.
-            log.info("Actualizando cliente ID {}: CURP ({}) y RFC ({}) se mantienen inmutables.", cliente.getId(), cliente.getCurp(), cliente.getRfc());
-        }
-
-        // Actualizar datos de contacto
-        if (request.getDatosContacto() != null) {
-            DatosContactoDto dc = request.getDatosContacto();
-            if (dc.getCorreo() != null && !dc.getCorreo().trim().equalsIgnoreCase(cliente.getCorreo())) {
-                if (clienteRepository.existsByCorreo(dc.getCorreo().trim().toLowerCase())) {
-                    throw new RegistroDuplicadoException("El nuevo correo ya está registrado por otro cliente.");
-                }
-                cliente.setCorreo(dc.getCorreo().trim().toLowerCase());
-            }
-            if (dc.getTelefonoMovil() != null) cliente.setTelefonoMovil(String.valueOf(dc.getTelefonoMovil()));
-            if (dc.getTelefonoAlt() != null) cliente.setTelefonoAlt(String.valueOf(dc.getTelefonoAlt()));
-        }
-
-        // Actualizar domicilio
-        if (request.getDomicilio() != null) {
-            DomicilioDto dom = request.getDomicilio();
-            DomicilioEntity d = cliente.getDomicilio();
-            if (d == null) {
-                d = new DomicilioEntity();
-                cliente.setDomicilio(d);
-            }
-            if (dom.getCalle() != null) d.setCalle(limpiar(dom.getCalle()));
-            if (dom.getNumeroExterior() != null) d.setNumeroExterior(limpiar(dom.getNumeroExterior()));
-            if (dom.getNumeroInterior() != null) d.setNumeroInterior(limpiar(dom.getNumeroInterior()));
-            if (dom.getColonia() != null) d.setColonia(limpiar(dom.getColonia()));
-            if (dom.getMunicipio() != null) d.setMunicipio(limpiar(dom.getMunicipio()));
-            if (dom.getEstado() != null) d.setEstado(limpiar(dom.getEstado()));
-            if (dom.getCodigoPostal() != null) d.setCodigoPostal(dom.getCodigoPostal());
-            if (dom.getPais() != null) d.setPais(limpiar(dom.getPais()));
-        }
-
-        // Actualizar información laboral
-        if (request.getInformacionLaboral() != null) {
-            InformacionLaboralDto info = request.getInformacionLaboral();
-            if (info.getOcupacion() != null) cliente.setOcupacion(limpiar(info.getOcupacion()));
-            if (info.getEmpresa() != null) cliente.setEmpresa(limpiar(info.getEmpresa()));
-            if (info.getIngresoMensual() != null) cliente.setIngresoMensual(info.getIngresoMensual());
-        }
-
-        // Credenciales de acceso: se puede cambiar la contraseña (y el Face ID); el usuario no cambia
-        LoginCredencialesDto credenciales = request.getLoginCredenciales();
-        if (credenciales != null) {
-            UsuarioLoginEntity usuario = usuarioLoginRepository.findByClienteId(cliente.getId())
-                    .orElseThrow(() -> new RecursoNoEncontradoException("El cliente no tiene un usuario de acceso registrado."));
-            if (credenciales.getUsername() != null && !credenciales.getUsername().equals(usuario.getUsername())) {
-                throw new ReglaNegocioException("El nombre de usuario no puede modificarse. Envíe el usuario registrado u omita 'loginCredenciales'.");
-            }
-            if (passwordHash != null) {
-                usuario.setPasswordHash(passwordHash);
-                usuario.setIsLoggedIn(false); // al cambiar la contraseña se cierra la sesión activa
-                usuario.setTokenHash(null);
-                usuario.setTokenExpira(null);
-            }
-            if (credenciales.getFaceIdBiometrico() != null) {
-                usuario.setFaceIdBiometrico(credenciales.getFaceIdBiometrico());
-            }
-            usuarioLoginRepository.save(usuario);
-            if (pinHash != null) {
-                // Un PIN nuevo reinicia el contador de intentos y levanta el bloqueo del anterior
-                cliente.setPin(pinHash);
-                cliente.setPinIntentosFallidos((short) 0);
-                cliente.setPinBloqueadoHasta(null);
-            }
-        }
+        actualizarDatosPersonales(cliente, request.getDatosPersonales());
+        actualizarContacto(cliente, request.getDatosContacto());
+        actualizarDomicilio(cliente, request.getDomicilio());
+        actualizarInformacionLaboral(cliente, request.getInformacionLaboral());
+        actualizarCredenciales(cliente, request.getLoginCredenciales(), passwordHash, pinHash);
 
         clienteRepository.save(cliente);
 
@@ -379,9 +294,7 @@ public class ClienteLayawayService {
 
         // 3. Desactivar sesión de login
         usuarioLoginRepository.findByClienteId(cliente.getId()).ifPresent(u -> {
-            u.setIsLoggedIn(false);
-            u.setTokenHash(null);
-            u.setTokenExpira(null);
+            cerrarSesion(u);
             usuarioLoginRepository.save(u);
         });
 
@@ -533,6 +446,120 @@ public class ClienteLayawayService {
     }
 
     /** Recorta espacios y convierte cadenas vacías en null (ej. segundo nombre o número interior ""). */
+    /** CURP y RFC son inmutables: si se envían deben coincidir con los registrados; el resto se actualiza si viene. */
+    private void actualizarDatosPersonales(ClienteEntity cliente, DatosPersonalesDto dp) {
+        if (dp == null) {
+            return;
+        }
+        if (dp.getCurp() != null && !dp.getCurp().trim().equalsIgnoreCase(cliente.getCurp())) {
+            throw new ReglaNegocioException("La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.");
+        }
+        if (dp.getRfc() != null && !dp.getRfc().trim().equalsIgnoreCase(cliente.getRfc())) {
+            throw new ReglaNegocioException("El RFC no puede modificarse. Envíe el RFC registrado o omita el campo.");
+        }
+        if (dp.getNacionalidad() != null) {
+            validarNacionalidadEnBD(dp.getNacionalidad());
+        }
+        textoSiPresente(dp.getNombre(), cliente::setNombre);
+        textoSiPresente(dp.getSegundoNombre(), cliente::setSegundoNombre);
+        textoSiPresente(dp.getApellidoPaterno(), cliente::setApellidoPaterno);
+        textoSiPresente(dp.getApellidoMaterno(), cliente::setApellidoMaterno);
+        siPresente(dp.getFechaNacimiento(), cliente::setFechaNacimiento);
+        siPresente(dp.getSexo(), cliente::setSexo);
+        siPresente(dp.getNacionalidad(), cliente::setNacionalidad);
+        siPresente(dp.getEstadoCivil(), cliente::setEstadoCivil);
+        siPresente(dp.getDatosBiometricos(), cliente::setDatosBiometricos);
+        log.info("Actualizando cliente ID {}: CURP y RFC se mantienen inmutables.", cliente.getId());
+    }
+
+    private void actualizarContacto(ClienteEntity cliente, DatosContactoDto dc) {
+        if (dc == null) {
+            return;
+        }
+        if (dc.getCorreo() != null) {
+            String correo = dc.getCorreo().trim().toLowerCase(Locale.ROOT);
+            if (!correo.equalsIgnoreCase(cliente.getCorreo())) {
+                if (clienteRepository.existsByCorreo(correo)) {
+                    throw new RegistroDuplicadoException("El nuevo correo ya está registrado por otro cliente.");
+                }
+                cliente.setCorreo(correo);
+            }
+        }
+        siPresente(dc.getTelefonoMovil(), telefono -> cliente.setTelefonoMovil(String.valueOf(telefono)));
+        siPresente(dc.getTelefonoAlt(), telefono -> cliente.setTelefonoAlt(String.valueOf(telefono)));
+    }
+
+    private static void actualizarDomicilio(ClienteEntity cliente, DomicilioDto dom) {
+        if (dom == null) {
+            return;
+        }
+        DomicilioEntity d = cliente.getDomicilio();
+        if (d == null) {
+            d = new DomicilioEntity();
+            cliente.setDomicilio(d);
+        }
+        textoSiPresente(dom.getCalle(), d::setCalle);
+        textoSiPresente(dom.getNumeroExterior(), d::setNumeroExterior);
+        textoSiPresente(dom.getNumeroInterior(), d::setNumeroInterior);
+        textoSiPresente(dom.getColonia(), d::setColonia);
+        textoSiPresente(dom.getMunicipio(), d::setMunicipio);
+        textoSiPresente(dom.getEstado(), d::setEstado);
+        siPresente(dom.getCodigoPostal(), d::setCodigoPostal);
+        textoSiPresente(dom.getPais(), d::setPais);
+    }
+
+    private static void actualizarInformacionLaboral(ClienteEntity cliente, InformacionLaboralDto info) {
+        if (info == null) {
+            return;
+        }
+        textoSiPresente(info.getOcupacion(), cliente::setOcupacion);
+        textoSiPresente(info.getEmpresa(), cliente::setEmpresa);
+        siPresente(info.getIngresoMensual(), cliente::setIngresoMensual);
+    }
+
+    /** Se puede cambiar la contraseña, el Face ID y el PIN; el nombre de usuario no cambia. */
+    private void actualizarCredenciales(ClienteEntity cliente, LoginCredencialesDto credenciales,
+                                        String passwordHash, String pinHash) {
+        if (credenciales == null) {
+            return;
+        }
+        UsuarioLoginEntity usuario = usuarioLoginRepository.findByClienteId(cliente.getId())
+                .orElseThrow(() -> new RecursoNoEncontradoException("El cliente no tiene un usuario de acceso registrado."));
+        if (credenciales.getUsername() != null && !credenciales.getUsername().equals(usuario.getUsername())) {
+            throw new ReglaNegocioException("El nombre de usuario no puede modificarse. Envíe el usuario registrado u omita 'loginCredenciales'.");
+        }
+        if (passwordHash != null) {
+            usuario.setPasswordHash(passwordHash);
+            cerrarSesion(usuario); // al cambiar la contraseña se cierra la sesión activa
+        }
+        siPresente(credenciales.getFaceIdBiometrico(), usuario::setFaceIdBiometrico);
+        usuarioLoginRepository.save(usuario);
+        if (pinHash != null) {
+            // Un PIN nuevo reinicia el contador de intentos y levanta el bloqueo del anterior
+            cliente.setPin(pinHash);
+            cliente.setPinIntentosFallidos((short) 0);
+            cliente.setPinBloqueadoHasta(null);
+        }
+    }
+
+    private static void cerrarSesion(UsuarioLoginEntity usuario) {
+        usuario.setIsLoggedIn(false);
+        usuario.setTokenHash(null);
+        usuario.setTokenExpira(null);
+    }
+
+    private static <T> void siPresente(T valor, Consumer<T> asignar) {
+        if (valor != null) {
+            asignar.accept(valor);
+        }
+    }
+
+    private static void textoSiPresente(String valor, Consumer<String> asignar) {
+        if (valor != null) {
+            asignar.accept(limpiar(valor));
+        }
+    }
+
     private static String limpiar(String valor) {
         if (valor == null) {
             return null;

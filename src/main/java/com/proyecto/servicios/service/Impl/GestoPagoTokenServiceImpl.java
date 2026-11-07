@@ -20,25 +20,25 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
     private final GestoPagoAuthClient gestoPagoAuthClient;
     private final GestoPagoTokenRepository tokenRepository;
     private final GestoPagoTokenMapper tokenMapper;
-
-    @Value("${gestopago.auth.id-distribuidor}")
-    private Integer idDistribuidor;
-
-    @Value("${gestopago.auth.codigo-dispositivo}")
-    private String codigoDispositivo;
-
-    @Value("${gestopago.auth.password}")
-    private String password;
-
-    @Value("${gestopago.api-key:}")
-    private String apiKey;
+    private final Integer idDistribuidor;
+    private final String codigoDispositivo;
+    private final String password;
+    private final String apiKey;
 
     public GestoPagoTokenServiceImpl(GestoPagoAuthClient gestoPagoAuthClient,
                                      GestoPagoTokenRepository tokenRepository,
-                                     GestoPagoTokenMapper tokenMapper) {
+                                     GestoPagoTokenMapper tokenMapper,
+                                     @Value("${gestopago.auth.id-distribuidor}") Integer idDistribuidor,
+                                     @Value("${gestopago.auth.codigo-dispositivo}") String codigoDispositivo,
+                                     @Value("${gestopago.auth.password}") String password,
+                                     @Value("${gestopago.api-key:}") String apiKey) {
         this.gestoPagoAuthClient = gestoPagoAuthClient;
         this.tokenRepository = tokenRepository;
         this.tokenMapper = tokenMapper;
+        this.idDistribuidor = idDistribuidor;
+        this.codigoDispositivo = codigoDispositivo;
+        this.password = password;
+        this.apiKey = apiKey == null || apiKey.isBlank() ? null : apiKey.trim();
     }
 
     @Override
@@ -47,29 +47,14 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         log.info("Renovando token GestoPago para distribuidor={}", idDistribuidor);
         try {
             GestoPagoAuthResponse response = gestoPagoAuthClient.authenticate(
-                    idDistribuidor, codigoDispositivo, password,
-                    apiKey == null || apiKey.isBlank() ? null : apiKey.trim());
+                    idDistribuidor, codigoDispositivo, password, apiKey);
 
             if (response == null || response.getToken() == null) {
                 log.error("La respuesta de GestoPago no contiene token");
                 return;
             }
 
-            GestoPagoToken tokenEntity = tokenRepository
-                    .findByIdDistribuidorAndCodigoDispositivo(idDistribuidor, codigoDispositivo)
-                    .map(existing -> {
-                        tokenMapper.updateEntity(response, existing);
-                        return existing;
-                    })
-                    .orElseGet(() -> {
-                        GestoPagoToken nuevo = tokenMapper.toEntity(response);
-                        nuevo.setIdDistribuidor(idDistribuidor);
-                        nuevo.setCodigoDispositivo(codigoDispositivo);
-                        nuevo.setActivo(true);
-                        return nuevo;
-                    });
-
-            tokenRepository.save(tokenEntity);
+            tokenRepository.save(actualizarOCrear(response));
             log.info("Token GestoPago renovado correctamente");
 
         } catch (Exception e) {
@@ -78,6 +63,24 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
                     e instanceof feign.FeignException feign ? feign.status() : -1);
         }
     }
+
+    /** Reutiliza el registro del dispositivo si ya existe; si no, crea uno nuevo activo. */
+    private GestoPagoToken actualizarOCrear(GestoPagoAuthResponse response) {
+        return tokenRepository
+                .findByIdDistribuidorAndCodigoDispositivo(idDistribuidor, codigoDispositivo)
+                .map(existente -> {
+                    tokenMapper.updateEntity(response, existente);
+                    return existente;
+                })
+                .orElseGet(() -> {
+                    GestoPagoToken nuevo = tokenMapper.toEntity(response);
+                    nuevo.setIdDistribuidor(idDistribuidor);
+                    nuevo.setCodigoDispositivo(codigoDispositivo);
+                    nuevo.setActivo(true);
+                    return nuevo;
+                });
+    }
+
     @Override
     public Optional<GestoPagoToken> obtenerTokenActivo(
             Integer idDistribuidor,

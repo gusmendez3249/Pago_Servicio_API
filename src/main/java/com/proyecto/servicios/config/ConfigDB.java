@@ -43,23 +43,16 @@ public class ConfigDB {
 
     @Bean(name = "sfDatasource")
     public DataSource sfDatasource() {
-        String url =
-                env.getRequiredProperty("spring.datasource.url");
+        return new HikariDataSource(hikariConfig());
+    }
 
-        String username =
-                env.getRequiredProperty("spring.datasource.username");
-
-        String password =
-                env.getRequiredProperty("spring.datasource.password");
-
+    /** Parámetros del pool; los límites son configurables para ajustarlos en pruebas de carga (JMeter). */
+    HikariConfig hikariConfig() {
         HikariConfig config = new HikariConfig();
-
-        config.setJdbcUrl(url);
-        config.setUsername(username);
-        config.setPassword(password);
+        config.setJdbcUrl(env.getRequiredProperty("spring.datasource.url"));
+        config.setUsername(env.getRequiredProperty("spring.datasource.username"));
+        config.setPassword(env.getRequiredProperty("spring.datasource.password"));
         config.setDriverClassName("org.postgresql.Driver");
-
-        // Configurables desde application.properties para ajustar ante pruebas de carga (JMeter)
         config.setMaximumPoolSize(env.getProperty("app.datasource.max-pool-size", Integer.class, 20));
         config.setMaxLifetime(1800000);
         config.setConnectionTimeout(env.getProperty("app.datasource.connection-timeout-ms", Long.class, 3000L));
@@ -67,8 +60,7 @@ public class ConfigDB {
         config.setMinimumIdle(env.getProperty("app.datasource.min-idle", Integer.class, 5));
         config.setConnectionTestQuery("SELECT 1");
         config.setPoolName("sfDatasource");
-
-        return new HikariDataSource(config);
+        return config;
     }
 
     @Bean(name = "sfEntityManagerFactory")

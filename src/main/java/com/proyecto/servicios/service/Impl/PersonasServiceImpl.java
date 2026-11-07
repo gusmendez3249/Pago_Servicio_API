@@ -13,61 +13,58 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class PersonasServiceImpl implements PersonaService {
+
+    private static final int CODIGO_CREADA = 1;
+    private static final int CODIGO_EXITO = 0;
+    private static final String PERSONA_NO_EXISTE = "La persona no existe";
+
     private final PersonasRepository personasRepository;
+
     @Override
     public PersonaResponse creaPersona(PersonasRequest personasRequest) {
-        PersonaResponse person=new PersonaResponse();
-     Personas persona=new Personas();
-     persona.setNombre(personasRequest.getNombre());
-     persona.setApellidoMaterno(personasRequest.getApellidoMaterno());
-     persona.setApellidoP(personasRequest.getApellidoP());
-     personasRepository.save(persona);
-     person.setCodigo(1);
-     person.setMensaje("Exito");
-     BeanUtils.copyProperties(persona,person);
+        Personas persona = new Personas();
+        persona.setNombre(personasRequest.getNombre());
+        persona.setApellidoP(personasRequest.getApellidoP());
+        persona.setApellidoMaterno(personasRequest.getApellidoMaterno());
+        personasRepository.save(persona);
 
-     return person;
+        PersonaResponse respuesta = new PersonaResponse();
+        BeanUtils.copyProperties(persona, respuesta);
+        respuesta.setCodigo(CODIGO_CREADA);
+        respuesta.setMensaje("Exito");
+        return respuesta;
     }
 
     @Override
     public GenericResponse eliminaPersona(EliminaPersonaRequest eliminaPersonaRequest) {
-        GenericResponse genericResponse=new GenericResponse();
-
-        Optional<Personas> existePersona=personasRepository.findFirstByNombreOrderByIdAsc(eliminaPersonaRequest.getNombre());
-        if(existePersona.isPresent()){
-            Personas personaElimina=existePersona.get();
-            personasRepository.delete(personaElimina);
-            genericResponse.setCodigo(0);
-            genericResponse.setMensaje("La persona ha sido eliminada correctamente");
-
-        }else{
-            throw new RecursoNoEncontradoException("La persona no existe");
-        }
-       return genericResponse;
-
+        Personas persona = buscarPorNombre(eliminaPersonaRequest.getNombre());
+        personasRepository.delete(persona);
+        return exito("La persona ha sido eliminada correctamente");
     }
 
     @Override
     public GenericResponse actualizaPersona(PersonasRequest personasRequest) {
-        GenericResponse genericResponse=new GenericResponse();
-        Optional<Personas> existePersona=personasRepository.findFirstByNombreOrderByIdAsc(personasRequest.getNombre());
-        if(existePersona.isPresent()){
-            Personas personaActualiza=existePersona.get();
-            personaActualiza.setApellidoP(personasRequest.getApellidoP());
-            personaActualiza.setApellidoMaterno(personasRequest.getApellidoMaterno());
-            personasRepository.save(personaActualiza);
-            genericResponse.setCodigo(0);
-            genericResponse.setMensaje("la persona ha sido actualizada correctamente");
+        Personas persona = buscarPorNombre(personasRequest.getNombre());
+        persona.setApellidoP(personasRequest.getApellidoP());
+        persona.setApellidoMaterno(personasRequest.getApellidoMaterno());
+        personasRepository.save(persona);
+        return exito("la persona ha sido actualizada correctamente");
+    }
 
-        }else{
-            throw new RecursoNoEncontradoException("La persona no existe");
-        }
-        return genericResponse;
+    private Personas buscarPorNombre(String nombre) {
+        return personasRepository.findFirstByNombreOrderByIdAsc(nombre)
+                .orElseThrow(() -> new RecursoNoEncontradoException(PERSONA_NO_EXISTE));
+    }
+
+    private static GenericResponse exito(String mensaje) {
+        GenericResponse respuesta = new GenericResponse();
+        respuesta.setCodigo(CODIGO_EXITO);
+        respuesta.setMensaje(mensaje);
+        return respuesta;
     }
 }
