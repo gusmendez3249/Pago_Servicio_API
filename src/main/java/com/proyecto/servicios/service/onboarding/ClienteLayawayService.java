@@ -62,12 +62,7 @@ public class ClienteLayawayService {
         // Aquí: 1) autenticación (401), 2) autorización por rol (403) y 3) reglas de negocio contra la base de datos.
         // El registro (bandera 1) es público: no requiere token.
         Integer bandera = request.getBandera();
-        SesionUsuario sesion = (bandera >= 2 && bandera <= 4) ? sesionService.autenticar(authorization) : null;
-        if (bandera == 3 && !sesion.esEjecutivo()) {
-            throw new AccesoDenegadoException("Solo un ejecutivo puede dar de baja clientes.");
-        }
-        // Autorización a nivel de recurso: un cliente solo accede a SU registro; el ejecutivo, a cualquiera (null)
-        Long propietario = (bandera == 2 || bandera == 4) ? propietarioPermitido(sesion) : null;
+        Long propietario = autorizar(bandera, authorization);
 
         return switch (bandera) {
             case 1 -> {
@@ -97,6 +92,25 @@ public class ClienteLayawayService {
      * Para el ejecutivo devuelve null (sin restricción). Para un cliente devuelve su propio ID interno,
      * que se agrega como condición a toda búsqueda: así, aunque envíe la llave de otro cliente, no lo encuentra.
      */
+    /**
+     * Autentica (401) y autoriza por rol (403) las banderas 2 a 4. Devuelve el cliente al que se limita la
+     * operación, o null cuando no aplica (registro público, baja por ejecutivo o ejecutivo con acceso total).
+     */
+    private Long autorizar(Integer bandera, String authorization) {
+        if (bandera < 2 || bandera > 4) {
+            return null;
+        }
+        SesionUsuario sesion = sesionService.autenticar(authorization);
+        if (bandera == 3) {
+            if (!sesion.esEjecutivo()) {
+                throw new AccesoDenegadoException("Solo un ejecutivo puede dar de baja clientes.");
+            }
+            return null;
+        }
+        // Autorización a nivel de recurso: un cliente solo accede a SU registro; el ejecutivo, a cualquiera (null)
+        return propietarioPermitido(sesion);
+    }
+
     private Long propietarioPermitido(SesionUsuario sesion) {
         if (sesion.esEjecutivo()) {
             return null;

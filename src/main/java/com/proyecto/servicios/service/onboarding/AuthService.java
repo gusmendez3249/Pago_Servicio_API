@@ -21,6 +21,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -112,13 +113,13 @@ public class AuthService {
         }
 
         if (usuario.getBloqueadoHasta() != null && usuario.getBloqueadoHasta().isAfter(ahora)) {
-            long minutos = Math.max(1, Duration.between(ahora, usuario.getBloqueadoHasta()).toMinutes());
+            long minutos = Math.max(1, minutosEntre(ahora, usuario.getBloqueadoHasta()));
             throw new CuentaBloqueadaException("Cuenta bloqueada temporalmente por exceso de intentos fallidos. Intente de nuevo en " + minutos + " minuto(s).");
         }
 
         // Verificar inactividad previa de 5 minutos si ya estaba logueado
         if (Boolean.TRUE.equals(usuario.getIsLoggedIn()) && usuario.getUltimaActividad() != null) {
-            long minutosInactivo = Duration.between(usuario.getUltimaActividad(), ahora).toMinutes();
+            long minutosInactivo = minutosEntre(usuario.getUltimaActividad(), ahora);
             if (minutosInactivo >= INACTIVIDAD_MINUTOS_MAX) {
                 usuario.setIsLoggedIn(false);
                 usuarioLoginRepository.save(usuario);
@@ -138,7 +139,7 @@ public class AuthService {
         LocalDateTime ahora = LocalDateTime.now();
         for (UsuarioLoginEntity u : usuariosActivos) {
             if (u.getUltimaActividad() != null) {
-                long minutos = Duration.between(u.getUltimaActividad(), ahora).toMinutes();
+                long minutos = minutosEntre(u.getUltimaActividad(), ahora);
                 if (minutos >= INACTIVIDAD_MINUTOS_MAX) {
                     u.setIsLoggedIn(false);
                     usuarioLoginRepository.save(u);
@@ -146,5 +147,14 @@ public class AuthService {
                 }
             }
         }
+    }
+
+    /**
+     * Minutos entre dos fechas locales. Se convierten a la zona del servidor antes de restar para que
+     * un cambio de horario (DST) no altere el cálculo de bloqueo e inactividad.
+     */
+    private static long minutosEntre(LocalDateTime desde, LocalDateTime hasta) {
+        ZoneId zona = ZoneId.systemDefault();
+        return Duration.between(desde.atZone(zona), hasta.atZone(zona)).toMinutes();
     }
 }
