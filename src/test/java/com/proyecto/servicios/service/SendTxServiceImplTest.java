@@ -44,8 +44,8 @@ class SendTxServiceImplTest {
     @Mock private CifradoService cifradoService;
 
     private SendTxServiceImpl service;
-    private final SendTxPayload payload = SendTxPayload.builder().idServicio(1).idProducto(2)
-            .montoPago(new BigDecimal("100.00")).telefono("4181234567").upc("ABCDE12345").build();
+    private final SendTxPayload payload = SendTxPayload.porTelefono(2, 1, "4181234567",
+            new BigDecimal("100.00"), "20260101120000", "ABCDE12345", null);
 
     @BeforeEach
     void setUp() {

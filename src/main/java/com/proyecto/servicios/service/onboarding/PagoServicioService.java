@@ -279,21 +279,15 @@ public class PagoServicioService {
     // ---------------------------------------------------------------- payload
 
     private SendTxPayload armarPayload(PagoServicioRequest request, ProductoPostgresEntity producto, String upc) {
-        SendTxPayload.SendTxPayloadBuilder payload = SendTxPayload.builder()
-                .idProducto(request.getIdProd())
-                .idServicio(request.getIdSer())
-                .montoPago(request.getMonto().setScale(2, RoundingMode.UNNECESSARY))
-                .horaLocal(LocalDateTime.now(zona).format(FORMATO_HORA_LOCAL))
-                .upc(upc)
-                .unidad(unidad);
+        BigDecimal monto = request.getMonto().setScale(2, RoundingMode.UNNECESSARY);
+        String horaLocal = LocalDateTime.now(zona).format(FORMATO_HORA_LOCAL);
 
         if (Boolean.TRUE.equals(request.getEsReferencia())) {
-            payload.referencia(request.getReference())
-                    .telefono(telefonoParaReferencia(producto));
-        } else {
-            payload.telefono(request.getTelefono());
+            return SendTxPayload.porReferencia(request.getIdProd(), request.getIdSer(), request.getReference(),
+                    telefonoParaReferencia(producto), monto, horaLocal, upc, unidad);
         }
-        return payload.build();
+        return SendTxPayload.porTelefono(request.getIdProd(), request.getIdSer(), request.getTelefono(),
+                monto, horaLocal, upc, unidad);
     }
 
     /** Reglas de GestoPago: tipoFront 1 o 2 -> "1111111111"; idCatTipoServicio 10 u 11 -> "#1111111111". */

@@ -1,6 +1,7 @@
 package com.proyecto.servicios.service.Impl;
 
 import com.proyecto.servicios.entity.sf.Personas;
+import com.proyecto.servicios.exception.RecursoNoEncontradoException;
 import com.proyecto.servicios.model.EliminaPersonaRequest;
 import com.proyecto.servicios.model.GenericResponse;
 import com.proyecto.servicios.model.PersonaResponse;
@@ -46,8 +47,7 @@ public class PersonasServiceImpl implements PersonaService {
             genericResponse.setMensaje("La persona ha sido eliminada correctamente");
 
         }else{
-            genericResponse.setCodigo(1);
-            genericResponse.setMensaje("La persona no existe ");
+            throw new RecursoNoEncontradoException("La persona no existe");
         }
        return genericResponse;
 
@@ -66,8 +66,7 @@ public class PersonasServiceImpl implements PersonaService {
             genericResponse.setMensaje("la persona ha sido actualizada correctamente");
 
         }else{
-            genericResponse.setCodigo(1);
-            genericResponse.setMensaje("La persona no existe ");
+            throw new RecursoNoEncontradoException("La persona no existe");
         }
         return genericResponse;
     }

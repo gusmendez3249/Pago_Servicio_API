@@ -74,11 +74,8 @@ public class PersonaController {
             @Parameter(hidden = true) @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @Valid @RequestBody PersonasRequest personasRequest) {
         exigirEjecutivo(authorization);
-        GenericResponse response = personaService.actualizaPersona(personasRequest);
-        if (response != null && response.getCodigo() != 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-        return ResponseEntity.ok(response);
+        // Si la persona no existe el servicio lanza RecursoNoEncontradoException (404 en GlobalExceptionHandler)
+        return ResponseEntity.ok(personaService.actualizaPersona(personasRequest));
     }
 
     @PutMapping(value = "/personasElimina", produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -95,11 +92,8 @@ public class PersonaController {
             @Parameter(hidden = true) @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @Valid @RequestBody EliminaPersonaRequest personasRequest) {
         exigirEjecutivo(authorization);
-        GenericResponse response = personaService.eliminaPersona(personasRequest);
-        if (response != null && response.getCodigo() != 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-        return ResponseEntity.ok(response);
+        // Si la persona no existe el servicio lanza RecursoNoEncontradoException (404 en GlobalExceptionHandler)
+        return ResponseEntity.ok(personaService.eliminaPersona(personasRequest));
     }
 }
 

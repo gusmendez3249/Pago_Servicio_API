@@ -89,27 +89,27 @@ public class SendTxServiceImpl implements SendTxService {
             formulario.add("signed", cifradoService.cifrar(serializar(payload)));
             authorization = authorization(obtenerToken());
         } catch (IntegrationException exception) {
-            log.error("No se envió sendTx: fallo previo al envío. upc={} causa={}", payload.getUpc(), exception.getErrorCode());
+            log.error("No se envió sendTx: fallo previo al envío. upc={} causa={}", payload.upc(), exception.getErrorCode());
             return ResultadoSendTx.noEnviada(exception.getErrorCode());
         }
 
         // --- Envío ---
         byte[] respuesta;
         try {
-            respuesta = enviarConRenovacionDeToken(authorization, formulario, payload.getUpc());
+            respuesta = enviarConRenovacionDeToken(authorization, formulario, payload.upc());
         } catch (FeignException.Unauthorized | FeignException.Forbidden exception) {
             // Rechazo en la capa de autenticación (antes de procesar la operación), incluso tras renovar el token
-            log.error("GestoPago rechazó las credenciales. upc={} status={}", payload.getUpc(), exception.status());
+            log.error("GestoPago rechazó las credenciales. upc={} status={}", payload.upc(), exception.status());
             return ResultadoSendTx.noEnviada(ErrorCode.AUTHENTICATION_ERROR);
         } catch (IntegrationException exception) {
-            log.error("No se pudo renovar el token de GestoPago. upc={}", payload.getUpc());
+            log.error("No se pudo renovar el token de GestoPago. upc={}", payload.upc());
             return ResultadoSendTx.noEnviada(exception.getErrorCode());
         } catch (RuntimeException exception) {
             // Otros FeignException (status HTTP o RetryableException de E/S) y cualquier falla inesperada
-            return clasificarFalla(exception, payload.getUpc());
+            return clasificarFalla(exception, payload.upc());
         }
 
-        return interpretarRespuesta(respuesta, payload.getUpc());
+        return interpretarRespuesta(respuesta, payload.upc());
     }
 
     /** El token dura 24 h: si GestoPago responde 401/403 (INVALID/EXPIRED) se renueva y se reintenta UNA vez. */

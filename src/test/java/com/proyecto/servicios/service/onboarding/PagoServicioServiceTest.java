@@ -106,9 +106,9 @@ class PagoServicioServiceTest {
 
         ArgumentCaptor<SendTxPayload> payload = ArgumentCaptor.forClass(SendTxPayload.class);
         verify(sendTxService).enviar(payload.capture());
-        assertEquals(r.getUpc(), payload.getValue().getUpc());
-        assertEquals(new BigDecimal("100.50"), payload.getValue().getMontoPago());
-        assertEquals("4181234567", payload.getValue().getTelefono());
+        assertEquals(r.getUpc(), payload.getValue().upc());
+        assertEquals(new BigDecimal("100.50"), payload.getValue().montoPago());
+        assertEquals("4181234567", payload.getValue().telefono());
     }
 
     @Test

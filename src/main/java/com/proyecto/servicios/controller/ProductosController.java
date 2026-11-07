@@ -1,6 +1,7 @@
 package com.proyecto.servicios.controller;
 
 import com.proyecto.servicios.enums.ErrorCode;
+import com.proyecto.servicios.exception.IntegrationException;
 import com.proyecto.servicios.model.GenericResponse;
 import com.proyecto.servicios.model.productos.ProductoResponse;
 import com.proyecto.servicios.service.ProductosStorageService;
@@ -10,14 +11,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -64,13 +63,8 @@ public class ProductosController {
             }
         }
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                GenericResponse.error(
-                        ErrorCode.NO_DATA.getCode(),
-                        ErrorCode.NO_DATA.getMessage(),
-                        Collections.emptyList()
-                )
-        );
+        // GlobalExceptionHandler responde 404 con el código y mensaje de NO_DATA
+        throw new IntegrationException(ErrorCode.NO_DATA);
     }
 
     @GetMapping("/agrupados")
@@ -101,13 +95,8 @@ public class ProductosController {
             }
         }
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                GenericResponse.error(
-                        ErrorCode.NO_DATA.getCode(),
-                        ErrorCode.NO_DATA.getMessage(),
-                        Collections.emptyMap()
-                )
-        );
+        // GlobalExceptionHandler responde 404 con el código y mensaje de NO_DATA
+        throw new IntegrationException(ErrorCode.NO_DATA);
     }
 
     private List<ProductoResponse> obtenerProductosDesdeStorage() {
@@ -119,18 +108,10 @@ public class ProductosController {
                 return productos;
             }
         } catch (Exception redisException) {
-            // Fallback a Postgres
+            // No es un error para el cliente: Redis es solo caché, se consulta PostgreSQL
         }
 
-        return consultarPostgres();
-    }
-
-    private List<ProductoResponse> consultarPostgres() {
-        try {
-            return storageService.consultarPostgres();
-
-        } catch (Exception postgresException) {
-            return Collections.emptyList();
-        }
+        // Si PostgreSQL también falla, la excepción llega a GlobalExceptionHandler (500/503)
+        return storageService.consultarPostgres();
     }
 }
