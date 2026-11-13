@@ -90,10 +90,6 @@ public class ClienteLayawayService {
     }
 
     /**
-     * Para el ejecutivo devuelve null (sin restricción). Para un cliente devuelve su propio ID interno,
-     * que se agrega como condición a toda búsqueda: así, aunque envíe la llave de otro cliente, no lo encuentra.
-     */
-    /**
      * Autentica (401) y autoriza por rol (403) las banderas 2 a 4. Devuelve el cliente al que se limita la
      * operación, o null cuando no aplica (registro público, baja por ejecutivo o ejecutivo con acceso total).
      */
@@ -221,12 +217,8 @@ public class ClienteLayawayService {
 
         log.info("Cliente registrado exitosamente. ID: {}, Cuenta: {}", clienteEntity.getId(), numeroCuenta);
 
-        String nombreCompleto = clienteEntity.getNombre() + " " +
-                (clienteEntity.getSegundoNombre() != null ? clienteEntity.getSegundoNombre() + " " : "") +
-                clienteEntity.getApellidoPaterno() + " " + clienteEntity.getApellidoMaterno();
-
         return LayawayClienteResponse.builder()
-                .nombreCompleto(nombreCompleto)
+                .nombreCompleto(nombreCompleto(clienteEntity))
                 .curp(clienteEntity.getCurp())
                 .rfc(clienteEntity.getRfc())
                 .correo(clienteEntity.getCorreo())
@@ -260,12 +252,8 @@ public class ClienteLayawayService {
         BigDecimal saldo = cuentas.isEmpty() ? BigDecimal.ZERO : cuentas.get(0).getSaldo();
         String estatusCta = cuentas.isEmpty() ? "N/A" : cuentas.get(0).getEstatus();
 
-        String nombreCompleto = cliente.getNombre() + " " +
-                (cliente.getSegundoNombre() != null ? cliente.getSegundoNombre() + " " : "") +
-                cliente.getApellidoPaterno() + " " + cliente.getApellidoMaterno();
-
         return LayawayClienteResponse.builder()
-                .nombreCompleto(nombreCompleto)
+                .nombreCompleto(nombreCompleto(cliente))
                 .curp(cliente.getCurp())
                 .rfc(cliente.getRfc())
                 .correo(cliente.getCorreo())
@@ -303,12 +291,8 @@ public class ClienteLayawayService {
         String numCuenta = cuentas.isEmpty() ? "N/A" : cuentas.get(0).getNumeroCuenta();
         BigDecimal saldo = cuentas.isEmpty() ? BigDecimal.ZERO : cuentas.get(0).getSaldo();
 
-        String nombreCompleto = cliente.getNombre() + " " +
-                (cliente.getSegundoNombre() != null ? cliente.getSegundoNombre() + " " : "") +
-                cliente.getApellidoPaterno() + " " + cliente.getApellidoMaterno();
-
         return LayawayClienteResponse.builder()
-                .nombreCompleto(nombreCompleto)
+                .nombreCompleto(nombreCompleto(cliente))
                 .curp(cliente.getCurp())
                 .rfc(cliente.getRfc())
                 .correo(cliente.getCorreo())
@@ -371,7 +355,7 @@ public class ClienteLayawayService {
      *                     false = "contiene" (consulta).
      * @param soloClienteId si no es nulo, limita la búsqueda a ese cliente (autorización a nivel de recurso).
      */
-    private Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f, boolean exacta, Long soloClienteId) {
+    static Specification<ClienteEntity> especificacionConsulta(FiltrosClienteDto f, boolean exacta, Long soloClienteId) {
         return (root, query, cb) -> {
             List<Predicate> condiciones = new ArrayList<>();
             if (soloClienteId != null) {
