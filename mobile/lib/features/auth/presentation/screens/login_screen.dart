@@ -11,6 +11,7 @@ import '../../../../shared/widgets/enlace.dart';
 import '../../../../shared/widgets/logo_bangus.dart';
 import '../providers/login_controller.dart';
 import '../widgets/validadores_login.dart';
+import '../../../../shared/entrada/entrada.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -170,6 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             enableSuggestions: false,
             autocorrect: false,
             autofillHints: const [AutofillHints.username],
+            inputFormatters: Entrada.usuario.formatos(),
             decoration: const InputDecoration(labelText: 'Usuario'),
             validator: ValidadoresLogin.usuario,
             forceErrorText: estado.erroresCampo['username'],
@@ -183,6 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             enableSuggestions: false,
             autocorrect: false,
             autofillHints: const [AutofillHints.password],
+            inputFormatters: Entrada.password.formatos(),
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => cargando ? null : _enviar(),
             decoration: InputDecoration(

@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import { ChangeDetectionStrategy, Component, Injector, afterNextRender, computed, effect, inject, signal, untracked, viewChild, ElementRef } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -14,7 +15,7 @@ import { ValidacionReferenciaStore } from '../store/validacion-referencia.store'
 
 @Component({
   selector: 'app-referencia-page',
-  imports: [CabeceraFlujo, Icono, LogoServicio, Pasos, ResultadoReferencia, RouterLink],
+  imports: [CabeceraFlujo, Icono, LogoServicio, Pasos, ResultadoReferencia, RouterLink, Entrada],
   templateUrl: './referencia-page.html',
   styleUrl: './referencia-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -38,8 +38,7 @@ bool digitoCurpValido(String curp) {
   return curp[17] == '${(10 - suma % 10) % 10}';
 }
 
-String _aammdd(DateTime f) =>
-    '${(f.year % 100).toString().padLeft(2, '0')}'
+String _aammdd(DateTime f) => '${(f.year % 100).toString().padLeft(2, '0')}'
     '${f.month.toString().padLeft(2, '0')}'
     '${f.day.toString().padLeft(2, '0')}';
 
@@ -63,7 +62,9 @@ enum ErrorRfc { formato, generico, curp }
 
 ErrorRfc? errorRfc(String rfc, String curp) {
   if (!patronRfc.hasMatch(rfc)) return ErrorRfc.formato;
-  if (rfc.startsWith('XAXX') || rfc.startsWith('XEXX')) return ErrorRfc.generico;
+  if (rfc.startsWith('XAXX') || rfc.startsWith('XEXX')) {
+    return ErrorRfc.generico;
+  }
   if (curp.length >= 10) {
     final inicio = rfc.length == 13 ? 4 : 3;
     if (rfc[0] != curp[0] ||

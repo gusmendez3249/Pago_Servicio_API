@@ -4,6 +4,7 @@ import '../../../../core/config/app_theme.dart';
 import '../../../../shared/widgets/acceso_circular.dart';
 import '../../domain/utils/filtros_catalogo.dart';
 import 'categorias_visuales.dart';
+import '../../../../shared/entrada/entrada.dart';
 
 /// Accesos rápidos por categoría: iconos en círculo con su nombre, con
 /// desplazamiento horizontal. "Todas" + las categorías reales.
@@ -205,6 +206,7 @@ class _BuscadorCatalogoState extends State<BuscadorCatalogo> {
       controller: _controlador,
       enabled: widget.habilitado,
       onChanged: widget.alCambiar,
+      inputFormatters: Entrada.busqueda.formatos(),
       textInputAction: TextInputAction.search,
       cursorColor: colores.texto,
       style: estiloTexto(
