@@ -4,7 +4,7 @@
  *
  * Uso (API en http://localhost:8081, arrancada con APP_EJECUTIVO_USUARIO / APP_EJECUTIVO_PASSWORD):
  *   npm install playwright-core
- *   EJECUTIVO_USUARIO=ejecutivo.admin EJECUTIVO_PASSWORD='Ejecutivo#2026' node capturas_swagger.js <carpeta_salida> [prefijo] [cortes.json]
+ *   EJECUTIVO_USUARIO=ejecutivo.admin EJECUTIVO_PASSWORD='<contraseña del ejecutivo>' node capturas_swagger.js <carpeta_salida> [prefijo] [cortes.json]
  * Requiere Microsoft Edge (se ajusta la ruta de EDGE si es otra).
  */
 const { chromium } = require("playwright-core");
@@ -17,7 +17,8 @@ const CORTES = process.argv[4];          // opcional: archivo donde se guardan l
 const BASE = "http://localhost:8081";
 const EDGE = process.env.EDGE || "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const USUARIO_EJ = process.env.EJECUTIVO_USUARIO || "ejecutivo.admin";
-const PASSWORD_EJ = process.env.EJECUTIVO_PASSWORD || "Ejecutivo#2026";
+const PASSWORD_EJ = process.env.EJECUTIVO_PASSWORD;
+if (!PASSWORD_EJ) { console.error("Defina EJECUTIVO_PASSWORD (la contraseña del ejecutivo) antes de ejecutar."); process.exit(1); }
 fs.mkdirSync(SALIDA, { recursive: true });
 
 const alta = {

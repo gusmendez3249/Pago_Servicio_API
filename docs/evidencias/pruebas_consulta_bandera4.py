@@ -24,7 +24,7 @@ TOKEN = None
 
 def _login_ejecutivo():
     usuario = _os.environ.get("EJECUTIVO_USUARIO", "ejecutivo.admin")
-    password = _os.environ.get("EJECUTIVO_PASSWORD", "Ejecutivo#2026")
+    password = _os.environ.get("EJECUTIVO_PASSWORD") or sys.exit("Defina EJECUTIVO_PASSWORD (la contraseña del ejecutivo) antes de ejecutar.")
     c = http.client.HTTPConnection("localhost", PORT, timeout=60)
     c.request("POST", "/api/v1/auth/login", body=json.dumps({"bandera": 1, "username": usuario, "password": password}).encode(),
               headers={"Content-Type": "application/json"})

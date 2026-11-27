@@ -49,13 +49,16 @@ API REST en Java / Spring Boot para registrar clientes personas físicas, valida
    $env:GESTOPAGO_API_KEY            = "<X-API-Key, opcional>"
    ```
    Variables opcionales de seguridad:
-   - `CLIENT_IP_HEADER` (por defecto `CF-Connecting-IP`): encabezado con la IP real del cliente, usado por el límite de 10 intentos de login por minuto e IP (`429`). En Render lo fija Cloudflare; si la API no está detrás de un proxy que lo sobrescriba, déjelo vacío (`CLIENT_IP_HEADER=`) para usar la IP de la conexión, porque de lo contrario un cliente podría inventar su IP.
-   - `SWAGGER_ENABLED` (por defecto `true`): con `false` se ocultan `/swagger-ui.html` y `/api-docs` en producción.
+   - `CLIENT_IP_HEADER` (por defecto vacío): encabezado con la IP real del cliente, usado por los límites de peticiones por IP (`429`). Vacío = se usa la IP de la conexión, que el cliente no puede falsificar. **En Render debe configurarse `CLIENT_IP_HEADER=CF-Connecting-IP`** (Cloudflare siempre lo sobrescribe); sin eso todos los usuarios compartirían la IP del proxy y el límite sería global.
+   - `SWAGGER_ENABLED` (por defecto `false`): con `true` se publican `/swagger-ui.html` y `/api-docs` (el arranque local de `.claude/launch.json` lo enciende).
+   - `APP_SALDO_INICIAL` (por defecto `0.00`): saldo con el que nace cada cuenta. El registro es público, así que en producción debe ser 0. Las cuentas nuevas nacen en 0.00 y el saldo se abona desde el panel de administrador (sección 5.8).
+   - `REDIS_PASSWORD`: contraseña de Redis. En local está en `redis-local.conf` (ignorado por git) y en `secretos.properties`.
+   - Errores propios de Gesto Pago: si `sendTx` responde un código de `gestopago.sendtx.codigos-error-gestopago` (por defecto `05` y `55` "Origen Valido"), el pago queda `RECHAZADA` con motivo `ERROR_GESTOPAGO`, el saldo se reintegra y la web y el móvil muestran "Error de Gesto Pago". No existe modo de pago simulado; los registros antiguos con `origen_confirmacion = SIMULADO` se conservan como historial.
    - `/personas`, `/personasActualiza` y `/personasElimina` requieren sesión de un usuario `EJECUTIVO` (`401` sin token, `403` con token de cliente).
 3. **Definir el usuario ejecutivo inicial** con variables de entorno (nunca en el código ni en `application.properties`):
    ```powershell
    $env:APP_EJECUTIVO_USUARIO  = "ejecutivo.admin"
-   $env:APP_EJECUTIVO_PASSWORD = "Ejecutivo#2026"   # mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial
+   $env:APP_EJECUTIVO_PASSWORD = "<contraseña propia y secreta>"   # nunca la publique; mín. 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial
    ```
    Al arrancar se crea ese usuario con rol `EJECUTIVO` si no existe. Sin él, las operaciones de actualizar, baja y consulta solo estarán disponibles para cada cliente sobre su propio registro (ver [sección 5.6](#56-autenticación-y-autorización-control-de-acceso-por-recurso)).
 4. **Compilar, probar y arrancar:**
@@ -238,7 +241,7 @@ El **ID interno del cliente no se pide ni se devuelve** en ninguna operación: a
 
 | `bandera` | Operación | Cómo se identifica al cliente | Resultado |
 |---|---|---|---|
-| `1` | Registrar cliente | No aplica | **201**. Crea el domicilio, el cliente, la cuenta bancaria (número único de 12 dígitos, saldo inicial `1000.00`, estatus `ACTIVA`) y el registro de acceso, todo en una sola transacción |
+| `1` | Registrar cliente | No aplica | **201**. Crea el domicilio, el cliente, la cuenta bancaria (número único de 12 dígitos, saldo inicial `0.00`, estatus `ACTIVA`) y el registro de acceso, todo en una sola transacción |
 | `2` | Actualizar datos personales, de contacto, domicilio, información laboral y **contraseña** | `filtros` con el valor **completo** de `curp`, `rfc` o `numeroCuenta` | **200**. CURP y RFC **no** se pueden modificar (400 si se envían distintos); el usuario tampoco; la contraseña nueva cumple la misma política que al registrar y cierra la sesión activa |
 | `3` | Baja lógica | `filtros` con el valor **completo** de `curp`, `rfc` o `numeroCuenta` | **200**. `activo = false`, cuentas `INACTIVA`, sesión cerrada; no se borra nada |
 | `4` | Consultar clientes | `filtros` opcional (parte del valor; ver [sección 5.2](#52-consulta-de-clientes-bandera-4)) | **200**. Lista de clientes con sus cuentas |
@@ -301,7 +304,7 @@ Respuesta `200 OK`:
         "telefonoMovil": "4181234567",
         "activo": true,
         "fechaRegistro": "2026-10-09T18:55:14.153443",
-        "cuentas": [ { "numeroCuenta": "635852470689", "saldo": 1000.00, "estatus": "ACTIVA" } ]
+        "cuentas": [ { "numeroCuenta": "635852470689", "saldo": 0.00, "estatus": "ACTIVA" } ]
       }
     ],
     "totalCoincidencias": 1,
@@ -328,7 +331,7 @@ Pruebas: 48 casos contra la API real ([resultado](docs/evidencias/resultado_prue
 | `telefonoMovil` / `telefonoAlt` | Número entero (sin comillas) de exactamente 10 dígitos; el alternativo es opcional |
 | `codigoPostal` | Exactamente 5 dígitos |
 | `calle`, `colonia`, `municipio`, `estado`, `pais`, `ocupacion`, `empresa` | Obligatorios (número interior opcional), máximo 100 caracteres, sin caracteres de control ni `<` `>` |
-| `ingresoMensual` | Mayor a cero, exactamente 2 decimales, máximo 12 enteros |
+| `ingresoMensual` | Mayor a cero, hasta 2 decimales, máximo 12 enteros (misma regla que el monto de un pago) |
 | `loginCredenciales.username` | 3 a 50 caracteres: letras, números, `.`, `_`, `-` |
 | `loginCredenciales.password` | Al registrar **y** al editar: 8 a 72 caracteres, sin espacios, con al menos **1 mayúscula, 1 minúscula, 1 número y 1 carácter especial** (`! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~`) |
 | `loginCredenciales.pin` | PIN de seguridad (2FA) que autoriza los pagos (`twoFA`): exactamente 4 dígitos, entre comillas, sin dígitos repetidos (`1111`) ni consecutivos (`1234`, `4321`). **Obligatorio al registrar**; al editar es opcional y reemplaza el anterior (reinicia los intentos fallidos y el bloqueo). Se guarda con hash PBKDF2 |
@@ -391,7 +394,7 @@ Respuesta `201 Created`:
     "correo": "laura.torres@example.com",
     "activo": true,
     "numeroCuenta": "498094527099",
-    "saldoInicial": 1000.00,
+    "saldoInicial": 0.00,
     "estatusCuenta": "ACTIVA",
     "username": "laura.torres",
     "operacionRealizada": "INSERTAR",
@@ -493,6 +496,47 @@ Cada escenario se probó con la API en ejecución (ver [sección 9](#9-evidencia
 
 ---
 
+### 5.8 Crear cuenta y recargas de saldo (panel de administrador)
+
+**Crear cuenta (web `/registro`).** El cliente nuevo se registra en 4 pasos (sus datos, contacto y domicilio, trabajo,
+acceso) con `POST /api/v1/layaway/cliente` (bandera 1). Toda cuenta nace con **saldo 0.00**
+(`APP_SALDO_INICIAL`, por defecto 0.00). Al terminar, la pantalla muestra su número de cuenta para pedir una recarga.
+
+**Panel de administrador (web `/admin`, solo rol EJECUTIVO).** Hoy es la única forma de abonar dinero a una cuenta. El
+ejecutivo entra directo al panel al iniciar sesión; los clientes no pueden abrirlo.
+
+| Endpoint | Uso |
+|---|---|
+| `POST /api/v1/admin/cuentas/consultar` | `{ "numeroCuenta": "<12 dígitos>" }` → titular, saldo, estatus y si admite recargas |
+| `POST /api/v1/admin/recargas` | Encabezado `Idempotency-Key` (UUID) y `{ "numeroCuenta", "monto" }` (1.00 a 50,000.00) → 201 con folio `R-000123` y saldo resultante |
+| `POST /api/v1/admin/recargas/historial` | `{ "pagina": 0 }` → recargas recientes, 20 por página |
+
+Cada recarga queda auditada en `tb_recarga_saldo` (V19): cuenta, monto, saldo resultante, ejecutivo y fecha. El abono es
+un `UPDATE` atómico condicionado a cuenta ACTIVA; repetir la misma solicitud con la misma llave no abona dos veces
+(409 si la llave se usó con otros datos). Un cliente recibe 403 y sin sesión 401. El usuario ejecutivo inicial se crea al
+arrancar con `APP_EJECUTIVO_USUARIO` / `APP_EJECUTIVO_PASSWORD`.
+
+**Tope diario.** Una recarga que rebase el total del día por cuenta (`APP_RECARGAS_TOPE_CUENTA`, por defecto 100,000.00)
+o por ejecutivo (`APP_RECARGAS_TOPE_EJECUTIVO`, por defecto 200,000.00) se rechaza con 422 (`TOPE_DIARIO_CUENTA` /
+`TOPE_DIARIO_EJECUTIVO`) y no abona nada. Las filas del ejecutivo y de la cuenta se bloquean durante la recarga, así que
+dos recargas simultáneas tampoco pueden rebasarlo.
+
+**Rotar la contraseña del ejecutivo.** `APP_EJECUTIVO_PASSWORD` es la fuente de verdad: al cambiarla y reiniciar, el
+backend reemplaza el hash y cierra la sesión abierta del ejecutivo. Las contraseñas que llegaron a publicarse en el
+repositorio se rechazan al arrancar.
+
+**Sesión antes que el cuerpo.** Las rutas protegidas autentican (y en `/api/v1/admin/**`, `/personas*` y
+`/api/v1/pagos/conciliacion` exigen rol EJECUTIVO) antes de leer y validar el cuerpo (`AutenticacionPreviaInterceptor`):
+sin sesión responden 401 y sin el rol 403, sin revelar los campos de la ruta.
+
+**Lista de despliegue.**
+- Contraseñas propias para `APP_EJECUTIVO_PASSWORD`, `DB_PASSWORD` y `REDIS_PASSWORD` (nunca las que aparecen en el
+  historial del repositorio).
+- `CLIENT_IP_HEADER` según el proxy (en Render, `CF-Connecting-IP`).
+- No definir `APP_SALDO_INICIAL` (las cuentas nacen en 0.00) ni `SWAGGER_ENABLED`.
+- Web: URL https real en `environment.ts` y en `connect-src` de `index.prod.html` (`npm run build` falla con el marcador).
+- Móvil: `android/key.properties` con la llave de firma y `API_BASE_URL` https.
+
 ## 6. Reglas de negocio
 
 Cada regla se valida en el API **y** en la base de datos, para que no pueda saltarse ni por SQL directo.
@@ -504,7 +548,7 @@ Cada regla se valida en el API **y** en la base de datos, para que no pueda salt
 | RFC único | `existsByRfc` → 409 | `UNIQUE (rfc)` |
 | Correo único | `existsByCorreo` (en minúsculas) → 409 | `UNIQUE (correo)` + `CHECK` de minúsculas |
 | Teléfono de exactamente 10 dígitos | `@Min/@Max` sobre un entero | `CHECK (telefono ~ '^[0-9]{10}$')` |
-| Saldo inicial no negativo | Definido por el sistema (`1000.00`) | `CHECK (saldo >= 0)` |
+| Saldo inicial no negativo | Definido por el sistema (`0.00`; se recarga desde el panel de administrador) | `CHECK (saldo >= 0)` |
 | Número de cuenta único | `SecureRandom` + `existsByNumeroCuenta` | `UNIQUE (numero_cuenta)` + `CHECK` de 12 dígitos |
 | Solo clientes activos con cuentas activas | La baja inactiva las cuentas | Triggers `trg_cliente_baja` y `trg_cuenta_cliente_activo` |
 | Baja lógica, sin borrado físico | Bandera 3 → `activo = false` | Todas las FK con `ON DELETE RESTRICT` |
@@ -514,7 +558,7 @@ Cada regla se valida en el API **y** en la base de datos, para que no pueda salt
 
 El manejo es **centralizado**: `GlobalExceptionHandler` (`@RestControllerAdvice`) tiene un método `@ExceptionHandler` por cada tipo de excepción y traduce todas al mismo envoltorio `{ codigo, mensaje, data }`. Los controladores no tienen bloques `try-catch` ni validaciones manuales: reciben el DTO con `@Valid @RequestBody` y delegan en el servicio. Nunca se exponen detalles internos (SQL, clases o trazas): esos solo se registran en el log.
 
-**Validación de entrada (Bean Validation).** Cada DTO declara sus reglas con `@NotNull`, `@NotBlank`, `@Email`, `@Size`, `@Pattern`, `@Min`, `@Max`, `@Positive`, `@AssertTrue` y validaciones propias (`@MayorDeEdad`, `@DosDecimales`). Las reglas que dependen de la bandera también viven en el DTO, como restricciones de clase que reportan el error en el campo que lo provoca:
+**Validación de entrada (Bean Validation).** Cada DTO declara sus reglas con `@NotNull`, `@NotBlank`, `@Email`, `@Size`, `@Pattern`, `@Min`, `@Max`, `@Positive`, `@AssertTrue` y validaciones propias (`@MayorDeEdad`, `@IdentidadCongruente`). Las reglas que dependen de la bandera también viven en el DTO, como restricciones de clase que reportan el error en el campo que lo provoca:
 
 - `@OperacionClienteValida` (en `LayawayClienteRequest`): secciones obligatorias en el registro, llaves completas para actualizar o dar de baja, solo `filtros` en la consulta y `clienteId` no permitido.
 - `@LoginValido` (en `LoginRequest`): contraseña obligatoria con la bandera 1 y Face ID con la bandera 2.
@@ -581,6 +625,12 @@ Cuando una validación falla, Spring lanza `MethodArgumentNotValidException` y e
 | Enumerar qué registros existen | "No existe" y "no es tuyo" devuelven el mismo 404 con el mismo mensaje |
 | Operaciones sin autenticar | Token obligatorio en actualizar, baja y consulta; baja solo para ejecutivos |
 | Robo de tokens desde la base | Solo se guarda el hash SHA-256; vencen a los 5 min de inactividad; el cambio de contraseña y la baja los invalidan |
+| Creación masiva de cuentas, sondeo de referencias o abuso de GestoPago | Límite por IP y minuto en `POST /api/v1/layaway/cliente` (20), `/api/v1/pagos/servicio` (20) y `/api/v1/pagos/referencia/validar` (30): `429` con `Retry-After`. Configurable con `app.http.limite.*` |
+| Comprobar si una persona ya es cliente (registro público) | El registro duplicado responde un solo mensaje para CURP, RFC, correo o usuario y nunca repite el dato enviado |
+| Datos biométricos (Face ID) en claro | Se guardan solo como hash PBKDF2 con sal (`face_id_hash`, `datos_biometricos_hash`); la migración V16 hashea los existentes y elimina las columnas en claro; la comparación es en tiempo constante |
+| Esquema modificado por Hibernate fuera de las migraciones | `ddl-auto=validate`: solo Flyway cambia la base; si una entidad no coincide con el esquema, la aplicación no arranca. `EsquemaPostgresValidacionTest` lo comprueba contra un PostgreSQL real (`DB_VALIDACION_URL`) |
+| Datos personales en los logs | Los errores de PostgreSQL se registran solo con su SQLState (su mensaje trae `Key (curp)=(...)`); el número de cuenta se registra enmascarado |
+| Respuestas del API abiertas en el navegador | `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`, `Cross-Origin-Opener/Resource-Policy`, además de `nosniff`, `DENY`, HSTS y `no-store` |
 
 ---
 
@@ -702,7 +752,7 @@ Script: [`docs/evidencias/pruebas_validacion_extrema.py`](docs/evidencias/prueba
 | JSON crudo y bandera | Cuerpo vacío, `null`, arreglo, BOM, UTF-16, bytes inválidos, byte nulo, comentarios, `NaN`; bandera `"1"`, `1.5`, `true`, `2147483648`, `1e0`, `0x1`, duplicada (`1` y `4`); anidamiento de 20,000 niveles, 70 KB, 300 KB *chunked* |
 | Cabeceras y métodos | `Content-Type` texto, XML, formulario, multipart o ausente; XML con XXE y *billion laughs*; `Accept: application/xml`; GET, PUT, DELETE, PATCH, TRACE; `/actuator` |
 | Registro, campo por campo (≈130 casos) | Nombres con dígitos, `<script>`, saltos de línea, doble espacio, caracteres invisibles, cirílico o emojis; fechas imposibles, futuras o con otro formato; CURP/RFC en minúsculas, con mes 13 o entidad inválida; catálogos con variantes; correos mal formados o con inyección de cabeceras; teléfonos como texto, decimales o `1e30`; ingreso `0.00`, `15000`, `15000.001`, `1e999999999`; contraseñas débiles; **números o booleanos en campos de texto** |
-| Campos del servidor y unicidad | Alta con `rol: EJECUTIVO`, `saldoInicial`, `activo`, `numeroCuenta` e `id` inyectados (se ignoran: el usuario es CLIENTE con saldo 1000.00); CURP, RFC, correo en mayúsculas y usuario duplicados |
+| Campos del servidor y unicidad | Alta con `rol: EJECUTIVO`, `saldoInicial`, `activo`, `numeroCuenta` e `id` inyectados (se ignoran: el usuario es CLIENTE con saldo 0.00); CURP, RFC, correo en mayúsculas y usuario duplicados |
 | Login y token | Inyección SQL, tipos incorrectos, contraseña de 10,000 caracteres; token alterado, de 8 KB, JWT `alg: none`, esquema Basic, CRLF |
 | Cliente autenticado | Comodines `%` y `_`, filtros que no son llave, filtros duplicados en el JSON, consultar o actualizar a otro cliente (también con su CURP en minúsculas), robar su correo, poner su CURP, baja como cliente |
 
@@ -737,7 +787,7 @@ src/main/java/com/proyecto/servicios/
 ├── entity/onboarding/                  # Entidades JPA: Cliente, Domicilio, Cuenta, UsuarioLogin, CatNacionalidad
 ├── repositorys/onboarding/             # Repositorios Spring Data JPA (incluye las consultas solicitadas)
 ├── dto/onboarding/                     # DTO de petición/respuesta con Bean Validation (incluye CatNacionalidadResponse)
-├── validation/                         # @MayorDeEdad, @DosDecimales, @OperacionClienteValida, @LoginValido, deserializadores estrictos
+├── validation/                         # @MayorDeEdad, @IdentidadCongruente, @OperacionClienteValida, @LoginValido, deserializadores estrictos
 ├── exception/                          # OnboardingException y sus 9 excepciones de negocio + GlobalExceptionHandler (manejo centralizado)
 └── config/                             # Pool de BD, Flyway, Jackson estricto (texto entre comillas en los DTO de onboarding), límite de tamaño, PasswordEncoderUtil, TokenUtil, usuario ejecutivo inicial, esquema de seguridad de Swagger
 src/main/resources/db/migration/        # Migraciones Flyway (V3, V8, V9 y V10 para onboarding)
