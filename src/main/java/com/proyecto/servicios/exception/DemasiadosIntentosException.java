@@ -14,4 +14,10 @@ public class DemasiadosIntentosException extends OnboardingException {
                 HttpStatus.TOO_MANY_REQUESTS);
         this.segundos = segundos;
     }
+
+    /** Límite de peticiones de una operación distinta del login (registro, pagos, validación de referencias). */
+    public DemasiadosIntentosException(String mensaje, long segundos) {
+        super(mensaje, HttpStatus.TOO_MANY_REQUESTS);
+        this.segundos = segundos;
+    }
 }

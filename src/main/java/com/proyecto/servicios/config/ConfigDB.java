@@ -89,9 +89,10 @@ public class ConfigDB {
 
         Map<String, Object> properties = new HashMap<>();
 
+        // El esquema lo crea y cambia SOLO Flyway; Hibernate únicamente comprueba que coincida con las entidades
         properties.put(
                 "hibernate.hbm2ddl.auto",
-                "update"
+                env.getProperty("spring.jpa.hibernate.ddl-auto", "validate")
         );
 
         properties.put(

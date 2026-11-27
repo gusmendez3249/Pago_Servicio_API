@@ -42,6 +42,8 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    static final String MENSAJE_VALIDACION = "Datos no válidos. Revise los campos indicados.";
+
     /** Código de la respuesta cuando falla la validación de un DTO (como en el ValidadorCampos de referencia). */
     public static final int CODIGO_VALIDACION = 1;
 
@@ -49,7 +51,7 @@ public class GlobalExceptionHandler {
 
     /**
      * En caso de que alguna validación de un DTO no se cumpla se lanza MethodArgumentNotValidException:
-     * se responde 400 con {@code codigo: 1}, el mensaje "Datos no validos{campo=motivo, ...}" y en {@code data}
+     * se responde 400 con {@code codigo: 1}, el mensaje genérico "Datos no válidos. Revise los campos indicados." y en {@code data}
      * la lista de campos inválidos con su mensaje.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -76,7 +78,7 @@ public class GlobalExceptionHandler {
     private ResponseEntity<GenericResponse<List<Map<String, String>>>> respuestaValidacion(Map<String, String> campos) {
         List<Map<String, String>> detalle = new ArrayList<>();
         campos.forEach((campo, mensaje) -> detalle.add(Map.of("campo", campo, "mensaje", String.valueOf(mensaje))));
-        return ResponseEntity.badRequest().body(GenericResponse.error(CODIGO_VALIDACION, "Datos no validos" + campos, detalle));
+        return ResponseEntity.badRequest().body(GenericResponse.error(CODIGO_VALIDACION, MENSAJE_VALIDACION, detalle));
     }
 
     // ---------- Excepciones de negocio (el código coincide con el estado HTTP) ----------
@@ -87,8 +89,9 @@ public class GlobalExceptionHandler {
      * denegado, cuenta bloqueada, pago rechazado, etc.). Solo las que agregan encabezados tienen el suyo.
      */
     @ExceptionHandler(OnboardingException.class)
-    public ResponseEntity<GenericResponse<Void>> handleNegocio(OnboardingException exception) {
-        return build(exception.getStatus(), exception.getCodigo(), exception.getMessage());
+    public ResponseEntity<GenericResponse<Object>> handleNegocio(OnboardingException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(GenericResponse.error(exception.getCodigo(), exception.getMessage(), exception.getDetalle()));
     }
 
     /** RFC 9110: toda respuesta 401 debe indicar el esquema de autenticación esperado. */
@@ -134,12 +137,12 @@ public class GlobalExceptionHandler {
                 mensajeError = "Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por ejemplo: 1995-05-15.";
             } else if (targetType != null && (targetType.equals(Integer.class) || targetType.equals(int.class) || targetType.equals(Long.class) || targetType.equals(long.class))) {
                 if (fieldName.toLowerCase().contains("telefono")) {
-                    mensajeError = "Error de tipo de dato JSON: Los números de teléfono deben enviarse como números enteros numéricos sin comillas (ejemplo: 4181234567) y NO como cadenas de texto (String).";
+                    mensajeError = "Los números de teléfono deben enviarse como números enteros sin comillas, por ejemplo 4181234567.";
                 } else {
-                    mensajeError = "Error de tipo de dato JSON: El campo '" + (fieldName.isEmpty() ? "bandera" : fieldName) + "' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de texto (String) ni un decimal.";
+                    mensajeError = "El campo '" + (fieldName.isEmpty() ? "bandera" : fieldName) + "' debe ser un número entero, por ejemplo 1, 2, 3 o 4.";
                 }
             } else if (!fieldName.isEmpty()) {
-                mensajeError = "Error de tipo de dato en el campo '" + fieldName + "': Se esperaba el tipo " + (targetType != null ? targetType.getSimpleName() : "válido") + ".";
+                mensajeError = "El campo '" + fieldName + "' tiene un valor no válido para su tipo.";
             }
         } else if (exception.getMessage() != null && exception.getMessage().contains("LocalDate")) {
             mensajeError = "Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por ejemplo: 1995-05-15.";
@@ -162,7 +165,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<GenericResponse<Void>> handleDataAccess(DataAccessException exception) {
-        log.error("Error de acceso a datos", exception);
+        // Sin el mensaje: el detalle de PostgreSQL puede incluir valores de la fila (CURP, correo, teléfono...)
+        Throwable raiz = NestedExceptionUtils.getMostSpecificCause(exception);
+        log.error("Error de acceso a datos. tipo={} causa={} SQLState={}", exception.getClass().getSimpleName(),
+                raiz.getClass().getSimpleName(), raiz instanceof SQLException sql ? sql.getSQLState() : null);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, 500,
                 "Ocurrió un error al acceder a la información. Intente nuevamente; si el problema continúa, contacte al administrador.");
     }
@@ -179,9 +185,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GenericResponse<Void>> handleTypeMismatch(
             MethodArgumentTypeMismatchException exception) {
 
-        String tipo = exception.getRequiredType() != null ? exception.getRequiredType().getSimpleName() : "válido";
         return build(HttpStatus.BAD_REQUEST, 400,
-                "El parámetro '" + exception.getName() + "' tiene un valor inválido. Se esperaba un valor de tipo " + tipo + ".");
+                "El parámetro '" + exception.getName() + "' tiene un valor no válido.");
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
@@ -256,7 +261,8 @@ public class GlobalExceptionHandler {
                     "Falta un campo obligatorio en la petición.");
         }
 
-        log.warn("Violación de integridad de datos no clasificada (SQLState={}): {}", sqlState, root.getMessage());
+        // Solo el SQLState: el mensaje de PostgreSQL trae "Key (campo)=(valor)" con datos personales
+        log.warn("Violación de integridad de datos no clasificada (SQLState={})", sqlState);
         return build(HttpStatus.CONFLICT, 409,
                 "La operación viola una restricción de integridad de datos.");
     }
@@ -299,7 +305,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GenericResponse<Void>> handleIllegalArgument(
             IllegalArgumentException exception) {
 
-        log.warn("Argumento no válido: {}", exception.getMessage());
+        // El mensaje puede contener datos enviados por el usuario: no se registra
+        log.warn("Argumento no válido en la petición: {}", exception.getClass().getSimpleName());
         return build(HttpStatus.BAD_REQUEST, 400,
                 "La petición contiene un valor que no se puede procesar. Revise los datos enviados e intente nuevamente.");
     }

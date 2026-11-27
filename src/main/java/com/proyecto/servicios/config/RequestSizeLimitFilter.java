@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
  * antes de que Jackson intente leerlas en memoria. Protege ante payloads masivos enviados por JMeter.
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 1)
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
     private final long maxBytes;

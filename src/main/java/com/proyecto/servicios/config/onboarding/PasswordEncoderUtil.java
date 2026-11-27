@@ -42,6 +42,20 @@ public class PasswordEncoderUtil {
         return PREFIJO + "$" + ITERACIONES + "$" + b64.encodeToString(sal) + "$" + b64.encodeToString(hash);
     }
 
+    /** Hash PBKDF2 de un dato biométrico (Face ID): mismo esquema que la contraseña. Nulo si no hay dato. */
+    public String encodeBiometrico(Long valor) {
+        return valor == null ? null : encode(String.valueOf(valor));
+    }
+
+    /** Compara un dato biométrico recibido con su hash en tiempo constante. */
+    public boolean matchesBiometrico(Long valor, String hash) {
+        if (valor == null || hash == null || !hash.startsWith(PREFIJO + "$")) {
+            simularVerificacion(valor == null ? "" : String.valueOf(valor));
+            return false;
+        }
+        return matches(String.valueOf(valor), hash);
+    }
+
     public boolean matches(String rawPassword, String encodedPassword) {
         if (rawPassword == null || encodedPassword == null) {
             return false;
