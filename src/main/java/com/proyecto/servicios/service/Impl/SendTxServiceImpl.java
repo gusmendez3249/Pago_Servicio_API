@@ -17,13 +17,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
 
 import javax.net.ssl.SSLHandshakeException;
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayInputStream;
 import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
@@ -43,6 +38,7 @@ import java.util.stream.Collectors;
 public class SendTxServiceImpl implements SendTxService {
 
     private static final String CODIGO_EXITO = "01";
+    private static final int MAX_TEXTO_LOG = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final SendTxClient sendTxClient;
@@ -60,7 +56,7 @@ public class SendTxServiceImpl implements SendTxService {
             @Value("${gestopago.auth.id-distribuidor}") Integer idDistribuidor,
             @Value("${gestopago.auth.codigo-dispositivo}") String codigoDispositivo,
             @Value("${gestopago.api-key:}") String apiKey,
-            @Value("${gestopago.sendtx.codigos-indeterminados:82}") String codigosIndeterminados) {
+            @Value("${gestopago.sendtx.codigos-indeterminados:82,06}") String codigosIndeterminados) {
 
         this.sendTxClient = sendTxClient;
         this.tokenService = tokenService;
@@ -226,18 +222,12 @@ public class SendTxServiceImpl implements SendTxService {
         }
         String codigo;
         String texto;
+        RespuestaXmlGestoPago respuesta;
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            // Protección contra XXE: la respuesta viene de un tercero
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-
-            Document documento = factory.newDocumentBuilder().parse(new ByteArrayInputStream(xml));
-            codigo = textoDelNodo(documento, "CODIGO");
-            texto = textoDelNodo(documento, "TEXTO");
-        } catch (Exception exception) {
+            respuesta = RespuestaXmlGestoPago.leer(xml);
+            codigo = respuesta.codigo();
+            texto = respuesta.textoProveedor();
+        } catch (IllegalArgumentException exception) {
             log.error("La respuesta de sendTx no es un XML válido: desenlace INDETERMINADO. upc={}", upc);
             return ResultadoSendTx.indeterminada(null, null, ErrorCode.INVALID_RESPONSE);
         }
@@ -247,18 +237,22 @@ public class SendTxServiceImpl implements SendTxService {
             return ResultadoSendTx.indeterminada(null, texto, ErrorCode.INVALID_RESPONSE);
         }
         if (CODIGO_EXITO.equals(codigo)) {
-            return ResultadoSendTx.aprobada(codigo, texto);
+            return ResultadoSendTx.aprobada(codigo, texto, respuesta.datos());
         }
         if (codigosIndeterminados.contains(codigo)) {
             log.warn("sendTx respondió un código sin resultado definitivo: INDETERMINADO. upc={} codigo={}", upc, codigo);
             return ResultadoSendTx.indeterminada(codigo, texto, ErrorCode.TIMEOUT_ERROR);
         }
-        log.warn("Pago rechazado por GestoPago. upc={} codigo={}", upc, codigo);
+        log.warn("Pago rechazado por GestoPago. upc={} codigo={} texto={}", upc, codigo, paraLog(texto));
         return ResultadoSendTx.rechazada(codigo, texto);
     }
 
-    private String textoDelNodo(Document documento, String nombre) {
-        NodeList nodos = documento.getElementsByTagName(nombre);
-        return nodos.getLength() == 0 ? null : nodos.item(0).getTextContent().trim();
+    /** Texto del proveedor para el registro interno: recortado y en una sola línea. Nunca se devuelve al cliente. */
+    public static String paraLog(String texto) {
+        if (texto == null) {
+            return null;
+        }
+        String limpio = texto.replaceAll("[\r\n\t]+", " ").trim();
+        return limpio.length() > MAX_TEXTO_LOG ? limpio.substring(0, MAX_TEXTO_LOG) : limpio;
     }
 }

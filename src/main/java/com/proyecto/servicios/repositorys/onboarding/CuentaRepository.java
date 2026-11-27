@@ -20,6 +20,10 @@ public interface CuentaRepository extends JpaRepository<CuentaEntity, Long> {
 
     List<CuentaEntity> findByClienteId(Long clienteId);
 
+
+    /** Cuentas del cliente en un estatus (p. ej. ACTIVA), en orden de apertura. */
+    List<CuentaEntity> findByClienteIdAndEstatusOrderByIdAsc(Long clienteId, String estatus);
+
     List<CuentaEntity> findByClienteIdIn(java.util.Collection<Long> clienteIds);
 
     boolean existsByNumeroCuenta(String numeroCuenta);
@@ -38,6 +42,11 @@ public interface CuentaRepository extends JpaRepository<CuentaEntity, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update CuentaEntity c set c.saldo = c.saldo + :monto where c.id = :id")
     int reintegrarSaldo(@Param("id") Long id, @Param("monto") BigDecimal monto);
+
+    /** Abona saldo de forma atómica solo a una cuenta ACTIVA; devuelve 0 si la cuenta no está activa. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update CuentaEntity c set c.saldo = c.saldo + :monto where c.id = :id and c.estatus = 'ACTIVA'")
+    int abonarSaldo(@Param("id") Long id, @Param("monto") BigDecimal monto);
 
     @Query("select c.saldo from CuentaEntity c where c.id = :id")
     Optional<BigDecimal> findSaldoById(@Param("id") Long id);

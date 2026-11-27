@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -24,6 +25,14 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
     private final String codigoDispositivo;
     private final String password;
     private final String apiKey;
+
+    /** Vigencia que se le da al token guardado: GestoPago lo emite por 24 h; se renueva un poco antes. */
+    @Value("${gestopago.auth.vigencia-minutos:1410}")
+    private long vigenciaMinutos = 1410;
+
+    /** Tiempo mínimo entre dos solicitudes de token: evita pedirlo en ráfaga aunque algo falle. */
+    @Value("${gestopago.auth.minutos-entre-solicitudes:10}")
+    private long minutosEntreSolicitudes = 10;
 
     public GestoPagoTokenServiceImpl(GestoPagoAuthClient gestoPagoAuthClient,
                                      GestoPagoTokenRepository tokenRepository,
@@ -41,10 +50,36 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         this.apiKey = apiKey == null || apiKey.isBlank() ? null : apiKey.trim();
     }
 
-    @Override
+    /**
+     * Revisión periódica (al arrancar y cada hora): solo solicita un token si no hay uno guardado o si el guardado
+     * ya cumplió su vigencia. GestoPago emite tokens de 24 h y su documentación pide tomar uno solo
+     * por día, así que reiniciar la aplicación NO debe pedir uno nuevo.
+     */
     @Scheduled(fixedRateString = "${gestopago.auth.refresh-rate-ms:3600000}", initialDelay = 0)
-    public void renovarToken() {
-        log.info("Renovando token GestoPago para distribuidor={}", idDistribuidor);
+    public void renovarSiHaceFalta() {
+        Optional<GestoPagoToken> guardado = tokenRepository
+                .findByIdDistribuidorAndCodigoDispositivo(idDistribuidor, codigoDispositivo);
+        if (guardado.filter(this::vigente).isPresent()) {
+            log.info("Token GestoPago vigente: no se solicita uno nuevo");
+            return;
+        }
+        renovarToken();
+    }
+
+    /**
+     * Solicita un token nuevo a GestoPago. Solo debe llamarse cuando no hay token vigente o cuando GestoPago
+     * rechazó el actual (401/403). Si ya se solicitó uno hace muy poco, se reutiliza ese y no se vuelve a pedir.
+     */
+    @Override
+    public synchronized void renovarToken() {
+        Optional<GestoPagoToken> guardado = tokenRepository
+                .findByIdDistribuidorAndCodigoDispositivo(idDistribuidor, codigoDispositivo);
+        if (guardado.filter(this::recienSolicitado).isPresent()) {
+            log.warn("Se omitió la solicitud de token GestoPago: ya se pidió uno hace menos de {} min",
+                    minutosEntreSolicitudes);
+            return;
+        }
+        log.info("Solicitando token GestoPago para distribuidor={}", idDistribuidor);
         try {
             GestoPagoAuthResponse response = gestoPagoAuthClient.authenticate(
                     idDistribuidor, codigoDispositivo, password, apiKey);
@@ -70,6 +105,8 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
                 .findByIdDistribuidorAndCodigoDispositivo(idDistribuidor, codigoDispositivo)
                 .map(existente -> {
                     tokenMapper.updateEntity(response, existente);
+                    // Explícito: la vigencia se cuenta desde aquí aunque el token recibido sea igual al guardado
+                    existente.setFechaActualizacion(LocalDateTime.now());
                     return existente;
                 })
                 .orElseGet(() -> {
@@ -91,6 +128,19 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
                         idDistribuidor,
                         codigoDispositivo
                 )
-                .filter(token -> Boolean.TRUE.equals(token.getActivo()));
+                .filter(token -> Boolean.TRUE.equals(token.getActivo()))
+                .filter(this::vigente);
+    }
+
+    private boolean vigente(GestoPagoToken token) {
+        return token.getToken() != null && !token.getToken().isBlank()
+                && token.getFechaActualizacion() != null
+                && token.getFechaActualizacion().plusMinutes(vigenciaMinutos).isAfter(LocalDateTime.now());
+    }
+
+    private boolean recienSolicitado(GestoPagoToken token) {
+        return token.getToken() != null && !token.getToken().isBlank()
+                && token.getFechaActualizacion() != null
+                && token.getFechaActualizacion().plusMinutes(minutosEntreSolicitudes).isAfter(LocalDateTime.now());
     }
 }

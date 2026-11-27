@@ -12,10 +12,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,6 +49,25 @@ public class AuthController {
     public ResponseEntity<GenericResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(GenericResponse.success("Inicio de sesión exitoso", response));
+    }
+
+    @PostMapping(value = "/logout", produces = MediaType.APPLICATION_JSON_VALUE)
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(
+            summary = "Cierre de sesión",
+            description = "Cierra la sesión del dueño del token enviado en `Authorization: Bearer <token>`. No lleva cuerpo. Tras el cierre el token deja de servir de inmediato y hay que iniciar sesión de nuevo."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Sesión cerrada (`codigo: 0`, `data: null`)", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized: falta el token, es inválido o la sesión ya expiró", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden: el cliente asociado se encuentra inactivo o fue dado de baja", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error: error interno del servidor", content = @Content(schema = @Schema(implementation = GenericResponse.class))),
+            @ApiResponse(responseCode = "503", description = "Service Unavailable: base de datos saturada o no disponible; incluye `Retry-After`", content = @Content(schema = @Schema(implementation = GenericResponse.class)))
+    })
+    public ResponseEntity<GenericResponse<Void>> logout(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        authService.logout(authorization);
+        return ResponseEntity.ok(GenericResponse.success("Sesión cerrada", null));
     }
 }
 

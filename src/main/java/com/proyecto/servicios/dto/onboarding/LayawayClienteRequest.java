@@ -47,5 +47,10 @@ public class LayawayClienteRequest {
     @Schema(description = "Llaves del cliente (curp, rfc, numeroCuenta): obligatorias con el valor completo en las banderas 2 (actualizar) y 3 (baja); opcionales en la bandera 4 (consulta; sin filtros devuelve todos los clientes)")
     @Valid
     private FiltrosClienteDto filtros;
+
+    @Schema(description = "Solo bandera 4: página de resultados, desde 0 (50 clientes por página)", example = "0")
+    @jakarta.validation.constraints.Min(value = 0, message = "La página debe ser 0 o mayor")
+    @jakarta.validation.constraints.Max(value = 10_000, message = "La página debe ser de 0 a 10000")
+    private Integer pagina;
 }
 

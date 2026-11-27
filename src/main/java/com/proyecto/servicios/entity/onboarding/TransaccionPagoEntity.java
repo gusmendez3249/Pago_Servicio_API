@@ -1,6 +1,9 @@
 package com.proyecto.servicios.entity.onboarding;
 
 import com.proyecto.servicios.enums.EstatusTransaccionPago;
+import com.proyecto.servicios.enums.MotivoPago;
+import com.proyecto.servicios.enums.OrigenConfirmacion;
+import com.proyecto.servicios.enums.OrigenMonto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -82,4 +85,68 @@ public class TransaccionPagoEntity {
 
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
+
+    // ---------- Sprint 3: datos del proveedor, instantanea del catalogo y control de confirmTx (todo nulable) ----------
+
+    /** NUM_AUTORIZACION del proveedor: el folio que ve el usuario. */
+    @Column(name = "folio", length = 30)
+    private String folio;
+
+    @Column(name = "id_tx", length = 30)
+    private String idTx;
+
+    @Column(name = "comision", precision = 15, scale = 2)
+    private BigDecimal comision;
+
+    @Column(name = "monto_proveedor", precision = 15, scale = 2)
+    private BigDecimal montoProveedor;
+
+    @Column(name = "fecha_proveedor", length = 30)
+    private String fechaProveedor;
+
+    /** PIN de tarjeta de regalo CIFRADO (AES). Nunca se registra en logs ni se imprime. */
+    @Column(name = "pin_servicio", length = 512)
+    @ToString.Exclude
+    private String pinServicio;
+
+    @Column(name = "leyenda", length = 500)
+    private String leyenda;
+
+    @Column(name = "nombre_servicio", length = 150)
+    private String nombreServicio;
+
+    @Column(name = "nombre_producto", length = 150)
+    private String nombreProducto;
+
+    @Column(name = "tipo_front")
+    private Integer tipoFront;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origen_monto", length = 12)
+    private OrigenMonto origenMonto;
+
+    /** Motivo enumerado cuando la operacion termina RECHAZADA. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "motivo", length = 40)
+    private MotivoPago motivo;
+
+    /** JSON exacto enviado a sendTx: confirmTx reenvia los mismos parametros. Nunca se registra en logs. */
+    @Column(name = "payload_sendtx", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String payloadSendtx;
+
+    /**
+     * Quién dio por aplicado el pago: GESTOPAGO (el proveedor lo aplicó) o SIMULADO (GestoPago no funcionó y el
+     * backend lo dio por exitoso). Nulo mientras la operación no esté CONFIRMADA.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origen_confirmacion", length = 10)
+    private OrigenConfirmacion origenConfirmacion;
+
+    @Column(name = "intentos_confirmacion", nullable = false)
+    @Builder.Default
+    private Integer intentosConfirmacion = 0;
+
+    @Column(name = "fecha_ultima_confirmacion")
+    private LocalDateTime fechaUltimaConfirmacion;
 }

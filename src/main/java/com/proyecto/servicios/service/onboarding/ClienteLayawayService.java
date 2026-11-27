@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -47,10 +48,18 @@ public class ClienteLayawayService {
     private final TransactionTemplate transactionTemplate;
     private final SesionService sesionService;
 
+    /**
+     * Saldo con el que nace una cuenta. En producción 0.00: el registro es público y un saldo regalado sería dinero
+     * gratis ilimitado. Solo un ambiente de pruebas lo sube (APP_SALDO_INICIAL).
+     */
+    @Value("${app.cuentas.saldo-inicial:0.00}")
+    private BigDecimal saldoInicialCuenta = new BigDecimal("0.00");
+
     private static final SecureRandom RANDOM = new SecureRandom();
 
     /** Tope de clientes por consulta (bandera 4): protege la memoria cuando no se envían filtros. */
-    private static final int MAX_RESULTADOS = 1000;
+    /** Clientes por página en la consulta (bandera 4). */
+    static final int TAMANIO_PAGINA_CONSULTA = 50;
 
     /**
      * Cada operación corre en su propia transacción (TransactionTemplate) en lugar de @Transactional
@@ -70,18 +79,42 @@ public class ClienteLayawayService {
                 LoginCredencialesDto login = request.getLoginCredenciales();
                 String passwordHash = login != null ? passwordEncoderUtil.encode(login.getPassword()) : null;
                 String pinHash = hashPin(login);
-                yield transactionTemplate.execute(status -> registrarCliente(request, passwordHash, pinHash));
+                Biometricos biometricos = hashBiometricosRegistro(request);
+                yield transactionTemplate.execute(status -> registrarCliente(request, passwordHash, pinHash, biometricos));
             }
             case 2 -> {
                 LoginCredencialesDto login = request.getLoginCredenciales();
                 String passwordHash = (login != null && login.getPassword() != null) ? passwordEncoderUtil.encode(login.getPassword()) : null;
                 String pinHash = hashPin(login);
-                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash, pinHash, propietario));
+                Biometricos biometricos = new Biometricos(
+                        passwordEncoderUtil.encodeBiometrico(login != null ? login.getFaceIdBiometrico() : null),
+                        passwordEncoderUtil.encodeBiometrico(request.getDatosPersonales() != null
+                                ? request.getDatosPersonales().getDatosBiometricos() : null));
+                yield transactionTemplate.execute(status -> actualizarCliente(request, passwordHash, pinHash, biometricos, propietario));
             }
             case 3 -> transactionTemplate.execute(status -> darDeBajaCliente(request));
             case 4 -> transactionTemplate.execute(status -> consultarClientes(request, propietario));
             default -> throw new ReglaNegocioException("Bandera de operación no válida: " + bandera + ". Use 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4 (Consultar).");
         };
+    }
+
+    /** Hashes PBKDF2 del Face ID del usuario y de los datos biométricos del cliente (nulos si no se enviaron). */
+    private record Biometricos(String faceIdHash, String datosBiometricosHash) {
+    }
+
+    /**
+     * En el registro, el Face ID y los datos biométricos se usan uno como respaldo del otro. Se calculan FUERA de la
+     * transacción (PBKDF2 es costoso) y, si son el mismo valor, se hashea una sola vez.
+     */
+    private Biometricos hashBiometricosRegistro(LayawayClienteRequest request) {
+        Long faceId = request.getLoginCredenciales() != null ? request.getLoginCredenciales().getFaceIdBiometrico() : null;
+        Long datos = request.getDatosPersonales() != null ? request.getDatosPersonales().getDatosBiometricos() : null;
+        Long paraLogin = faceId != null ? faceId : datos;
+        Long paraCliente = datos != null ? datos : faceId;
+        String hashLogin = passwordEncoderUtil.encodeBiometrico(paraLogin);
+        String hashCliente = java.util.Objects.equals(paraLogin, paraCliente)
+                ? hashLogin : passwordEncoderUtil.encodeBiometrico(paraCliente);
+        return new Biometricos(hashLogin, hashCliente);
     }
 
     /** El PIN (2FA de los pagos) se guarda con PBKDF2, igual que la contraseña: nunca en claro. */
@@ -118,7 +151,15 @@ public class ClienteLayawayService {
         return sesion.clienteId();
     }
 
-    private LayawayClienteResponse registrarCliente(LayawayClienteRequest request, String passwordHash, String pinHash) {
+    /**
+     * Mismo mensaje para CURP, RFC, correo o usuario repetidos y sin repetir el dato: el registro es público y no debe
+     * servir para comprobar si una persona ya es cliente ni devolver sus datos personales.
+     */
+    private static final String REGISTRO_DUPLICADO = "No es posible completar el registro: alguno de los datos "
+            + "proporcionados (CURP, RFC, correo o usuario) ya está registrado. Si ya es cliente, inicie sesión.";
+
+    private LayawayClienteResponse registrarCliente(LayawayClienteRequest request, String passwordHash, String pinHash,
+                                                   Biometricos biometricos) {
         DatosPersonalesDto dp = request.getDatosPersonales();
         DatosContactoDto dc = request.getDatosContacto();
         DomicilioDto dom = request.getDomicilio();
@@ -131,13 +172,13 @@ public class ClienteLayawayService {
 
         // 2. Validar Unicidad de CURP, RFC, Correo
         if (clienteRepository.existsByCurp(dp.getCurp().trim().toUpperCase())) {
-            throw new RegistroDuplicadoException("Ya existe un cliente registrado con la CURP: " + dp.getCurp());
+            throw new RegistroDuplicadoException(REGISTRO_DUPLICADO);
         }
         if (clienteRepository.existsByRfc(dp.getRfc().trim().toUpperCase())) {
-            throw new RegistroDuplicadoException("Ya existe un cliente registrado con el RFC: " + dp.getRfc());
+            throw new RegistroDuplicadoException(REGISTRO_DUPLICADO);
         }
         if (clienteRepository.existsByCorreo(dc.getCorreo().trim().toLowerCase())) {
-            throw new RegistroDuplicadoException("Ya existe un cliente registrado con el correo: " + dc.getCorreo());
+            throw new RegistroDuplicadoException(REGISTRO_DUPLICADO);
         }
 
         String username = (loginDto != null && loginDto.getUsername() != null && !loginDto.getUsername().trim().isEmpty())
@@ -145,7 +186,7 @@ public class ClienteLayawayService {
                 : dp.getCurp().trim().toLowerCase();
 
         if (usuarioLoginRepository.existsByUsername(username)) {
-            throw new RegistroDuplicadoException("El nombre de usuario '" + username + "' ya se encuentra en uso.");
+            throw new RegistroDuplicadoException(REGISTRO_DUPLICADO);
         }
 
         // 3. Crear Domicilio
@@ -180,7 +221,7 @@ public class ClienteLayawayService {
                 .ocupacion(limpiar(infoLab.getOcupacion()))
                 .empresa(limpiar(infoLab.getEmpresa()))
                 .ingresoMensual(infoLab.getIngresoMensual())
-                .datosBiometricos(dp.getDatosBiometricos() != null ? dp.getDatosBiometricos() : (loginDto != null ? loginDto.getFaceIdBiometrico() : null))
+                .datosBiometricosHash(biometricos.datosBiometricosHash())
                 .pin(pinHash)
                 .activo(true)
                 .fechaRegistro(LocalDateTime.now())
@@ -190,7 +231,7 @@ public class ClienteLayawayService {
 
         // 5. Creación Automática de Cuenta Bancaria
         String numeroCuenta = generarNumeroCuentaUnico();
-        BigDecimal saldoInicial = new BigDecimal("1000.00");
+        BigDecimal saldoInicial = saldoInicialCuenta.setScale(2, java.math.RoundingMode.HALF_UP);
 
         CuentaEntity cuentaEntity = CuentaEntity.builder()
                 .numeroCuenta(numeroCuenta)
@@ -204,18 +245,18 @@ public class ClienteLayawayService {
         // 6. Crear Registro de Login Cifrado (el hash se calculó antes de abrir la transacción).
         // Sin contraseña enviada NO se asigna una por defecto (sería conocida por todos): el hash queda nulo
         // y el acceso por contraseña permanece deshabilitado; solo podrá entrar por Face ID si lo registró.
-        Long faceId = (loginDto != null && loginDto.getFaceIdBiometrico() != null) ? loginDto.getFaceIdBiometrico() : dp.getDatosBiometricos();
 
         UsuarioLoginEntity usuarioLogin = UsuarioLoginEntity.builder()
                 .username(username)
                 .passwordHash(passwordHash)
-                .faceIdBiometrico(faceId)
+                .faceIdHash(biometricos.faceIdHash())
                 .isLoggedIn(false)
                 .cliente(clienteEntity)
                 .build();
         usuarioLoginRepository.save(usuarioLogin);
 
-        log.info("Cliente registrado exitosamente. ID: {}, Cuenta: {}", clienteEntity.getId(), numeroCuenta);
+        log.info("Cliente registrado exitosamente. ID: {}, Cuenta: {}", clienteEntity.getId(),
+                com.proyecto.servicios.mapper.PagoServicioMapper.enmascarar(numeroCuenta));
 
         return LayawayClienteResponse.builder()
                 .nombreCompleto(nombreCompleto(clienteEntity))
@@ -232,7 +273,8 @@ public class ClienteLayawayService {
                 .build();
     }
 
-    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash, String pinHash, Long soloClienteId) {
+    private LayawayClienteResponse actualizarCliente(LayawayClienteRequest request, String passwordHash, String pinHash,
+                                                    Biometricos biometricos, Long soloClienteId) {
         ClienteEntity cliente = localizarCliente(request, soloClienteId);
 
         if (Boolean.FALSE.equals(cliente.getActivo())) {
@@ -243,7 +285,8 @@ public class ClienteLayawayService {
         actualizarContacto(cliente, request.getDatosContacto());
         actualizarDomicilio(cliente, request.getDomicilio());
         actualizarInformacionLaboral(cliente, request.getInformacionLaboral());
-        actualizarCredenciales(cliente, request.getLoginCredenciales(), passwordHash, pinHash);
+        siPresente(biometricos.datosBiometricosHash(), cliente::setDatosBiometricosHash);
+        actualizarCredenciales(cliente, request.getLoginCredenciales(), passwordHash, pinHash, biometricos.faceIdHash());
 
         clienteRepository.save(cliente);
 
@@ -282,7 +325,7 @@ public class ClienteLayawayService {
 
         // 3. Desactivar sesión de login
         usuarioLoginRepository.findByClienteId(cliente.getId()).ifPresent(u -> {
-            cerrarSesion(u);
+            u.cerrarSesion();
             usuarioLoginRepository.save(u);
         });
 
@@ -308,14 +351,18 @@ public class ClienteLayawayService {
     /**
      * Bandera 4: consulta de clientes por campos llave inmutables (curp, rfc, numeroCuenta).
      * Los filtros de texto son "contiene" sin distinguir mayúsculas; varios filtros se combinan con AND.
-     * Sin filtros devuelve todos los clientes (hasta MAX_RESULTADOS; se indica si hubo más).
+     * Sin filtros devuelve el listado paginado (50 por página) con los datos personales enmascarados.
      */
     private LayawayClienteResponse consultarClientes(LayawayClienteRequest request, Long soloClienteId) {
         // Que solo se envíe 'filtros' ya lo garantiza @OperacionClienteValida en el DTO.
         FiltrosClienteDto filtros = request.getFiltros() != null ? request.getFiltros() : new FiltrosClienteDto();
         Specification<ClienteEntity> spec = especificacionConsulta(filtros, false, soloClienteId);
 
-        Page<ClienteEntity> pagina = clienteRepository.findAll(spec, PageRequest.of(0, MAX_RESULTADOS, Sort.by("id")));
+        int numeroPagina = request.getPagina() != null ? request.getPagina() : 0;
+        Page<ClienteEntity> pagina = clienteRepository.findAll(spec,
+                PageRequest.of(numeroPagina, TAMANIO_PAGINA_CONSULTA, Sort.by("id")));
+        // Listado general (sin filtros): datos personales enmascarados. Para ver un registro completo se busca por su llave
+        boolean enmascarar = filtros.estaVacio() && soloClienteId == null;
 
         // Se buscó un cliente concreto y no existe (o no está entre los registros a los que se tiene acceso)
         if (!filtros.estaVacio() && pagina.isEmpty()) {
@@ -329,15 +376,16 @@ public class ClienteLayawayService {
 
         List<ClienteConsultaDto> clientes = pagina.getContent().stream().map(c -> ClienteConsultaDto.builder()
                 .nombreCompleto(nombreCompleto(c))
-                .curp(c.getCurp())
-                .rfc(c.getRfc())
-                .correo(c.getCorreo())
-                .telefonoMovil(c.getTelefonoMovil())
+                .curp(enmascarar ? mascara(c.getCurp()) : c.getCurp())
+                .rfc(enmascarar ? mascara(c.getRfc()) : c.getRfc())
+                .correo(enmascarar ? mascaraCorreo(c.getCorreo()) : c.getCorreo())
+                .telefonoMovil(enmascarar ? mascara(c.getTelefonoMovil()) : c.getTelefonoMovil())
                 .activo(c.getActivo())
                 .fechaRegistro(c.getFechaRegistro())
                 .cuentas(cuentasPorCliente.getOrDefault(c.getId(), List.of()).stream()
                         .map(k -> ClienteConsultaDto.CuentaConsultaDto.builder()
-                                .numeroCuenta(k.getNumeroCuenta()).saldo(k.getSaldo()).estatus(k.getEstatus()).build())
+                                .numeroCuenta(enmascarar ? mascara(k.getNumeroCuenta()) : k.getNumeroCuenta())
+                                .saldo(k.getSaldo()).estatus(k.getEstatus()).build())
                         .toList())
                 .build()).toList();
 
@@ -346,8 +394,24 @@ public class ClienteLayawayService {
                 .fechaOperacion(LocalDateTime.now())
                 .clientes(clientes)
                 .totalCoincidencias(pagina.getTotalElements())
-                .resultadosTruncados(pagina.getTotalElements() > clientes.size())
+                .resultadosTruncados(pagina.hasNext())
+                .pagina(numeroPagina)
+                .tamanioPagina(TAMANIO_PAGINA_CONSULTA)
+                .totalPaginas(pagina.getTotalPages())
                 .build();
+    }
+
+    private static String mascara(String valor) {
+        return com.proyecto.servicios.mapper.PagoServicioMapper.enmascarar(valor);
+    }
+
+    /** a****@dominio.com */
+    static String mascaraCorreo(String correo) {
+        if (correo == null || correo.indexOf('@') < 1) {
+            return mascara(correo);
+        }
+        int arroba = correo.indexOf('@');
+        return correo.charAt(0) + "*".repeat(Math.max(1, arroba - 1)) + correo.substring(arroba);
     }
 
     /**
@@ -444,6 +508,12 @@ public class ClienteLayawayService {
         if (dp.getNacionalidad() != null) {
             validarNacionalidadEnBD(dp.getNacionalidad());
         }
+        // La CURP no cambia: la fecha de nacimiento y el sexo nuevos deben seguir coincidiendo con ella
+        String fecha = com.proyecto.servicios.validation.IdentidadCurp.fechaCongruente(cliente.getCurp(), dp.getFechaNacimiento());
+        String sexo = com.proyecto.servicios.validation.IdentidadCurp.sexoCongruente(cliente.getCurp(), dp.getSexo());
+        if (fecha != null || sexo != null) {
+            throw new ReglaNegocioException(fecha != null ? fecha : sexo);
+        }
         textoSiPresente(dp.getNombre(), cliente::setNombre);
         textoSiPresente(dp.getSegundoNombre(), cliente::setSegundoNombre);
         textoSiPresente(dp.getApellidoPaterno(), cliente::setApellidoPaterno);
@@ -452,7 +522,6 @@ public class ClienteLayawayService {
         siPresente(dp.getSexo(), cliente::setSexo);
         siPresente(dp.getNacionalidad(), cliente::setNacionalidad);
         siPresente(dp.getEstadoCivil(), cliente::setEstadoCivil);
-        siPresente(dp.getDatosBiometricos(), cliente::setDatosBiometricos);
         log.info("Actualizando cliente ID {}: CURP y RFC se mantienen inmutables.", cliente.getId());
     }
 
@@ -503,7 +572,7 @@ public class ClienteLayawayService {
 
     /** Se puede cambiar la contraseña, el Face ID y el PIN; el nombre de usuario no cambia. */
     private void actualizarCredenciales(ClienteEntity cliente, LoginCredencialesDto credenciales,
-                                        String passwordHash, String pinHash) {
+                                        String passwordHash, String pinHash, String faceIdHash) {
         if (credenciales == null) {
             return;
         }
@@ -514,9 +583,9 @@ public class ClienteLayawayService {
         }
         if (passwordHash != null) {
             usuario.setPasswordHash(passwordHash);
-            cerrarSesion(usuario); // al cambiar la contraseña se cierra la sesión activa
+            usuario.cerrarSesion(); // al cambiar la contraseña se cierra la sesión activa
         }
-        siPresente(credenciales.getFaceIdBiometrico(), usuario::setFaceIdBiometrico);
+        siPresente(faceIdHash, usuario::setFaceIdHash);
         usuarioLoginRepository.save(usuario);
         if (pinHash != null) {
             // Un PIN nuevo reinicia el contador de intentos y levanta el bloqueo del anterior
@@ -524,12 +593,6 @@ public class ClienteLayawayService {
             cliente.setPinIntentosFallidos((short) 0);
             cliente.setPinBloqueadoHasta(null);
         }
-    }
-
-    private static void cerrarSesion(UsuarioLoginEntity usuario) {
-        usuario.setIsLoggedIn(false);
-        usuario.setTokenHash(null);
-        usuario.setTokenExpira(null);
     }
 
     private static <T> void siPresente(T valor, Consumer<T> asignar) {

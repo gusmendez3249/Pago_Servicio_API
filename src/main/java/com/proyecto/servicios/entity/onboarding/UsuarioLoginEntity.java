@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -26,8 +27,10 @@ public class UsuarioLoginEntity {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
-    @Column(name = "face_id_biometrico")
-    private Long faceIdBiometrico;
+    /** Hash PBKDF2 del Face ID (dato biométrico): nunca se guarda en claro. */
+    @Column(name = "face_id_hash", length = 255)
+    @ToString.Exclude
+    private String faceIdHash;
 
     @Column(name = "is_logged_in", nullable = false)
     @Builder.Default
@@ -58,4 +61,11 @@ public class UsuarioLoginEntity {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id", referencedColumnName = "id")
     private ClienteEntity cliente;
+
+    /** Cierra la sesión: el token vigente deja de servir de inmediato. No persiste; quien llama guarda la entidad. */
+    public void cerrarSesion() {
+        this.isLoggedIn = false;
+        this.tokenHash = null;
+        this.tokenExpira = null;
+    }
 }
