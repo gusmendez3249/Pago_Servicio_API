@@ -1,0 +1,15 @@
+analyzer:
+  errors:
+    # Flutter 3.50 marca como obsoleto el import de material.dart; migrar al
+    # paquete sustituto exigiría una dependencia nueva.
+    deprecated_member_use: ignore
+  exclude:
+    - build/**
+    - android/**
+    - web/**
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    always_declare_return_types: true

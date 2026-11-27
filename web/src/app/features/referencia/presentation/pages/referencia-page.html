@@ -1,0 +1,136 @@
+<app-cabecera-flujo
+  titulo="Captura tu referencia"
+  [volver]="producto() ? ['/catalogo', producto()!.idServicio, producto()!.idProducto] : '/catalogo'"
+  textoVolver="Volver al servicio"
+/>
+<main>
+  <section class="franja oscuro" aria-labelledby="flujo-titulo">
+    <div class="franja__contenido">
+      <app-pasos [actual]="2" />
+      @if (producto(); as p) {
+        <div class="franja__servicio">
+          <app-logo-servicio [url]="p.logoUrl" [nombre]="p.servicio" tamano="grande" />
+          <div>
+            <p class="franja__nombre">{{ p.servicio || 'Servicio' }}</p>
+            <p class="franja__sub">{{ p.producto }}</p>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="hoja">
+    <div class="hoja__contenido">
+      @if (catalogo.estado() === 'cargando') {
+        <p class="cargando" role="status" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span> Cargando información del servicio…
+        </p>
+      } @else if (catalogo.estado() === 'error') {
+        <section class="estado-error" role="alert">
+          <span class="estado-error__icono"><app-icono nombre="alerta" /></span>
+          <p class="estado-error__texto">{{ catalogo.mensajeError() }}</p>
+          <button type="button" class="btn" (click)="catalogo.recargar()">Reintentar</button>
+        </section>
+      } @else if (!producto()) {
+        <section class="mensaje" role="status">
+          <span class="mensaje__icono"><app-icono nombre="buscar" /></span>
+          <p>No encontramos este servicio. Puede que ya no esté disponible.</p>
+          <a class="btn" routerLink="/catalogo">Ir al inicio</a>
+        </section>
+      } @else if (!soportado()) {
+        <section class="mensaje" role="status">
+          <span class="mensaje__icono"><app-icono nombre="reloj" /></span>
+          <p>El pago de este producto estará disponible próximamente.</p>
+          <a class="btn" routerLink="/catalogo">Ir al inicio</a>
+        </section>
+      } @else {
+        @if (producto(); as p) {
+          <div class="flujo">
+            <section class="tarjeta" aria-label="Referencia de pago">
+              <form (submit)="validar($event)" novalidate>
+                <div class="campo">
+                  <label class="campo__etiqueta" for="referencia">Referencia de pago</label>
+                  <input
+                    #campo
+                    id="referencia"
+                    placeholder=" "
+                    class="campo__input campo__input--grande"
+                    name="referencia"
+                    type="text"
+                    inputmode="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    [attr.maxlength]="maxlength"
+                    [value]="store.texto()"
+                    [readOnly]="store.validando()"
+                    [attr.aria-invalid]="store.estado() === 'formatoInvalido' ? 'true' : null"
+                    [attr.aria-describedby]="store.mensajeFormato() ? 'referencia-error' : 'referencia-ayuda'"
+                    (input)="alEscribir($event)"
+                  />
+                  <p id="referencia-ayuda" class="campo__ayuda">Solo letras y números, sin espacios.</p>
+                  <p id="referencia-error" class="campo__error" [hidden]="!store.mensajeFormato()">
+                    {{ store.mensajeFormato() }}
+                  </p>
+                </div>
+
+                @if (p.ayudaUrl) {
+                  <button type="button" class="enlace" [attr.aria-expanded]="ayudaVisible()" aria-controls="ayuda-imagen" (click)="alternarAyuda()">
+                    ¿Dónde encuentro mi referencia?
+                  </button>
+                  @if (ayudaVisible()) {
+                    <div id="ayuda-imagen" class="captura__ayuda">
+                      <img [src]="p.ayudaUrl" [alt]="'Imagen de ayuda para ' + (p.servicio || 'el servicio')" loading="lazy" decoding="async" />
+                    </div>
+                  }
+                }
+
+                <div class="acciones">
+                  <button type="submit" class="btn" [class.btn--sec]="store.puedeContinuar()" [disabled]="store.validando()">
+                    @if (store.validando()) {
+                      <span class="spinner" aria-hidden="true"></span> Validando…
+                    } @else {
+                      Validar referencia
+                    }
+                  </button>
+                </div>
+              </form>
+
+              <div class="captura__resultado" aria-live="polite" aria-atomic="true">
+                @if (store.validando()) {
+                  <p class="cargando" role="status">Estamos verificando tu referencia…</p>
+                }
+                @if (store.resultado(); as r) {
+                  <app-resultado-referencia [resultado]="r" />
+                  @if (store.estado() === 'error' || store.estado() === 'expirada') {
+                    <div class="acciones">
+                      <button type="button" class="btn btn--sec" (click)="store.reintentar()">
+                        {{ store.estado() === 'error' ? 'Reintentar' : 'Validar de nuevo' }}
+                      </button>
+                    </div>
+                  }
+                }
+              </div>
+            </section>
+
+            <aside class="flujo__lado tarjeta" aria-labelledby="captura-resumen">
+              <h2 id="captura-resumen" class="tarjeta__titulo">Tu pago</h2>
+              <dl class="ficha">
+                <dt>Servicio</dt>
+                <dd>{{ p.servicio }}</dd>
+                <dt>Producto</dt>
+                <dd>{{ p.producto }}</dd>
+                <dt>Referencia</dt>
+                <dd>{{ store.resultado() ? store.texto().trim() : '—' }}</dd>
+              </dl>
+              <div class="accion-anclada captura__continuar">
+                <button type="button" class="btn btn--bloque" [disabled]="!store.puedeContinuar()" (click)="continuar()">
+                  Continuar al pago
+                </button>
+              </div>
+            </aside>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</main>

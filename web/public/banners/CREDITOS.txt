@@ -1,0 +1,3 @@
+Fotos de Unsplash (licencia Unsplash, uso gratuito).
+login.jpg  -> https://unsplash.com/photos/DJhWOKUSqrI (1400x2100, vertical 2:3)
+inicio.jpg -> https://unsplash.com/photos/X1GZqv-F7Tw (1600x1067, horizontal 3:2)

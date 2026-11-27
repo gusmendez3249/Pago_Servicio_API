@@ -1,0 +1,63 @@
+# Blueprint de Render: API (Docker), PostgreSQL y Key Value (Redis).
+# El servicio pago-servicios-api ya existe en Render; este archivo documenta su configuración y permite recrearlo.
+# Los secretos (sync: false) se capturan en el panel de Render al crear el Blueprint; nunca van en el repositorio.
+databases:
+  - name: bangus-db
+    plan: free
+    region: oregon
+    databaseName: pago_servicios_db
+    user: bangus
+    ipAllowList: []
+
+services:
+  - type: keyvalue
+    name: bangus-redis
+    plan: free
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  - type: web
+    name: pago-servicios-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/cat/nacionalidades
+    autoDeploy: true
+    envVars:
+      - key: DB_HOST
+        fromDatabase: { name: bangus-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: bangus-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: bangus-db, property: database }
+      - key: DB_USERNAME
+        fromDatabase: { name: bangus-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: bangus-db, property: password }
+      - key: REDIS_HOST
+        fromService: { type: keyvalue, name: bangus-redis, property: host }
+      - key: REDIS_PORT
+        fromService: { type: keyvalue, name: bangus-redis, property: port }
+      - key: APP_CORS_ORIGINS
+        value: https://gusmendez3249.github.io
+      - key: CLIENT_IP_HEADER
+        value: CF-Connecting-IP
+      - key: APP_EJECUTIVO_USUARIO
+        value: ejecutivo.admin
+      - key: APP_EJECUTIVO_PASSWORD
+        sync: false
+      - key: GESTOPAGO_ID_DISTRIBUIDOR
+        sync: false
+      - key: GESTOPAGO_CODIGO_DISPOSITIVO
+        sync: false
+      - key: GESTOPAGO_PASSWORD
+        sync: false
+      - key: GESTOPAGO_API_KEY
+        sync: false
+      - key: GESTOPAGO_SECRET_KEY
+        sync: false
+      - key: GESTOPAGO_IV
+        sync: false

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.net.SocketTimeoutException;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -47,183 +48,83 @@ public class ProductosServiceImpl implements ProductosService {
     @Override
     public List<ProductoResponse> obtenerProductos() {
         log.info("Inicio consulta de productos");
-
+        validarConfiguracion();
         try {
-            validarConfiguracion();
-
-            GestoPagoToken tokenEntity =
-                    tokenService.obtenerTokenActivo(
-                            idDistribuidor,
-                            codigoDispositivo
-                    ).orElseGet(() -> {
-                        tokenService.renovarToken();
-
-                        return tokenService.obtenerTokenActivo(
-                                idDistribuidor,
-                                codigoDispositivo
-                        ).orElseThrow(() ->
-                                new IntegrationException(
-                                        ErrorCode.AUTHENTICATION_ERROR
-                                )
-                        );
-                    });
-
-            validarToken(tokenEntity);
-
-            String tipoToken = tokenEntity.getTokenType();
-
-            if (tipoToken == null || tipoToken.isBlank()) {
-                tipoToken = "Bearer";
-            }
-
-            String authorization =
-                    tipoToken.trim()
-                            + " "
-                            + tokenEntity.getToken().trim();
-
-            ProductosXmlResponse response =
-                    productosClient.obtenerProductos(authorization);
-
-            validarRespuesta(response);
-
-            List<ProductoResponse> productos =
-                    response.getProductos() != null
-                            && response.getProductos().getProducto() != null
-                            ? response.getProductos()
-                                    .getProducto()
-                                    .stream()
-                                    .map(productoMapper::toResponse)
-                                    .toList()
-                            : Collections.emptyList();
-
-            log.info(
-                    "Fin consulta de productos. Total={}",
-                    productos.size()
-            );
-
+            ProductosXmlResponse response = productosClient.obtenerProductos(authorization(obtenerToken()));
+            List<ProductoResponse> productos = convertir(response);
+            log.info("Fin consulta de productos. Total={}", productos.size());
             return productos;
-
         } catch (IntegrationException exception) {
             throw exception;
-
         } catch (FeignException exception) {
-            manejarFeignException(exception);
-            return Collections.emptyList();
-
+            throw traducir(exception);
         } catch (Exception exception) {
-            if (esTimeout(exception)) {
-                log.error("Timeout al consultar productos");
-                throw new IntegrationException(
-                        ErrorCode.TIMEOUT_ERROR,
-                        exception
-                );
-            }
-
-            log.error("Error de comunicación al consultar productos");
-            throw new IntegrationException(
-                    ErrorCode.COMMUNICATION_ERROR,
-                    exception
-            );
+            log.error(esTimeout(exception) ? "Timeout al consultar productos" : "Error de comunicación al consultar productos");
+            throw new IntegrationException(esTimeout(exception) ? ErrorCode.TIMEOUT_ERROR : ErrorCode.COMMUNICATION_ERROR,
+                    exception);
         }
     }
 
     private void validarConfiguracion() {
-        if (idDistribuidor == null
-                || codigoDispositivo == null
-                || codigoDispositivo.isBlank()) {
-
-            log.error(
-                    "Configuración de GestoPago incompleta o faltante"
-            );
-
-            throw new IntegrationException(
-                    ErrorCode.CONFIGURATION_ERROR
-            );
+        if (idDistribuidor == null || codigoDispositivo == null || codigoDispositivo.isBlank()) {
+            log.error("Configuración de GestoPago incompleta o faltante");
+            throw new IntegrationException(ErrorCode.CONFIGURATION_ERROR);
         }
     }
 
-    private void validarToken(GestoPagoToken tokenEntity) {
-        if (tokenEntity == null
-                || tokenEntity.getToken() == null
-                || tokenEntity.getToken().isBlank()) {
-
+    /** Reutiliza el token vigente; si no hay, lo renueva una vez. */
+    private GestoPagoToken obtenerToken() {
+        GestoPagoToken token = tokenService.obtenerTokenActivo(idDistribuidor, codigoDispositivo)
+                .orElseGet(() -> {
+                    tokenService.renovarToken();
+                    return tokenService.obtenerTokenActivo(idDistribuidor, codigoDispositivo)
+                            .orElseThrow(() -> new IntegrationException(ErrorCode.AUTHENTICATION_ERROR));
+                });
+        if (token.getToken() == null || token.getToken().isBlank()) {
             log.error("Token no disponible o vacío");
-
-            throw new IntegrationException(
-                    ErrorCode.AUTHENTICATION_ERROR
-            );
+            throw new IntegrationException(ErrorCode.AUTHENTICATION_ERROR);
         }
+        return token;
     }
 
-    private void validarRespuesta(ProductosXmlResponse response) {
-        if (response == null
-                || response.getMensaje() == null) {
-
-            throw new IntegrationException(
-                    ErrorCode.INVALID_RESPONSE
-            );
-        }
+    private static String authorization(GestoPagoToken token) {
+        String tipo = token.getTokenType() == null || token.getTokenType().isBlank() ? "Bearer" : token.getTokenType().trim();
+        return tipo + " " + token.getToken().trim();
     }
 
-    private void manejarFeignException(FeignException exception) {
+    private List<ProductoResponse> convertir(ProductosXmlResponse response) {
+        if (response == null || response.getMensaje() == null) {
+            throw new IntegrationException(ErrorCode.INVALID_RESPONSE);
+        }
+        if (response.getProductos() == null || response.getProductos().getProducto() == null) {
+            return Collections.emptyList();
+        }
+        return response.getProductos().getProducto().stream().map(productoMapper::toResponse).toList();
+    }
+
+    /** Traduce el error HTTP del proveedor al código de error de la API. */
+    private static IntegrationException traducir(FeignException exception) {
         int status = exception.status();
-
-        if (esTimeout(exception)
-                || status == 408
-                || status == 504) {
-
-            log.error(
-                    "Timeout al consultar servicio externo. status={}",
-                    status
-            );
-
-            throw new IntegrationException(
-                    ErrorCode.TIMEOUT_ERROR,
-                    exception
-            );
+        if (esTimeout(exception) || status == 408 || status == 504) {
+            log.error("Timeout al consultar servicio externo. status={}", status);
+            return new IntegrationException(ErrorCode.TIMEOUT_ERROR, exception);
         }
-
-        if (status == 401
-                || status == 403
-                || exception instanceof FeignException.Unauthorized
-                || exception instanceof FeignException.Forbidden) {
-
-            log.error(
-                    "Error de autenticación al consultar productos. status={}",
-                    status
-            );
-
-            throw new IntegrationException(
-                    ErrorCode.AUTHENTICATION_ERROR,
-                    exception
-            );
+        if (status == 401 || status == 403) {
+            log.error("Error de autenticación al consultar productos. status={}", status);
+            return new IntegrationException(ErrorCode.AUTHENTICATION_ERROR, exception);
         }
-
-        log.error(
-                "Respuesta HTTP no exitosa del servicio externo. status={}",
-                status
-        );
-
-        throw new IntegrationException(
-                ErrorCode.HTTP_ERROR,
-                exception
-        );
+        log.error("Respuesta HTTP no exitosa del servicio externo. status={}", status);
+        return new IntegrationException(ErrorCode.HTTP_ERROR, exception);
     }
 
-    private boolean esTimeout(Throwable exception) {
-        Throwable actual = exception;
-
-        while (actual != null) {
+    private static boolean esTimeout(Throwable exception) {
+        for (Throwable actual = exception; actual != null; actual = actual.getCause()) {
             if (actual instanceof SocketTimeoutException
-                    || actual instanceof java.util.concurrent.TimeoutException
+                    || actual instanceof TimeoutException
                     || actual instanceof FeignException.GatewayTimeout) {
-
                 return true;
             }
-
-            actual = actual.getCause();
         }
-
         return false;
     }
 }

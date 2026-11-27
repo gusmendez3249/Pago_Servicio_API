@@ -1,0 +1,73 @@
+/* Registro: mismo esqueleto que el login (login-page.scss). Aquí solo lo propio de un formulario largo. */
+
+/* Dos campos cortos en una fila desde 600 px (fecha y sexo, número exterior e interior…) */
+.registro__par {
+  display: grid;
+  gap: 0 var(--s-4);
+
+  @media (min-width: 37.5rem) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.mayusculas {
+  text-transform: uppercase;
+}
+
+.registro__nota {
+  margin: 0 0 var(--s-4);
+  color: var(--texto-2);
+  font-size: var(--t-14);
+}
+
+.registro__acciones {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+}
+
+.registro__cambio {
+  margin: var(--s-5) 0 0;
+  color: var(--texto-2);
+}
+
+h1:focus {
+  outline: none;
+}
+
+/* Comprobante de la cuenta creada: etiqueta a la izquierda, dato a la derecha */
+.registro__datos {
+  margin: 0 0 var(--s-5);
+  border-top: 1px solid var(--borde);
+
+  > div {
+    display: flex;
+    gap: var(--s-4);
+    justify-content: space-between;
+    padding: var(--s-3) 0;
+    border-bottom: 1px solid var(--borde);
+  }
+
+  dt {
+    color: var(--texto-2);
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 500;
+    text-align: right;
+  }
+}
+
+/* Escritorio: el formulario es largo; la foto y la marca se quedan fijas mientras se desplaza */
+@media (min-width: 64rem) {
+  .registro .login__visual {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+  }
+
+  .registro .login__zona {
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,284 @@
+<main class="login registro">
+  <div class="login__visual">
+    <app-banner
+      class="login__foto"
+      imagen="banners/login.jpg"
+      alt="Dos personas en casa usando una laptop"
+      proporcion="auto"
+      enfoque="50% 45%"
+      [sangre]="true"
+      [prioridad]="true"
+    />
+    <div class="login__marca oscuro">
+      <app-logotipo fondo="oscuro" tamano="grande" />
+      <p class="login__titular">Abre tu cuenta y paga tus servicios desde aquí.</p>
+    </div>
+  </div>
+
+  <section class="login__zona" aria-labelledby="registro-titulo">
+    <div class="login__formulario">
+      @if (creada(); as cuenta) {
+        <h1 id="registro-titulo" #titulo tabindex="-1">Tu cuenta está lista</h1>
+        <p class="login__ayuda">Ya puedes iniciar sesión con tu usuario y tu contraseña.</p>
+        <dl class="registro__datos">
+          <div><dt>Titular</dt><dd>{{ cuenta.nombreCompleto }}</dd></div>
+          <div><dt>Usuario</dt><dd>{{ cuenta.username }}</dd></div>
+          <div><dt>Número de cuenta</dt><dd class="cifra">{{ cuenta.numeroCuenta }}</dd></div>
+          <div><dt>Saldo disponible</dt><dd class="cifra">{{ moneda(cuenta.saldoInicial) }}</dd></div>
+        </dl>
+        <div class="aviso aviso--info">
+          <app-icono class="aviso__icono" nombre="info" />
+          <div class="aviso__cuerpo">
+            <p>Tu cuenta inicia con saldo de {{ moneda(cuenta.saldoInicial) }}. Para pagar servicios, pide una recarga en
+              tu sucursal BanGus con tu número de cuenta.</p>
+          </div>
+        </div>
+        <a class="btn btn--bloque" routerLink="/login">Iniciar sesión</a>
+      } @else {
+        <h1 id="registro-titulo" #titulo tabindex="-1">Crear cuenta</h1>
+        <app-pasos [actual]="paso() + 1" [nombres]="pasos" etiqueta="Progreso del registro" />
+
+        <div class="login__avisos" aria-live="assertive" role="alert">
+          @if (error(); as e) {
+            <div class="aviso aviso--error">
+              <app-icono class="aviso__icono" nombre="alerta" />
+              <div class="aviso__cuerpo"><p>{{ e }}</p></div>
+            </div>
+          }
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="paso() === 3 ? crear() : continuar()" novalidate>
+          @switch (paso()) {
+            @case (0) {
+    <div class="campo">
+      <label class="campo__etiqueta" for="nombre">Nombre</label>
+      <input id="nombre" class="campo__input" type="text" formControlName="nombre" placeholder=" " autocomplete="given-name"
+        [attr.aria-invalid]="mensaje('nombre') ? 'true' : null" [attr.aria-describedby]="mensaje('nombre') ? 'nombre-error' : null" (input)="limpiar('nombre')" />
+      <p class="campo__error" id="nombre-error">{{ mensaje('nombre') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="segundoNombre">Segundo nombre (opcional)</label>
+      <input id="segundoNombre" class="campo__input" type="text" formControlName="segundoNombre" placeholder=" " autocomplete="additional-name"
+        [attr.aria-invalid]="mensaje('segundoNombre') ? 'true' : null" [attr.aria-describedby]="mensaje('segundoNombre') ? 'segundoNombre-error' : null" (input)="limpiar('segundoNombre')" />
+      <p class="campo__error" id="segundoNombre-error">{{ mensaje('segundoNombre') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="apellidoPaterno">Apellido paterno</label>
+      <input id="apellidoPaterno" class="campo__input" type="text" formControlName="apellidoPaterno" placeholder=" " autocomplete="family-name"
+        [attr.aria-invalid]="mensaje('apellidoPaterno') ? 'true' : null" [attr.aria-describedby]="mensaje('apellidoPaterno') ? 'apellidoPaterno-error' : null" (input)="limpiar('apellidoPaterno')" />
+      <p class="campo__error" id="apellidoPaterno-error">{{ mensaje('apellidoPaterno') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="apellidoMaterno">Apellido materno</label>
+      <input id="apellidoMaterno" class="campo__input" type="text" formControlName="apellidoMaterno" placeholder=" " 
+        [attr.aria-invalid]="mensaje('apellidoMaterno') ? 'true' : null" [attr.aria-describedby]="mensaje('apellidoMaterno') ? 'apellidoMaterno-error' : null" (input)="limpiar('apellidoMaterno')" />
+      <p class="campo__error" id="apellidoMaterno-error">{{ mensaje('apellidoMaterno') }}</p>
+    </div>
+  <div class="registro__par">
+    <div class="campo">
+      <label class="campo__etiqueta" for="fechaNacimiento">Fecha de nacimiento</label>
+      <input id="fechaNacimiento" class="campo__input" type="date" formControlName="fechaNacimiento" placeholder=" " autocomplete="bday"
+        [attr.aria-invalid]="mensaje('fechaNacimiento') ? 'true' : null" [attr.aria-describedby]="mensaje('fechaNacimiento') ? 'fechaNacimiento-error' : null" (input)="limpiar('fechaNacimiento')" />
+      <p class="campo__error" id="fechaNacimiento-error">{{ mensaje('fechaNacimiento') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="sexo">Sexo</label>
+      <select id="sexo" class="campo__input" formControlName="sexo"
+        [attr.aria-invalid]="mensaje('sexo') ? 'true' : null" [attr.aria-describedby]="mensaje('sexo') ? 'sexo-error' : null" (change)="limpiar('sexo')">
+        <option value="" disabled></option>
+        <option value="FEMENINO">Femenino</option>
+        <option value="MASCULINO">Masculino</option>
+        <option value="OTRO">Otro</option>
+      </select>
+      <p class="campo__error" id="sexo-error">{{ mensaje('sexo') }}</p>
+    </div>
+  </div>
+  <div class="registro__par">
+    <div class="campo">
+      <label class="campo__etiqueta" for="estadoCivil">Estado civil</label>
+      <select id="estadoCivil" class="campo__input" formControlName="estadoCivil"
+        [attr.aria-invalid]="mensaje('estadoCivil') ? 'true' : null" [attr.aria-describedby]="mensaje('estadoCivil') ? 'estadoCivil-error' : null" (change)="limpiar('estadoCivil')">
+        <option value="" disabled></option>
+        <option value="SOLTERO">Soltero(a)</option>
+        <option value="CASADO">Casado(a)</option>
+        <option value="UNION LIBRE">Unión libre</option>
+        <option value="DIVORCIADO">Divorciado(a)</option>
+        <option value="VIUDO">Viudo(a)</option>
+      </select>
+      <p class="campo__error" id="estadoCivil-error">{{ mensaje('estadoCivil') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="nacionalidad">Nacionalidad</label>
+      <select id="nacionalidad" class="campo__input" formControlName="nacionalidad"
+        [attr.aria-invalid]="mensaje('nacionalidad') ? 'true' : null" (change)="limpiar('nacionalidad')">
+        @if (nacionalidades().length === 0) {
+          <option value="MEXICANA">Mexicana</option>
+        }
+        @for (n of nacionalidades(); track n.id) {
+          <option [value]="n.nombre">{{ n.nombre }}</option>
+        }
+      </select>
+      <p class="campo__error" id="nacionalidad-error">{{ mensaje('nacionalidad') }}</p>
+    </div>
+  </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="curp">CURP</label>
+      <input id="curp" class="campo__input mayusculas" type="text" formControlName="curp" placeholder=" " maxlength="18" autocapitalize="characters" spellcheck="false"
+        [attr.aria-invalid]="mensaje('curp') ? 'true' : null" [attr.aria-describedby]="mensaje('curp') ? 'curp-error' : 'curp-ayuda'" (input)="limpiar('curp')" />
+      <p class="campo__ayuda" id="curp-ayuda">La encuentras en tu acta de nacimiento o en tu INE.</p>
+      <p class="campo__error" id="curp-error">{{ mensaje('curp') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="rfc">RFC con homoclave</label>
+      <input id="rfc" class="campo__input mayusculas" type="text" formControlName="rfc" placeholder=" " maxlength="13" autocapitalize="characters" spellcheck="false"
+        [attr.aria-invalid]="mensaje('rfc') ? 'true' : null" [attr.aria-describedby]="mensaje('rfc') ? 'rfc-error' : null" (input)="limpiar('rfc')" />
+      <p class="campo__error" id="rfc-error">{{ mensaje('rfc') }}</p>
+    </div>
+            }
+            @case (1) {
+    <div class="campo">
+      <label class="campo__etiqueta" for="correo">Correo electrónico</label>
+      <input id="correo" class="campo__input" type="email" formControlName="correo" placeholder=" " autocomplete="email" spellcheck="false"
+        [attr.aria-invalid]="mensaje('correo') ? 'true' : null" [attr.aria-describedby]="mensaje('correo') ? 'correo-error' : null" (input)="limpiar('correo')" />
+      <p class="campo__error" id="correo-error">{{ mensaje('correo') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="telefono">Celular (10 dígitos)</label>
+      <input id="telefono" class="campo__input" type="tel" formControlName="telefono" placeholder=" " inputmode="numeric" maxlength="10" autocomplete="tel-national"
+        [attr.aria-invalid]="mensaje('telefono') ? 'true' : null" [attr.aria-describedby]="mensaje('telefono') ? 'telefono-error' : null" (input)="limpiar('telefono')" />
+      <p class="campo__error" id="telefono-error">{{ mensaje('telefono') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="calle">Calle</label>
+      <input id="calle" class="campo__input" type="text" formControlName="calle" placeholder=" " autocomplete="address-line1"
+        [attr.aria-invalid]="mensaje('calle') ? 'true' : null" [attr.aria-describedby]="mensaje('calle') ? 'calle-error' : null" (input)="limpiar('calle')" />
+      <p class="campo__error" id="calle-error">{{ mensaje('calle') }}</p>
+    </div>
+  <div class="registro__par">
+    <div class="campo">
+      <label class="campo__etiqueta" for="numeroExterior">Número exterior</label>
+      <input id="numeroExterior" class="campo__input" type="text" formControlName="numeroExterior" placeholder=" " 
+        [attr.aria-invalid]="mensaje('numeroExterior') ? 'true' : null" [attr.aria-describedby]="mensaje('numeroExterior') ? 'numeroExterior-error' : null" (input)="limpiar('numeroExterior')" />
+      <p class="campo__error" id="numeroExterior-error">{{ mensaje('numeroExterior') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="numeroInterior">Número interior (opcional)</label>
+      <input id="numeroInterior" class="campo__input" type="text" formControlName="numeroInterior" placeholder=" " 
+        [attr.aria-invalid]="mensaje('numeroInterior') ? 'true' : null" [attr.aria-describedby]="mensaje('numeroInterior') ? 'numeroInterior-error' : null" (input)="limpiar('numeroInterior')" />
+      <p class="campo__error" id="numeroInterior-error">{{ mensaje('numeroInterior') }}</p>
+    </div>
+  </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="colonia">Colonia</label>
+      <input id="colonia" class="campo__input" type="text" formControlName="colonia" placeholder=" " 
+        [attr.aria-invalid]="mensaje('colonia') ? 'true' : null" [attr.aria-describedby]="mensaje('colonia') ? 'colonia-error' : null" (input)="limpiar('colonia')" />
+      <p class="campo__error" id="colonia-error">{{ mensaje('colonia') }}</p>
+    </div>
+  <div class="registro__par">
+    <div class="campo">
+      <label class="campo__etiqueta" for="codigoPostal">Código postal</label>
+      <input id="codigoPostal" class="campo__input" type="text" formControlName="codigoPostal" placeholder=" " inputmode="numeric" maxlength="5" autocomplete="postal-code"
+        [attr.aria-invalid]="mensaje('codigoPostal') ? 'true' : null" [attr.aria-describedby]="mensaje('codigoPostal') ? 'codigoPostal-error' : null" (input)="limpiar('codigoPostal')" />
+      <p class="campo__error" id="codigoPostal-error">{{ mensaje('codigoPostal') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="municipio">Municipio o alcaldía</label>
+      <input id="municipio" class="campo__input" type="text" formControlName="municipio" placeholder=" " autocomplete="address-level2"
+        [attr.aria-invalid]="mensaje('municipio') ? 'true' : null" [attr.aria-describedby]="mensaje('municipio') ? 'municipio-error' : null" (input)="limpiar('municipio')" />
+      <p class="campo__error" id="municipio-error">{{ mensaje('municipio') }}</p>
+    </div>
+  </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="estado">Estado</label>
+      <input id="estado" class="campo__input" type="text" formControlName="estado" placeholder=" " autocomplete="address-level1"
+        [attr.aria-invalid]="mensaje('estado') ? 'true' : null" [attr.aria-describedby]="mensaje('estado') ? 'estado-error' : null" (input)="limpiar('estado')" />
+      <p class="campo__error" id="estado-error">{{ mensaje('estado') }}</p>
+    </div>
+            }
+            @case (2) {
+    <div class="campo">
+      <label class="campo__etiqueta" for="ocupacion">Ocupación</label>
+      <input id="ocupacion" class="campo__input" type="text" formControlName="ocupacion" placeholder=" " autocomplete="organization-title"
+        [attr.aria-invalid]="mensaje('ocupacion') ? 'true' : null" [attr.aria-describedby]="mensaje('ocupacion') ? 'ocupacion-error' : null" (input)="limpiar('ocupacion')" />
+      <p class="campo__error" id="ocupacion-error">{{ mensaje('ocupacion') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="empresa">Empresa donde trabajas</label>
+      <input id="empresa" class="campo__input" type="text" formControlName="empresa" placeholder=" " autocomplete="organization"
+        [attr.aria-invalid]="mensaje('empresa') ? 'true' : null" [attr.aria-describedby]="mensaje('empresa') ? 'empresa-error' : null" (input)="limpiar('empresa')" />
+      <p class="campo__error" id="empresa-error">{{ mensaje('empresa') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="ingresoMensual">Ingreso mensual (MXN)</label>
+      <input id="ingresoMensual" class="campo__input" type="text" formControlName="ingresoMensual" placeholder=" " inputmode="decimal"
+        [attr.aria-invalid]="mensaje('ingresoMensual') ? 'true' : null" [attr.aria-describedby]="mensaje('ingresoMensual') ? 'ingresoMensual-error' : null" (input)="limpiar('ingresoMensual')" />
+      <p class="campo__error" id="ingresoMensual-error">{{ mensaje('ingresoMensual') }}</p>
+    </div>
+            }
+            @default {
+    <div class="campo">
+      <label class="campo__etiqueta" for="username">Usuario</label>
+      <input id="username" class="campo__input" type="text" formControlName="username" placeholder=" " autocomplete="username" autocapitalize="none" spellcheck="false"
+        [attr.aria-invalid]="mensaje('username') ? 'true' : null" [attr.aria-describedby]="mensaje('username') ? 'username-error' : 'username-ayuda'" (input)="limpiar('username')" />
+      <p class="campo__ayuda" id="username-ayuda">Con él iniciarás sesión.</p>
+      <p class="campo__error" id="username-error">{{ mensaje('username') }}</p>
+    </div>
+    <div class="campo campo--con-accion">
+      <label class="campo__etiqueta" for="password">Contraseña</label>
+      <input id="password" class="campo__input" [type]="verPassword() ? 'text' : 'password'" formControlName="password" placeholder=" "
+        autocomplete="new-password" [attr.aria-invalid]="mensaje('password') ? 'true' : null"
+        [attr.aria-describedby]="mensaje('password') ? 'password-error' : null" (input)="limpiar('password')" />
+      <button type="button" class="campo__accion" [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+        [attr.aria-pressed]="verPassword()" aria-controls="password" (click)="verPassword.set(!verPassword())">
+        <app-icono [nombre]="verPassword() ? 'ojo-tachado' : 'ojo'" />
+      </button>
+      <p class="campo__error" id="password-error">{{ mensaje('password') }}</p>
+    </div>
+    <div class="campo campo--con-accion">
+      <label class="campo__etiqueta" for="confirmacion">Confirma la contraseña</label>
+      <input id="confirmacion" class="campo__input" [type]="verPassword() ? 'text' : 'password'" formControlName="confirmacion" placeholder=" "
+        autocomplete="new-password" [attr.aria-invalid]="mensaje('confirmacion') ? 'true' : null"
+        [attr.aria-describedby]="mensaje('confirmacion') ? 'confirmacion-error' : null" (input)="limpiar('confirmacion')" />
+      <button type="button" class="campo__accion" [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+        [attr.aria-pressed]="verPassword()" aria-controls="confirmacion" (click)="verPassword.set(!verPassword())">
+        <app-icono [nombre]="verPassword() ? 'ojo-tachado' : 'ojo'" />
+      </button>
+      <p class="campo__error" id="confirmacion-error">{{ mensaje('confirmacion') }}</p>
+    </div>
+  <div class="registro__par">
+    <div class="campo">
+      <label class="campo__etiqueta" for="pin">PIN de 4 dígitos</label>
+      <input id="pin" class="campo__input" type="password" formControlName="pin" placeholder=" " inputmode="numeric" maxlength="4" autocomplete="off"
+        [attr.aria-invalid]="mensaje('pin') ? 'true' : null" [attr.aria-describedby]="mensaje('pin') ? 'pin-error' : null" (input)="limpiar('pin')" />
+      <p class="campo__error" id="pin-error">{{ mensaje('pin') }}</p>
+    </div>
+    <div class="campo">
+      <label class="campo__etiqueta" for="confirmacionPin">Confirma el PIN</label>
+      <input id="confirmacionPin" class="campo__input" type="password" formControlName="confirmacionPin" placeholder=" " inputmode="numeric" maxlength="4" autocomplete="off"
+        [attr.aria-invalid]="mensaje('confirmacionPin') ? 'true' : null" [attr.aria-describedby]="mensaje('confirmacionPin') ? 'confirmacionPin-error' : null" (input)="limpiar('confirmacionPin')" />
+      <p class="campo__error" id="confirmacionPin-error">{{ mensaje('confirmacionPin') }}</p>
+    </div>
+  </div>
+    <p class="registro__nota">El PIN autoriza cada pago que hagas. No lo compartas con nadie.</p>
+            }
+          }
+
+          <div class="registro__acciones">
+            <button class="btn btn--bloque" type="submit" [disabled]="enviando()">
+              @if (enviando()) {
+                <span class="spinner" aria-hidden="true"></span>
+                Creando tu cuenta…
+              } @else {
+                {{ paso() === 3 ? 'Crear cuenta' : 'Continuar' }}
+              }
+            </button>
+            @if (paso() > 0) {
+              <button class="btn btn--sec btn--bloque" type="button" (click)="atras()" [disabled]="enviando()">Atrás</button>
+            }
+          </div>
+        </form>
+        <p class="registro__cambio">¿Ya tienes cuenta? <a class="enlace" routerLink="/login">Inicia sesión</a></p>
+      }
+    </div>
+  </section>
+</main>

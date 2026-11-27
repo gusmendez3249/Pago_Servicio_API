@@ -1,0 +1,33 @@
+.captura {
+  &__ayuda {
+    margin-bottom: var(--s-4);
+    overflow: hidden;
+    border: 1px solid var(--borde);
+    border-radius: var(--r-control);
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+  }
+
+  &__resultado {
+    display: grid;
+    gap: var(--s-4);
+    margin-top: var(--s-5);
+
+    &:empty {
+      display: none;
+    }
+
+    .acciones {
+      margin-top: 0;
+    }
+  }
+
+  &__continuar {
+    margin-top: var(--s-5);
+  }
+}

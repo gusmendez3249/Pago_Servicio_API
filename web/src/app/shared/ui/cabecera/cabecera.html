@@ -1,0 +1,33 @@
+<header class="cabecera oscuro">
+  <div class="cabecera__fila">
+    <a class="cabecera__marca" [routerLink]="esAdmin() ? '/admin' : '/catalogo'" aria-label="BanGus, ir al inicio">
+      <app-logotipo fondo="oscuro" />
+    </a>
+    <nav class="cabecera__nav" aria-label="Principal">
+      @if (esAdmin()) {
+        <a class="cabecera__enlace" routerLink="/admin" routerLinkActive="activo" ariaCurrentWhenActive="page">Recargas</a>
+      } @else {
+        <a class="cabecera__enlace" routerLink="/catalogo" routerLinkActive="activo" ariaCurrentWhenActive="page">Inicio</a>
+        <a class="cabecera__enlace" routerLink="/historial" routerLinkActive="activo" ariaCurrentWhenActive="page">Mis pagos</a>
+      }
+    </nav>
+    <a class="cabecera__cliente" [routerLink]="esAdmin() ? '/admin' : '/cuenta'" routerLinkActive="activo" ariaCurrentWhenActive="page">
+      <app-icono nombre="usuario" />
+      <span>{{ sesion.nombreCliente() || 'Cuenta' }}</span>
+    </a>
+  </div>
+</header>
+
+@if (!esAdmin()) {
+  <nav class="barra" aria-label="Principal">
+    <a class="barra__item" routerLink="/catalogo" routerLinkActive="activo" ariaCurrentWhenActive="page">
+      <app-icono nombre="casa" />Inicio
+    </a>
+    <a class="barra__item" routerLink="/historial" routerLinkActive="activo" ariaCurrentWhenActive="page">
+      <app-icono nombre="recibo" />Mis pagos
+    </a>
+    <a class="barra__item" routerLink="/cuenta" routerLinkActive="activo" ariaCurrentWhenActive="page">
+      <app-icono nombre="usuario" />Cuenta
+    </a>
+  </nav>
+}

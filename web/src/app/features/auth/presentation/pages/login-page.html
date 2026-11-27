@@ -1,0 +1,98 @@
+<main class="login">
+  <div class="login__visual">
+    <app-banner
+      class="login__foto"
+      imagen="banners/login.jpg"
+      alt="Dos personas en casa usando una laptop"
+      proporcion="auto"
+      enfoque="50% 45%"
+      [sangre]="true"
+      [prioridad]="true"
+    />
+    <div class="login__marca oscuro">
+      <app-logotipo fondo="oscuro" tamano="grande" />
+      <p class="login__titular">Tus servicios, pagados en un momento.</p>
+    </div>
+  </div>
+
+  <section class="login__zona" aria-labelledby="login-titulo">
+    <div class="login__formulario">
+      <h1 id="login-titulo">Inicia sesión</h1>
+      <p class="login__ayuda">Paga luz, agua, teléfono y recargas con el usuario y la contraseña de tu banca.</p>
+
+      <div class="login__avisos" aria-live="polite" role="status">
+        @if (sesion.aviso(); as aviso) {
+          <div class="aviso aviso--info">
+            <app-icono class="aviso__icono" nombre="info" />
+            <div class="aviso__cuerpo"><p>{{ aviso }}</p></div>
+          </div>
+        }
+      </div>
+
+      <div class="login__avisos" aria-live="assertive" role="alert">
+        @if (store.mensajeError(); as error) {
+          <div class="aviso aviso--error">
+            <app-icono class="aviso__icono" nombre="alerta" />
+            <div class="aviso__cuerpo"><p>{{ error }}</p></div>
+          </div>
+        }
+      </div>
+
+      <form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <div class="campo">
+          <label class="campo__etiqueta" for="username">Usuario</label>
+          <input
+            id="username"
+            class="campo__input"
+            type="text"
+            formControlName="username"
+            placeholder=" "
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            [attr.aria-invalid]="mensajeUsuario() ? 'true' : null"
+            [attr.aria-describedby]="mensajeUsuario() ? 'username-error' : null"
+            (input)="store.limpiarErrorCampo('username')"
+          />
+          <p class="campo__error" id="username-error" aria-live="polite">{{ mensajeUsuario() }}</p>
+        </div>
+
+        <div class="campo campo--con-accion">
+          <label class="campo__etiqueta" for="password">Contraseña</label>
+          <input
+            id="password"
+            class="campo__input"
+            [type]="verPassword() ? 'text' : 'password'"
+            formControlName="password"
+            placeholder=" "
+            autocomplete="current-password"
+            [attr.aria-invalid]="mensajePassword() ? 'true' : null"
+            [attr.aria-describedby]="mensajePassword() ? 'password-error' : null"
+            (input)="store.limpiarErrorCampo('password')"
+          />
+          <button
+            type="button"
+            class="campo__accion"
+            [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+            [attr.aria-pressed]="verPassword()"
+            aria-controls="password"
+            (click)="verPassword.set(!verPassword())"
+          >
+            <app-icono [nombre]="verPassword() ? 'ojo-tachado' : 'ojo'" />
+          </button>
+          <p class="campo__error" id="password-error" aria-live="polite">{{ mensajePassword() }}</p>
+        </div>
+
+        <button class="btn btn--bloque login__enviar" type="submit" [disabled]="store.estado() === 'cargando'">
+          @if (store.estado() === 'cargando') {
+            <span class="spinner" aria-hidden="true"></span>
+            Ingresando…
+          } @else {
+            Iniciar sesión
+          }
+        </button>
+      </form>
+      <p class="login__registro">¿Aún no tienes cuenta? <a class="enlace" routerLink="/registro">Crear cuenta</a></p>
+    </div>
+  </section>
+</main>

@@ -1,0 +1,272 @@
+Objetivo: https://pago-servicios-api.onrender.com
+
+PASS [200 esp 200] despierta el servicio (GET /api-docs) :: None
+
+===== 1. JSON CRUDO Y BANDERA =====
+PASS [400 esp 400] cuerpo: cuerpo vacío :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: null :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: arreglo :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: número :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: texto :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: JSON roto :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: coma final :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: comillas simples :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: comentario :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: NaN :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: BOM UTF-8 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+PASS [400 esp 400] cuerpo: UTF-16 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+PASS [400 esp 400] cuerpo: bytes inválidos :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] cuerpo: byte nulo :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] bandera texto '1' :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera decimal 1.5 :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera 1.0 :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera booleano :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera null :: Datos no validos{bandera=La bandera de operación es obligatoria (1 = Insertar, 2 = Actualizar, 3 = Eliminar/Baja Lógica,
+PASS [400 esp 400] bandera arreglo :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera objeto :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera negativo :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+PASS [400 esp 400] bandera cero :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+PASS [400 esp 400] bandera int overflow :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] bandera enorme :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] bandera exponente 1e0 :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+PASS [400 esp 400] bandera hex :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] bandera con ceros :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [401 esp 400/401] bandera duplicada (1 y 4): no debe colarse como consulta pública :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [400 esp 400/413] JSON anidado 20,000 niveles :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [413 esp 413] cuerpo 70 KB :: El cuerpo de la petición excede el tamaño máximo permitido (65536 bytes).
+PASS [413 esp 413/400] cuerpo chunked 300 KB :: El cuerpo de la petición excede el tamaño máximo permitido (65536 bytes).
+PASS [400 esp 400/413] clave de 10,000 caracteres :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+
+===== 2. CABECERAS Y MÉTODOS =====
+PASS [400 esp 400/415] XML: bandera 9 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+PASS [401 esp 401/415] XML: bandera 4 sin token (¿entra por XML?) :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [400 esp 400/415] XML: bandera como texto 'uno' :: Error de tipo de dato JSON: El campo 'bandera' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una cadena de t
+FAIL [403 esp 400/415] XML: entidad externa (XXE) :: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="vie
+PASS [400 esp 400/415] XML: billion laughs :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [401 esp 401/400/415] XML: login con usuario inexistente :: Credenciales inválidas.
+PASS [415 esp 415] Content-Type text/plain :: Content-Type no soportado. Envíe la petición con 'Content-Type: application/json'.
+FAIL [400 esp 415] Content-Type application/xml :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [415 esp 415] Content-Type application/x-www-form-urlencoded :: Content-Type no soportado. Envíe la petición con 'Content-Type: application/json'.
+PASS [415 esp 415] Content-Type multipart/form-data; boundary=x :: Content-Type no soportado. Envíe la petición con 'Content-Type: application/json'.
+PASS [415 esp 415] Content-Type None :: Content-Type no soportado. Envíe la petición con 'Content-Type: application/json'.
+PASS [400 esp 400] Content-Type json;charset=ISO-8859-1 :: Datos no validos{bandera=La bandera de operación solo permite los enteros 1 (Insertar), 2 (Actualizar), 3 (Eliminar) o 4
+PASS [400 esp 406/400] Accept: application/xml :: <GenericResponse><codigo>1</codigo><mensaje>Datos no validos{bandera=La bandera de operaci
+PASS [405 esp 405] GET /api/v1/layaway/cliente :: Método HTTP 'GET' no permitido para este endpoint.
+PASS [405 esp 405] PUT /api/v1/layaway/cliente :: Método HTTP 'PUT' no permitido para este endpoint.
+PASS [405 esp 405] DELETE /api/v1/layaway/cliente :: Método HTTP 'DELETE' no permitido para este endpoint.
+PASS [405 esp 405] PATCH /api/v1/layaway/cliente :: Método HTTP 'PATCH' no permitido para este endpoint.
+PASS [405 esp 405/403/400] TRACE (no debe reflejar la petición) :: <html>
+
+<head><title>405 Not Allowed</title></head>
+
+<body>
+
+<center><h1>405 Not Allowed</
+PASS [405 esp 405] POST al catálogo :: Método HTTP 'POST' no permitido para este endpoint.
+PASS [404 esp 404] ruta inexistente :: El recurso '/api/v1/../../etc/passwd' no existe.
+PASS [404 esp 404/401/403] actuator/env no expuesto :: El recurso '/actuator/env' no existe.
+PASS [404 esp 404/401/403] actuator/heapdump no expuesto :: El recurso '/actuator/heapdump' no existe.
+
+===== 3. REGISTRO (bandera 1): VALIDACIÓN CAMPO POR CAMPO =====
+PASS [201 esp 201] CONTROL: un alta válida se acepta (si falla, el resto de la sección no es concluyente) :: Cliente registrado correctamente
+PASS [400 esp 400] datosPersonales.nombre = "" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "   " :: Datos no validos{datosPersonales.nombre=El nombre es obligatorio}
+PASS [400 esp 400] datosPersonales.nombre = "Li" :: Datos no validos{datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres}
+PASS [400 esp 400] datosPersonales.nombre = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA :: Datos no validos{datosPersonales.nombre=El nombre debe tener entre 3 y 50 caracteres}
+PASS [400 esp 400] datosPersonales.nombre = "Juan2" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "<script>alert(1)</script>" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "Juan\nPerez" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "Juan  Perez" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = " Juan" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "Juan​ito" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "Juan‮" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "Ju\u0000an" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "' OR 1=1 --" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "Јuan" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = "😀😀😀" :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = 12345 :: Datos no validos{datosPersonales.nombre=El nombre solo debe contener letras y espacios simples entre palabras}
+PASS [400 esp 400] datosPersonales.nombre = ["Juan"] :: El campo 'datosPersonales.nombre' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni bool
+PASS [400 esp 400] datosPersonales.nombre = {"a": 1} :: El campo 'datosPersonales.nombre' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni bool
+FAIL [201 esp 400] datosPersonales.nombre = true :: Cliente registrado correctamente
+PASS [400 esp 400] datosPersonales.nombre = null :: Datos no validos{datosPersonales.nombre=El nombre es obligatorio}
+PASS [400 esp 400] datosPersonales.segundoNombre = "Al" :: Datos no validos{datosPersonales.segundoNombre=El segundo nombre debe tener entre 3 y 50 caracteres y solo letras y espa
+PASS [400 esp 400] datosPersonales.segundoNombre = "<b>" :: Datos no validos{datosPersonales.segundoNombre=El segundo nombre debe tener entre 3 y 50 caracteres y solo letras y espa
+PASS [400 esp 400] datosPersonales.apellidoPaterno = "Pe" :: Datos no validos{datosPersonales.apellidoPaterno=El apellido paterno debe tener mínimo 3 y máximo 50 caracteres}
+PASS [400 esp 400] datosPersonales.apellidoMaterno = "__QUITAR__" :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio}
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "1995-02-30" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "1995-2-3" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "15/05/1995" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "1995-05-15T00:00:00" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "2026-10-18" :: Datos no validos{datosPersonales.fechaNacimiento=El cliente debe ser mayor de edad (mínimo 18 años) y la fecha de nacimi
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "2008-10-18" :: Datos no validos{datosPersonales.fechaNacimiento=El cliente debe ser mayor de edad (mínimo 18 años) y la fecha de nacimi
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "1800-01-01" :: Datos no validos{datosPersonales.fechaNacimiento=El cliente debe ser mayor de edad (mínimo 18 años) y la fecha de nacimi
+PASS [400 esp 400] datosPersonales.fechaNacimiento = 19950515 :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "0000-00-00" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "+1995-05-15" :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = "1995-05-15 " :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = [1995, 5, 15] :: Error de formato de fecha: La fecha de nacimiento debe enviarse estrictamente en formato año-mes-día (yyyy-MM-dd), por e
+PASS [400 esp 400] datosPersonales.fechaNacimiento = null :: Datos no validos{datosPersonales.fechaNacimiento=La fecha de nacimiento es obligatoria (formato yyyy-MM-dd)}
+PASS [400 esp 400] datosPersonales.curp = "pera900310hgtrrr01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900310HGTRRR0" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900310HGTRRR011" :: Datos no validos{datosPersonales.curp=La CURP debe tener exactamente 18 caracteres}
+PASS [400 esp 400] datosPersonales.curp = "PERA901310HGTRRR01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900332HGTRRR01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900310HXXRRR01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900310HGTAEI01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900310 GTRRR01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PERA900310XGTRRR01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = "PÉRA900310HGTRRR01" :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.curp = 123456789012345678 :: Datos no validos{datosPersonales.curp=Formato de CURP no válido}
+PASS [400 esp 400] datosPersonales.rfc = "PERA900310AB" :: Datos no validos{datosPersonales.rfc=Formato de RFC no válido}
+PASS [400 esp 400] datosPersonales.rfc = "PERA901310AB1" :: Datos no validos{datosPersonales.rfc=Formato de RFC no válido}
+PASS [400 esp 400] datosPersonales.rfc = "pera900310ab1" :: Datos no validos{datosPersonales.rfc=Formato de RFC no válido}
+PASS [400 esp 400] datosPersonales.rfc = "PERA900310AB12" :: Datos no validos{datosPersonales.rfc=El RFC debe tener 12 o 13 caracteres}
+PASS [400 esp 400] datosPersonales.rfc = "PE RA900310AB" :: Datos no validos{datosPersonales.rfc=Formato de RFC no válido}
+PASS [400 esp 400] datosPersonales.sexo = "masculino" :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [400 esp 400] datosPersonales.sexo = "M" :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [400 esp 400] datosPersonales.sexo = "HOMBRE" :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [400 esp 400] datosPersonales.sexo = "MASCULINO " :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [400 esp 400] datosPersonales.sexo = " MASCULINO" :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [400 esp 400] datosPersonales.sexo = "OTRO\n" :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [400 esp 400] datosPersonales.sexo = "MASCULINO,FEMENINO" :: Datos no validos{datosPersonales.sexo=El sexo debe ser exactamente uno de los valores del catálogo: MASCULINO, FEMENINO 
+PASS [404 esp 404] datosPersonales.nacionalidad = "MEX" :: La nacionalidad 'MEX' no es válida. Debe ser exactamente uno de los nombres activos del catálogo cat_nacionalidad (consu
+PASS [400 esp 400] datosPersonales.nacionalidad = "mexicana" :: Datos no validos{datosPersonales.nacionalidad=La nacionalidad debe enviarse exactamente como el nombre del catálogo, en 
+PASS [400 esp 400] datosPersonales.nacionalidad = "MEXICANA " :: Datos no validos{datosPersonales.nacionalidad=La nacionalidad debe enviarse exactamente como el nombre del catálogo, en 
+FAIL [403 esp 400] datosPersonales.nacionalidad = "MEXICANA'; DROP TABLE tb_cliente;--" :: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="vie
+PASS [400 esp 400] datosPersonales.nacionalidad = "MEXICANA%" :: Datos no validos{datosPersonales.nacionalidad=La nacionalidad debe enviarse exactamente como el nombre del catálogo, en 
+PASS [400 esp 400] datosPersonales.estadoCivil = "UNION  LIBRE" :: Datos no validos{datosPersonales.estadoCivil=El estado civil debe ser exactamente uno de los valores del catálogo: SOLTE
+PASS [400 esp 400] datosPersonales.estadoCivil = "union libre" :: Datos no validos{datosPersonales.estadoCivil=El estado civil debe ser exactamente uno de los valores del catálogo: SOLTE
+PASS [400 esp 400] datosPersonales.estadoCivil = "UNIÓN LIBRE" :: Datos no validos{datosPersonales.estadoCivil=El estado civil debe ser exactamente uno de los valores del catálogo: SOLTE
+PASS [400 esp 400] datosPersonales.datosBiometricos = -1 :: Datos no validos{datosPersonales.datosBiometricos=El identificador biométrico debe ser un número positivo}
+PASS [400 esp 400] datosPersonales.datosBiometricos = 0 :: Datos no validos{datosPersonales.datosBiometricos=El identificador biométrico debe ser un número positivo}
+PASS [400 esp 400] datosPersonales.datosBiometricos = "123" :: Error de tipo de dato JSON: El campo 'datosPersonales.datosBiometricos' debe ser un número entero numérico (ej. 1, 2, 3 
+PASS [400 esp 400] datosPersonales.datosBiometricos = 99999999999999999999 :: Error de formato o tipo de dato en la petición JSON. Verifique que los datos sean correctos.
+PASS [400 esp 400] datosContacto.correo = "a@b" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
+PASS [400 esp 400] datosContacto.correo = "a@@b.com" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
+PASS [400 esp 400] datosContacto.correo = "a b@c.com" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
+PASS [400 esp 400] datosContacto.correo = "<x>@y.com" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [400 esp 400] datosContacto.correo = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa :: Datos no validos{datosContacto.correo=El correo electrónico no puede superar los 100 caracteres}
+PASS [400 esp 400] datosContacto.correo = "x@example.com\nBcc: y@z.com" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [400 esp 400] datosContacto.correo = "" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
+PASS [400 esp 400] datosContacto.correo = "x@example..com" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido (usuario@dominio.com)}
+PASS [400 esp 400] datosContacto.correo = ".x@example.com" :: Datos no validos{datosContacto.correo=El correo electrónico debe tener un formato válido}
+PASS [400 esp 400] datosContacto.telefonoMovil = 418123456 :: Datos no validos{datosContacto.telefonoMovil=El teléfono móvil debe ser un número entero de 10 dígitos (ejemplo: 4181234
+PASS [400 esp 400] datosContacto.telefonoMovil = 41812345678 :: Datos no validos{datosContacto.telefonoMovil=El teléfono móvil debe ser un número entero de 10 dígitos (ejemplo: 4181234
+PASS [400 esp 400] datosContacto.telefonoMovil = "4181234567" :: Error de tipo de dato JSON: Los números de teléfono deben enviarse como números enteros numéricos sin comillas (ejemplo:
+PASS [400 esp 400] datosContacto.telefonoMovil = -4181234567 :: Datos no validos{datosContacto.telefonoMovil=El teléfono móvil debe ser un número entero de 10 dígitos (ejemplo: 4181234
+PASS [400 esp 400] datosContacto.telefonoMovil = 4181234567.5 :: Error de tipo de dato JSON: Los números de teléfono deben enviarse como números enteros numéricos sin comillas (ejemplo:
+PASS [400 esp 400] datosContacto.telefonoMovil = 1e+30 :: Error de tipo de dato JSON: Los números de teléfono deben enviarse como números enteros numéricos sin comillas (ejemplo:
+PASS [400 esp 400] datosContacto.telefonoMovil = 0 :: Datos no validos{datosContacto.telefonoMovil=El teléfono móvil debe ser un número entero de 10 dígitos (ejemplo: 4181234
+PASS [400 esp 400] datosContacto.telefonoAlt = 12 :: Datos no validos{datosContacto.telefonoAlt=El teléfono alternativo debe ser un número entero de 10 dígitos (ejemplo: 418
+PASS [400 esp 400] domicilio.codigoPostal = "3780" :: Datos no validos{domicilio.codigoPostal=El código postal debe contener exactamente 5 dígitos}
+PASS [400 esp 400] domicilio.codigoPostal = "378000" :: Datos no validos{domicilio.codigoPostal=El código postal debe contener exactamente 5 dígitos}
+PASS [400 esp 400] domicilio.codigoPostal = "ABCDE" :: Datos no validos{domicilio.codigoPostal=El código postal debe contener exactamente 5 dígitos}
+FAIL [409 esp 400] domicilio.codigoPostal = 37800 :: Ya existe un cliente registrado con la CURP: HMTP900310HGTRJQ07
+PASS [400 esp 400] domicilio.calle = "__QUITAR__" :: Datos no validos{domicilio.calle=La calle es obligatoria}
+PASS [400 esp 400] domicilio.calle = "<img src=x onerror=alert(1)>" :: Datos no validos{domicilio.calle=La calle contiene caracteres no permitidos (control, < o >)}
+PASS [400 esp 400] domicilio.numeroExterior = "11111111111111111111111111111111111111111111 :: Datos no validos{domicilio.numeroExterior=El número exterior no puede superar los 20 caracteres}
+PASS [400 esp 400] domicilio.estado = "Guanajuato\r\n" :: Datos no validos{domicilio.estado=El estado contiene caracteres no permitidos (control, < o >)}
+PASS [400 esp 400] domicilio.pais = "" :: Datos no validos{domicilio.pais=El país es obligatorio}
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:0.00__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe ser mayor a cero}
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:-1.00__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe ser mayor a cero}
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:15000.001__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual no puede tener más de 2 posiciones decimales}
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:15000__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe incluir obligatoriamente exactamente 2 decima
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:15000.0__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe incluir obligatoriamente exactamente 2 decima
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "15000.00" :: Error de tipo de dato en el campo 'informacionLaboral.ingresoMensual': Se esperaba el tipo BigDecimal.
+PASS [400 esp 400] informacionLaboral.ingresoMensual = null :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual es obligatorio}
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:1e308__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual debe incluir obligatoriamente exactamente 2 decima
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:99999999999999999999.99__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual no puede tener más de 2 posiciones decimales}
+PASS [400 esp 400] informacionLaboral.ingresoMensual = "__N:1e999999999__" :: Datos no validos{informacionLaboral.ingresoMensual=El ingreso mensual no puede tener más de 2 posiciones decimales}
+PASS [400 esp 400] loginCredenciales.username = "ab" :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto
+PASS [400 esp 400] loginCredenciales.username = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto
+PASS [400 esp 400] loginCredenciales.username = "juan perez" :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto
+PASS [400 esp 400] loginCredenciales.username = "admin'--" :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto
+PASS [400 esp 400] loginCredenciales.username = "jüan" :: Datos no validos{loginCredenciales.username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto
+PASS [400 esp 400] loginCredenciales.username = "" :: Datos no validos{loginCredenciales.username=El nombre de usuario es obligatorio}
+PASS [400 esp 400] loginCredenciales.password = "password" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "PASSWORD123!" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "Password!!" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "Password123" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "Pa1!" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "Pass word123!" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "Aa1!xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = "Password123!\t" :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.password = 12345678 :: Datos no validos{loginCredenciales.password=La contraseña debe tener de 8 a 72 caracteres, sin espacios, con al menos 1 
+PASS [400 esp 400] loginCredenciales.faceIdBiometrico = -5 :: Datos no validos{loginCredenciales.faceIdBiometrico=El identificador biométrico debe ser un número positivo}
+PASS [400 esp 400] loginCredenciales.faceIdBiometrico = "abc" :: Error de tipo de dato JSON: El campo 'loginCredenciales.faceIdBiometrico' debe ser un número entero numérico (ej. 1, 2, 
+PASS [400 esp 400] datosPersonales = null :: Datos no validos{datosPersonales=Los datos personales son obligatorios para el registro (bandera = 1).}
+PASS [400 esp 400] datosContacto = "__QUITAR__" :: Datos no validos{datosContacto=Los datos de contacto son obligatorios para el registro (bandera = 1).}
+PASS [400 esp 400] domicilio = [] :: Error de tipo de dato en el campo 'domicilio': Se esperaba el tipo DomicilioDto.
+PASS [400 esp 400] informacionLaboral = "texto" :: Error de tipo de dato en el campo 'informacionLaboral': Se esperaba el tipo InformacionLaboralDto.
+PASS [400 esp 400] clienteId = 7 :: Datos no validos{clienteId=Para la operación INSERTAR (bandera = 1), el clienteId debe ser nulo o 0. No se permite envia
+PASS [400 esp 400] filtros = {"curp": "PERA900310HGTRRR01"} :: Datos no validos{filtros=Para la operación INSERTAR (bandera = 1) no se usa el objeto 'filtros'.}
+
+===== 4. CAMPOS DEL SERVIDOR Y UNICIDAD =====
+PASS [201 esp 201/400] alta con rol/saldo/activo/numeroCuenta inyectados: se crea con valores del servidor :: Cliente registrado correctamente
+PASS [200 esp 200] el usuario inyectado sigue siendo CLIENTE :: Inicio de sesión exitoso
+PASS [409 esp 409] CURP duplicada :: Ya existe un cliente registrado con la CURP: MVVH900310HGTFQX03
+PASS [409 esp 409] RFC duplicado :: Ya existe un cliente registrado con el RFC: MVVH900310JZ2
+PASS [409 esp 409] correo duplicado en MAYÚSCULAS :: Ya existe un cliente registrado con el correo: VAL.TRNOWMVK@EXAMPLE.COM
+PASS [409 esp 409] username duplicado :: El nombre de usuario 'val.trnowmvk' ya se encuentra en uso.
+PASS [201 esp 409/400/201] username que solo difiere en mayúsculas (¿suplantación?) :: Cliente registrado correctamente
+   NOTA: se aceptó un username que solo difiere en mayúsculas
+
+===== 5. LOGIN =====
+PASS [400 esp 400] login: SQL en usuario :: Datos no validos{username=El nombre de usuario debe tener de 3 a 50 caracteres: letras, números, punto, guion o guion ba
+FAIL [401 esp 400] login: usuario como número :: Credenciales inválidas.
+PASS [400 esp 400] login: password como objeto :: El campo 'password' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
+PASS [400 esp 400] login: faceId como texto :: Error de tipo de dato JSON: El campo 'faceIdBiometrico' debe ser un número entero numérico (ej. 1, 2, 3 o 4) y NO una ca
+PASS [400 esp 400] login: faceId negativo :: Datos no validos{faceIdBiometrico=El identificador biométrico debe ser un número positivo}
+PASS [400 esp 400] login: bandera 3 :: Datos no validos{bandera=La bandera de autenticación solo permite los enteros 1 (Contraseña) o 2 (Biométrico Face ID)}
+PASS [400 esp 400] login: password de 10,000 :: Datos no validos{password=La contraseña no puede superar los 100 caracteres}
+PASS [400 esp 400] login: sin cuerpo útil :: Datos no validos{bandera=La bandera de autenticación es obligatoria (1 = Contraseña, 2 = Biométrico Face ID), username=E
+PASS [401 esp 401] login: usuario inexistente :: Credenciales inválidas.
+
+===== 6. TOKEN =====
+PASS [401 esp 400/401/431] bandera 4 sin Authorization :: Se requiere autenticación: envíe el encabezado 'Authorization: Bearer <token>' obtenido en POST /api/v1/auth/login.
+PASS [200 esp 200/401] bandera 4 bearer en minúsculas :: Consulta realizada correctamente
+FAIL [200 esp 400/401/431] bandera 4 doble espacio :: Consulta realizada correctamente
+PASS [401 esp 400/401/431] bandera 4 token + basura :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 400/401/431] bandera 4 token de 8 KB :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 400/401/431] bandera 4 JWT falso alg none :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+PASS [401 esp 400/401/431] bandera 4 Basic :: Esquema de autenticación no soportado: use 'Authorization: Bearer <token>'.
+PASS [401 esp 400/401/431] bandera 4 inyección CRLF :: Token inválido o sesión expirada. Inicie sesión de nuevo en POST /api/v1/auth/login.
+
+===== 7. CLIENTE AUTENTICADO: FILTROS Y ACTUALIZACIÓN =====
+PASS [200 esp 200] cliente sin filtros: solo su registro :: Consulta realizada correctamente
+PASS [400 esp 400] filtro comodín % :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [400 esp 400] filtro comodín _ :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [400 esp 400] filtro curp con espacio :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [400 esp 400] filtro curp vacía :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [200 esp 200] filtro curp null: equivale a sin filtro (solo el suyo) :: Consulta realizada correctamente
+PASS [400 esp 400] filtro curp número :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
+PASS [400 esp 400] filtro curp arreglo :: El campo 'filtros.curp' debe enviarse como texto entre comillas (por ejemplo "MERG95"), no como número ni booleano.
+PASS [400 esp 400] filtro filtro nombre :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuent
+PASS [400 esp 400] filtro filtro id :: Datos no validos{filtros.sinCamposDesconocidos=El objeto 'filtros' solo admite los campos llave: curp, rfc y numeroCuent
+PASS [400 esp 400] filtro filtros arreglo :: Error de tipo de dato en el campo 'filtros': Se esperaba el tipo FiltrosClienteDto.
+PASS [400 esp 400] filtro filtros texto :: Error de tipo de dato en el campo 'filtros': Se esperaba el tipo FiltrosClienteDto.
+PASS [400 esp 400] filtro SQL :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [400 esp 400] filtro unicode :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [400 esp 400] filtro curp de 19 :: Datos no validos{filtros.curp=El filtro 'curp' debe ir entre comillas, no estar en blanco y tener de 1 a 18 letras o núm
+PASS [404 esp 404] cliente consulta CURP del otro :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404] cliente consulta CURP del otro en minúsculas :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [404 esp 404/400/200] filtros duplicados en el JSON (propio + ajeno) :: No se encontró ningún cliente con los filtros indicados entre los registros a los que tiene acceso.
+PASS [409 esp 409] actualizar con el correo del otro :: El nuevo correo ya está registrado por otro cliente.
+PASS [400 esp 400] actualizar intentando poner la CURP del otro :: La CURP no puede modificarse. Envíe la CURP registrada o omita el campo.
+PASS [400 esp 400] actualizar con datosPersonales parciales (solo nombre) :: Datos no validos{datosPersonales.apellidoMaterno=El apellido materno es obligatorio, datosPersonales.apellidoPaterno=El 
+PASS [400 esp 400] actualizar con loginCredenciales de otro usuario :: El nombre de usuario no puede modificarse. Envíe el usuario registrado u omita 'loginCredenciales'.
+PASS [404 esp 404] actualizar con llave del otro en minúsculas :: No se encontró ningún cliente con las llaves indicadas entre los registros a los que tiene acceso.
+PASS [403 esp 403] baja como cliente :: Solo un ejecutivo puede dar de baja clientes.
+PASS [400 esp 400] bandera 4 con datosPersonales :: Datos no validos{datosPersonales=Para la consulta (bandera = 4) envíe únicamente el objeto 'filtros' (curp, rfc, numeroC
+PASS [400 esp 400] bandera 2 con clienteId :: Datos no validos{clienteId=El clienteId ya no se utiliza. Para la operación ACTUALIZAR (bandera = 2) identifique al clie
+
+TOTAL 239  PASS 232  FAIL 7

@@ -1,0 +1,572 @@
+package com.proyecto.servicios.service.onboarding;
+
+import com.proyecto.servicios.config.onboarding.PasswordEncoderUtil;
+import com.proyecto.servicios.dto.onboarding.*;
+import com.proyecto.servicios.entity.onboarding.*;
+import com.proyecto.servicios.exception.*;
+import com.proyecto.servicios.repositorys.onboarding.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ClienteLayawayServiceTest {
+
+    @Mock
+    private ClienteRepository clienteRepository;
+
+    @Mock
+    private DomicilioRepository domicilioRepository;
+
+    @Mock
+    private CuentaRepository cuentaRepository;
+
+    @Mock
+    private UsuarioLoginRepository usuarioLoginRepository;
+
+    @Mock
+    private PasswordEncoderUtil passwordEncoderUtil;
+
+    @Mock
+    private CatNacionalidadRepository catNacionalidadRepository;
+
+    // TransactionTemplate real sobre un gestor de transacciones simulado: ejecuta el callback tal cual
+    @Spy
+    private TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class));
+
+    @Mock
+    private SesionService sesionService;
+
+    @InjectMocks
+    private ClienteLayawayService clienteLayawayService;
+
+    private static final SesionUsuario EJECUTIVO = new SesionUsuario(1L, "admin", "EJECUTIVO", null);
+    private static final SesionUsuario CLIENTE = new SesionUsuario(2L, "juan", "CLIENTE", 10L);
+    private static final String TOKEN = "Bearer token-de-prueba";
+
+    /**
+     * Por omisión las pruebas actúan como ejecutivo autenticado (sin restricción de recurso). El formato del cuerpo
+     * lo valida @Valid en el controlador (ver LayawayClienteRequestValidacionTest); aquí se prueban las reglas de negocio.
+     */
+    private LayawayClienteResponse procesar(LayawayClienteRequest request) {
+        return clienteLayawayService.procesarOperacion(request, TOKEN);
+    }
+
+    private LayawayClienteRequest requestInsertar;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(sesionService.autenticar(any())).thenReturn(EJECUTIVO);
+        DatosPersonalesDto dp = DatosPersonalesDto.builder()
+                .nombre("Juan")
+                .apellidoPaterno("Pérez")
+                .apellidoMaterno("Gómez")
+                .fechaNacimiento(LocalDate.of(1995, 5, 15))
+                .curp("PERJ950515HDFRMN01")
+                .rfc("PERJ9505151A2")
+                .sexo("MASCULINO")
+                .nacionalidad("MEXICANA")
+                .estadoCivil("SOLTERO")
+                .build();
+
+        DatosContactoDto dc = DatosContactoDto.builder()
+                .correo("juan.perez@email.com")
+                .telefonoMovil(5512345678L)
+                .build();
+
+        DomicilioDto dom = DomicilioDto.builder()
+                .calle("Av. Reforma")
+                .numeroExterior("100")
+                .colonia("Centro")
+                .municipio("Cuauhtémoc")
+                .estado("CDMX")
+                .codigoPostal("06000")
+                .pais("México")
+                .build();
+
+        InformacionLaboralDto infoLab = InformacionLaboralDto.builder()
+                .ocupacion("Desarrollador")
+                .empresa("Empresa X")
+                .ingresoMensual(new BigDecimal("30000.00"))
+                .build();
+
+        LoginCredencialesDto login = LoginCredencialesDto.builder()
+                .username("juan_perez")
+                .password("Password123!")
+                .faceIdBiometrico(987654321L)
+                .pin("4831")
+                .build();
+
+        requestInsertar = LayawayClienteRequest.builder()
+                .bandera(1)
+                .datosPersonales(dp)
+                .datosContacto(dc)
+                .domicilio(dom)
+                .informacionLaboral(infoLab)
+                .loginCredenciales(login)
+                .build();
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_InsertarCorrectamente() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.existsByCurp(any())).thenReturn(false);
+        when(clienteRepository.existsByRfc(any())).thenReturn(false);
+        when(clienteRepository.existsByCorreo(any())).thenReturn(false);
+        when(usuarioLoginRepository.existsByUsername(any())).thenReturn(false);
+        when(passwordEncoderUtil.encode(any())).thenReturn("hash_pass");
+
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> {
+            ClienteEntity c = invocation.getArgument(0);
+            c.setId(10L);
+            return c;
+        });
+
+        LayawayClienteResponse response = procesar(requestInsertar);
+
+        assertNotNull(response);
+        assertEquals("INSERTAR", response.getOperacionRealizada());
+        assertEquals("ACTIVA", response.getEstatusCuenta());
+        assertEquals(new BigDecimal("0.00"), response.getSaldoInicial(), "el registro público no regala saldo");
+        verify(cuentaRepository, times(1)).save(any(CuentaEntity.class));
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_GuardaElPinComoHash() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(passwordEncoderUtil.encode("Password123!")).thenReturn("hash_pass");
+        when(passwordEncoderUtil.encode("4831")).thenReturn("pbkdf2$hash_pin");
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        procesar(requestInsertar);
+
+        verify(clienteRepository).save(argThat((ClienteEntity c) -> "pbkdf2$hash_pin".equals(c.getPin())));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarPin_GuardaHashYLevantaElBloqueo() {
+        ClienteEntity existente = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").rfc("PERJ9505151A2")
+                .nombre("Juan").apellidoPaterno("Perez").apellidoMaterno("Gomez").activo(true)
+                .pin("pbkdf2$hash_viejo").pinIntentosFallidos((short) 2)
+                .pinBloqueadoHasta(java.time.LocalDateTime.now().plusMinutes(10)).build();
+        UsuarioLoginEntity usuario = UsuarioLoginEntity.builder().id(3L).username("juan_perez").cliente(existente).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+        when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
+        when(cuentaRepository.findByClienteId(7L)).thenReturn(List.of());
+        when(passwordEncoderUtil.encode("5072")).thenReturn("pbkdf2$hash_nuevo");
+
+        procesar(LayawayClienteRequest.builder().bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").pin("5072").build())
+                .build());
+
+        assertEquals("pbkdf2$hash_nuevo", existente.getPin());
+        assertEquals((short) 0, existente.getPinIntentosFallidos());
+        assertNull(existente.getPinBloqueadoHasta());
+        verify(clienteRepository).save(existente);
+    }
+
+    @Test
+    void procesarOperacion_Bandera3_BajaLogicaExitosamente() {
+        ClienteEntity clienteExistente = ClienteEntity.builder()
+                .id(5L)
+                .nombre("Maria")
+                .apellidoPaterno("López")
+                .apellidoMaterno("Sánchez")
+                .curp("LOPS900101MDFRMN02")
+                .rfc("LOPS9001012B3")
+                .correo("maria@test.com")
+                .activo(true)
+                .build();
+
+        CuentaEntity cuenta = CuentaEntity.builder()
+                .id(1L)
+                .numeroCuenta("300123456789")
+                .saldo(new BigDecimal("1500.00"))
+                .estatus("ACTIVA")
+                .cliente(clienteExistente)
+                .build();
+
+        LayawayClienteRequest requestBaja = LayawayClienteRequest.builder()
+                .bandera(3)
+                .filtros(FiltrosClienteDto.builder().curp("LOPS900101MDFRMN02").build())
+                .build();
+
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(clienteExistente), PageRequest.of(0, 2), 1));
+        when(cuentaRepository.findByClienteId(5L)).thenReturn(Collections.singletonList(cuenta));
+
+        LayawayClienteResponse response = procesar(requestBaja);
+
+        assertNotNull(response);
+        assertEquals("ELIMINAR_BAJA_LOGICA", response.getOperacionRealizada());
+        assertFalse(response.getActivo());
+        assertEquals("INACTIVA", response.getEstatusCuenta());
+        verify(clienteRepository, times(1)).save(clienteExistente);
+        // El ID interno ya no se expone en ninguna respuesta
+        assertFalse(com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules().build()
+                .valueToTree(response).has("clienteId"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2y3_LlaveSinCoincidencia_Lanza404() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+        for (int bandera : new int[]{2, 3}) {
+            LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera)
+                    .filtros(FiltrosClienteDto.builder().curp("ZZZZ900101MDFRMN02").build()).build();
+            ClienteNoEncontradoException ex = assertThrows(ClienteNoEncontradoException.class, () -> procesar(req));
+            assertEquals(404, ex.getCodigo());
+        }
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarContrasena_GuardaNuevoHashYCierraSesion() {
+        ClienteEntity existente = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").rfc("PERJ9505151A2")
+                .nombre("Juan").apellidoPaterno("Perez").apellidoMaterno("Gomez").activo(true).build();
+        UsuarioLoginEntity usuario = UsuarioLoginEntity.builder().id(3L).username("juan_perez")
+                .passwordHash("hash_viejo").isLoggedIn(true).cliente(existente).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+        when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
+        when(cuentaRepository.findByClienteId(7L)).thenReturn(List.of());
+        when(passwordEncoderUtil.encode("NuevaClave#2026")).thenReturn("hash_nuevo");
+
+        procesar(LayawayClienteRequest.builder().bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
+                .loginCredenciales(LoginCredencialesDto.builder().username("juan_perez").password("NuevaClave#2026").build())
+                .build());
+
+        assertEquals("hash_nuevo", usuario.getPasswordHash());
+        assertFalse(usuario.getIsLoggedIn());
+        verify(usuarioLoginRepository).save(usuario);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarUsuario_LanzaBadRequest() {
+        ClienteEntity existente = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").activo(true).build();
+        UsuarioLoginEntity usuario = UsuarioLoginEntity.builder().id(3L).username("juan_perez").cliente(existente).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+        when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
+
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class, () -> procesar(
+                LayawayClienteRequest.builder().bandera(2)
+                        .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build())
+                        .loginCredenciales(LoginCredencialesDto.builder().username("otro_usuario").build()).build()));
+
+        assertEquals(400, ex.getCodigo());
+        assertTrue(ex.getMessage().contains("usuario no puede modificarse"));
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_SinPassword_NoAsignaPasswordPorDefecto() {
+        requestInsertar.getLoginCredenciales().setPassword(null);
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        procesar(requestInsertar);
+
+        verify(passwordEncoderUtil).encode(null);
+        verify(passwordEncoderUtil, never()).encode("DefaultPassword123!");
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_NacionalidadConClaveEnVezDeNombre_Lanza404() {
+        // Catálogo estricto: la clave "MEX" tiene formato válido pero no es el nombre "MEXICANA" -> no existe (404)
+        requestInsertar.getDatosPersonales().setNacionalidad("MEX");
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEX")).thenReturn(false);
+
+        NacionalidadNoValidaException exception = assertThrows(NacionalidadNoValidaException.class, () ->
+                procesar(requestInsertar)
+        );
+
+        assertEquals(404, exception.getCodigo());
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_NumeroCuentaSiempreDe12Digitos() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        for (int i = 0; i < 200; i++) {
+            LayawayClienteResponse response = procesar(requestInsertar);
+            assertTrue(response.getNumeroCuenta().matches("^\\d{12}$"), response.getNumeroCuenta());
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_CambiarCurp_LanzaBadRequest() {
+        ClienteEntity existente = ClienteEntity.builder()
+                .id(7L).curp("OTRA950515HDFRMN09").rfc("PERJ9505151A2").activo(true).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existente), PageRequest.of(0, 2), 1));
+
+        LayawayClienteRequest requestActualizar = LayawayClienteRequest.builder()
+                .bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("OTRA950515HDFRMN09").build())
+                .datosPersonales(requestInsertar.getDatosPersonales())
+                .build();
+
+        ReglaNegocioException exception = assertThrows(ReglaNegocioException.class, () ->
+                procesar(requestActualizar)
+        );
+
+        assertEquals(400, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("CURP no puede modificarse"));
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_NacionalidadFueraDeCatalogoOInactiva_Lanza404SinGuardar() {
+        // existsByNombreAndActivoTrue solo considera registros activos: una nacionalidad inexistente
+        // o dada de baja en cat_nacionalidad devuelve false
+        requestInsertar.getDatosPersonales().setNacionalidad("MARCIANA");
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MARCIANA")).thenReturn(false);
+
+        NacionalidadNoValidaException exception = assertThrows(NacionalidadNoValidaException.class, () ->
+                procesar(requestInsertar)
+        );
+
+        assertEquals(404, exception.getCodigo());
+        verify(clienteRepository, never()).save(any());
+        verify(cuentaRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_ValoresDeCatalogoSeGuardanExactos() {
+        requestInsertar.getDatosPersonales().setSexo("FEMENINO");
+        requestInsertar.getDatosPersonales().setEstadoCivil("UNION LIBRE");
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        procesar(requestInsertar);
+
+        verify(clienteRepository).save(argThat(c -> "FEMENINO".equals(c.getSexo())
+                && "UNION LIBRE".equals(c.getEstadoCivil()) && "MEXICANA".equals(c.getNacionalidad())));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera2_ClienteDadoDeBaja_LanzaClienteInactivo() {
+        ClienteEntity inactivo = ClienteEntity.builder().id(7L).curp("PERJ950515HDFRMN01").activo(false).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(inactivo), PageRequest.of(0, 2), 1));
+
+        ClienteInactivoException ex = assertThrows(ClienteInactivoException.class, () -> procesar(LayawayClienteRequest.builder().bandera(2)
+                .filtros(FiltrosClienteDto.builder().curp("PERJ950515HDFRMN01").build()).build()));
+
+        assertEquals(403, ex.getCodigo());
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    void procesarOperacion_Bandera1_CurpDuplicada_LanzaRegistroDuplicado() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.existsByCurp("PERJ950515HDFRMN01")).thenReturn(true);
+
+        RegistroDuplicadoException ex = assertThrows(RegistroDuplicadoException.class, () -> procesar(requestInsertar));
+
+        assertEquals(409, ex.getCodigo());
+        assertTrue(ex.getMessage().contains("CURP"));
+        verify(clienteRepository, never()).save(any());
+    }
+
+    // ---------- Bandera 4: consulta ----------
+
+    private ClienteEntity clienteConsulta(Long id) {
+        return ClienteEntity.builder().id(id).nombre("Ana").apellidoPaterno("Paz").apellidoMaterno("Ruiz")
+                .curp("PARA950515HDFRMN01").rfc("PARA9505151A2").correo("ana@test.com").telefonoMovil("5512345678")
+                .activo(true).build();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_SinFiltros_DevuelveTodosLosClientes() {
+        ClienteEntity c1 = clienteConsulta(1L);
+        ClienteEntity c2 = clienteConsulta(2L);
+        CuentaEntity cuenta = CuentaEntity.builder().id(9L).numeroCuenta("300123456789")
+                .saldo(new BigDecimal("1000.00")).estatus("ACTIVA").cliente(c1).build();
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(c1, c2), PageRequest.of(0, 1000), 2));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of(cuenta));
+
+        // Con "filtros" ausente y con "filtros": {} el resultado es el mismo: todos los clientes
+        for (FiltrosClienteDto filtros : new FiltrosClienteDto[]{null, new FiltrosClienteDto()}) {
+            LayawayClienteResponse r = procesar(
+                    LayawayClienteRequest.builder().bandera(4).filtros(filtros).build());
+
+            assertEquals("CONSULTAR", r.getOperacionRealizada());
+            assertEquals(2, r.getClientes().size());
+            assertEquals(2L, r.getTotalCoincidencias());
+            assertFalse(r.getResultadosTruncados());
+            assertEquals("********6789", r.getClientes().get(0).getCuentas().get(0).getNumeroCuenta(),
+                    "el listado general enmascara los datos personales");
+            assertTrue(r.getClientes().get(0).getCurp() == null || r.getClientes().get(0).getCurp().startsWith("*"),
+                    "la CURP también va enmascarada");
+            assertEquals(0, r.getPagina());
+            assertEquals(1, r.getTotalPaginas());
+            assertTrue(r.getClientes().get(1).getCuentas().isEmpty());
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_ConFiltros_ConsultaConEspecificacion() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(clienteConsulta(1L)), PageRequest.of(0, 1000), 1));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of());
+
+        LayawayClienteResponse r = procesar(LayawayClienteRequest.builder().bandera(4)
+                .filtros(FiltrosClienteDto.builder().curp("PARA95").rfc("PARA").numeroCuenta("3001").build())
+                .build());
+
+        assertEquals(1, r.getClientes().size());
+        verify(clienteRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesarOperacion_Bandera4_MasCoincidenciasQueElTope_IndicaTruncado() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(clienteConsulta(1L)), PageRequest.of(0, 1), 5000));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of());
+
+        LayawayClienteResponse r = procesar(LayawayClienteRequest.builder().bandera(4).build());
+
+        assertEquals(5000L, r.getTotalCoincidencias());
+        assertTrue(r.getResultadosTruncados());
+    }
+
+    // ---------- Autenticación y autorización a nivel de recurso ----------
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void banderas2_3_4_SinToken_Lanzan401SinTocarLosDatos() {
+        when(sesionService.autenticar(isNull()))
+                .thenThrow(new NoAutenticadoException("Se requiere autenticación"));
+        FiltrosClienteDto llaves = FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build();
+
+        for (int bandera : new int[]{2, 3, 4}) {
+            LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera).filtros(llaves).build();
+            NoAutenticadoException ex = assertThrows(NoAutenticadoException.class, () -> clienteLayawayService.procesarOperacion(req, null));
+            assertEquals(401, ex.getCodigo(), "bandera " + bandera);
+        }
+        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+        verify(clienteRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoderUtil);
+    }
+
+    @Test
+    void bandera1_Registro_NoRequiereToken() {
+        when(catNacionalidadRepository.existsByNombreAndActivoTrue("MEXICANA")).thenReturn(true);
+        when(clienteRepository.save(any(ClienteEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LayawayClienteResponse r = clienteLayawayService.procesarOperacion(requestInsertar, null);
+
+        assertEquals("INSERTAR", r.getOperacionRealizada());
+        verifyNoInteractions(sesionService);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void bandera3_Baja_UnClienteNoPuedeDarDeBaja_Lanza403() {
+        when(sesionService.autenticar(any())).thenReturn(CLIENTE);
+
+        AccesoDenegadoException ex = assertThrows(AccesoDenegadoException.class, () -> procesar(LayawayClienteRequest.builder().bandera(3)
+                .filtros(FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build()).build()));
+
+        assertEquals(403, ex.getCodigo());
+        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+        verify(clienteRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void banderas2y4_ClienteSinClienteAsociado_Lanza403() {
+        when(sesionService.autenticar(any())).thenReturn(new SesionUsuario(3L, "huerfano", "CLIENTE", null));
+        for (int bandera : new int[]{2, 4}) {
+            LayawayClienteRequest req = LayawayClienteRequest.builder().bandera(bandera)
+                    .filtros(FiltrosClienteDto.builder().curp("PARA950515HDFRMN01").build()).build();
+            AccesoDenegadoException ex = assertThrows(AccesoDenegadoException.class, () -> procesar(req));
+            assertEquals(403, ex.getCodigo(), "bandera " + bandera);
+        }
+        verify(clienteRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void bandera4_ClienteSinFiltros_ConsultaConLaRestriccionDeSuPropioRegistro() {
+        when(sesionService.autenticar(any())).thenReturn(CLIENTE);
+        ClienteEntity propio = clienteConsulta(10L);
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(propio), PageRequest.of(0, 1000), 1));
+        when(cuentaRepository.findByClienteIdIn(any())).thenReturn(List.of());
+
+        LayawayClienteResponse r = procesar(LayawayClienteRequest.builder().bandera(4).build());
+
+        assertEquals(1, r.getClientes().size());
+        // la restricción de propietario es una condición más de la consulta: la especificación se ejecuta
+        // en la base de datos, donde se comprueba con datos reales (ver pruebas de integración contra PostgreSQL)
+        verify(clienteRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    // ---------- Registro inexistente ----------
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void bandera4_ConFiltrosSinCoincidencias_Lanza404Descriptivo() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1000), 0));
+
+        ClienteNoEncontradoException ex = assertThrows(ClienteNoEncontradoException.class, () -> procesar(LayawayClienteRequest.builder().bandera(4)
+                .filtros(FiltrosClienteDto.builder().curp("ZZZZ").build()).build()));
+
+        assertEquals(404, ex.getCodigo());
+        assertTrue(ex.getMessage().contains("No se encontró"));
+        verifyNoInteractions(cuentaRepository);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void bandera4_SinFiltrosYSinClientes_Devuelve200ConListaVacia() {
+        when(clienteRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1000), 0));
+
+        LayawayClienteResponse r = procesar(LayawayClienteRequest.builder().bandera(4).build());
+
+        assertTrue(r.getClientes().isEmpty());
+        assertEquals(0L, r.getTotalCoincidencias());
+    }
+
+}

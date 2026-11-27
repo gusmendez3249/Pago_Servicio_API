@@ -1,0 +1,1192 @@
+/*
+ * BanGus: interfaz CLARA con el negro de marca como color dominante (cabecera, franjas, bloque del login y del
+ * comprobante, botón primario). Titulares en serif y texto en grotesca. Colores planos y opacos: sin degradados,
+ * sin transparencias de color; la única sombra difusa es la de modales y menús. El efecto metálico es un FILO:
+ * líneas sólidas de 1 px (canto iluminado arriba, canto en sombra abajo), nunca un desvanecido.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Marca: negro metálico sólido */
+  --marca: #121417;
+  --marca-hover: #2a2e35;
+  --marca-divisor: #2a2e35;
+
+  /* Filo metálico: cantos de 1 px sin desenfoque */
+  --filo-luz: #5b616b;
+  --filo-sombra: #000000;
+  --metal-filo: inset 0 1px 0 var(--filo-luz), inset 0 -1px 0 var(--filo-sombra);
+  --boton-filo: inset 0 1px 0 #3a3f47, inset 0 -1px 0 #000000;
+  --boton-filo-hundido: inset 0 1px 0 #000000, inset 0 -1px 0 #3a3f47;
+
+  /* Superficies claras */
+  --fondo: #f4f5f7;
+  --superficie: #ffffff;
+  --borde: #e3e5e8;
+  --borde-fuerte: #c9cdd2;
+  --hover: #f4f5f7;
+  --circulo: #f4f5f7;
+
+  /* Texto sobre claro */
+  --texto: #121417;
+  --texto-2: #5b616b;
+  --apagado: #8a9099;
+
+  /* Campos */
+  --campo: #f4f5f7;
+  --campo-linea: #8a9099;
+  --campo-foco: #121417;
+
+  /* Interacción: el color de interacción es el negro de marca */
+  --primario: #121417;
+  --primario-texto: #ffffff;
+  --primario-hover: #2a2e35;
+  --foco: #121417;
+
+  /* Estados: solo icono y barra izquierda de 3 px; el texto siempre en --texto */
+  --exito: #1e7a4c;
+  --pendiente: #8a5a12;
+  --error: #b3261e;
+  --info: #5b616b;
+
+  /* Peligro: relleno rojo SOLO para acciones destructivas confirmadas (p. ej. cerrar sesión) */
+  --peligro: #b3261e;
+  --peligro-fuerte: #8c1d17;
+
+  --velo: rgb(18 20 23 / 0.5);
+  --sombra-modal: 0 8px 24px rgb(18 20 23 / 0.12);
+
+  /* Radios */
+  --r-control: 4px;
+  --r-tarjeta: 8px;
+
+  /* Espaciado (escala única) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* Tipografía */
+  --fuente: 'Libre Franklin', system-ui, sans-serif;
+  --serif: 'Source Serif 4', Georgia, serif;
+  --t-13: 0.8125rem;
+  --t-14: 0.875rem;
+  --t-16: 1rem;
+  --t-20: 1.25rem;
+  --t-28: 1.75rem;
+  --t-40: 2.5rem;
+
+  /* Medidas de página */
+  --margen: 16px;
+  --ancho-pagina: 1120px;
+  --alto-cabecera: 56px;
+  --alto-barra: 64px;
+
+  /* Contenedor único: 16 px (<600), 24 px (600–1023), 32 px (≥1024) */
+  @media (min-width: 37.5rem) {
+    --margen: 24px;
+    --alto-cabecera: 64px;
+  }
+
+  @media (min-width: 64rem) {
+    --margen: 32px;
+  }
+}
+
+/* Zonas de marca (cabecera, franjas, bloque del login): mismos tokens, valores sobre negro */
+.oscuro,
+.franja {
+  --texto: #ffffff;
+  --texto-2: #b4bac4;
+  --borde: #2a2e35;
+  --borde-fuerte: #2a2e35;
+  --hover: #2a2e35;
+  --circulo: #1e2127;
+  --campo: #1e2127;
+  --campo-linea: #5b616b;
+  --campo-foco: #ffffff;
+  --primario: #ffffff;
+  --primario-texto: #121417;
+  --primario-hover: #e3e5e8;
+  --foco: #ffffff;
+  /* El primario sobre negro es blanco: sin filo */
+  --boton-filo: none;
+  --boton-filo-hundido: none;
+  color: var(--texto);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--fondo);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font: 400 var(--t-16) / 1.5 var(--fuente);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--texto);
+  background: var(--fondo);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Un solo título serif por pantalla (h1); los títulos de sección van en la grotesca. */
+h1,
+h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+h1,
+.titulo-serif {
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: var(--t-28);
+  line-height: 1.15;
+
+  @media (min-width: 64rem) {
+    font-size: var(--t-40);
+    line-height: 1.1;
+  }
+}
+
+h2 {
+  font-size: var(--t-16);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Cifras: importes, folios, referencias (grotesca, nunca serif) */
+.cifra {
+  font-family: var(--fuente);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.cifra--40 {
+  font-size: var(--t-40);
+}
+
+.cifra--28 {
+  font-size: var(--t-28);
+}
+
+/* ---------- Estructura: franja negra de marca + contenido sobre fondo claro ---------- */
+
+/* Superficie negra metálica: fondo sólido y filo de 1 px (luz arriba, sombra abajo) */
+.metal {
+  background: var(--marca);
+  box-shadow: var(--metal-filo);
+}
+
+.franja {
+  padding: calc(var(--alto-cabecera) + var(--s-5)) var(--margen) var(--s-5);
+  color: var(--texto);
+  background: var(--marca);
+  /* Con la cabecera encima forman una sola pieza: la cabecera pone el filo de luz, la franja el de sombra */
+  box-shadow: var(--metal-filo);
+
+  @media (min-width: 64rem) {
+    padding-top: calc(var(--alto-cabecera) + var(--s-6));
+    padding-bottom: var(--s-6);
+  }
+}
+
+.franja__contenido,
+.hoja__contenido {
+  max-width: var(--ancho-pagina);
+  margin: 0 auto;
+}
+
+.franja__nombre {
+  margin: 0;
+  font-size: var(--t-20);
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.franja__sub {
+  margin: var(--s-1) 0 0;
+  color: var(--texto-2);
+  font-size: var(--t-14);
+  overflow-wrap: anywhere;
+}
+
+.franja__dato {
+  margin: var(--s-5) 0 0;
+}
+
+.franja__etiqueta {
+  display: block;
+  margin-bottom: var(--s-1);
+  color: var(--texto-2);
+  font-size: var(--t-14);
+}
+
+.franja__servicio {
+  display: flex;
+  gap: var(--s-4);
+  align-items: center;
+  min-width: 0;
+}
+
+.franja__servicio > div {
+  min-width: 0;
+}
+
+.hoja {
+  padding: var(--s-5) var(--margen) var(--s-7);
+  background: var(--fondo);
+
+  @media (min-width: 64rem) {
+    padding-top: var(--s-6);
+  }
+}
+
+/* Rejilla de 12 columnas desde 1024 px: flujo de pago 7 + 5, catálogo 8 + 4. */
+.flujo,
+.rejilla-8-4 {
+  display: grid;
+  gap: var(--s-5);
+  align-items: start;
+
+  @media (min-width: 64rem) {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}
+
+.flujo > * {
+  @media (min-width: 64rem) {
+    grid-column: span 7;
+  }
+}
+
+.flujo > .flujo__lado {
+  @media (min-width: 64rem) {
+    position: sticky;
+    top: var(--s-5);
+    grid-column: span 5;
+  }
+}
+
+.rejilla-8-4 > * {
+  min-width: 0;
+
+  @media (min-width: 64rem) {
+    grid-column: span 8;
+  }
+}
+
+.rejilla-8-4 > .rejilla__lado {
+  @media (min-width: 64rem) {
+    grid-column: span 4;
+  }
+}
+
+/* Historial, detalle y cuenta: 8 de 12 columnas, alineadas al borde izquierdo del contenedor */
+.columna-8 {
+  @media (min-width: 64rem) {
+    max-width: calc((100% - 11 * var(--s-5)) * 8 / 12 + 7 * var(--s-5));
+  }
+}
+
+/* Formularios y columnas de lectura: una columna de 480 como máximo, botón del ancho de los campos */
+.estrecho,
+form {
+  max-width: 480px;
+}
+
+form .acciones > .btn {
+  width: 100%;
+}
+
+/* Enlace de regreso (vive en la franja) */
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 48px;
+  margin: 0 0 var(--s-3) calc(-1 * var(--s-2));
+  padding: 0 var(--s-2);
+  color: var(--texto-2);
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: var(--r-control);
+  transition: color 0.12s;
+
+  &:hover {
+    color: var(--texto);
+  }
+}
+
+/* Terciario: texto subrayado en el color del texto */
+.enlace {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0;
+  color: var(--texto);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+/* ---------- Botones: rectángulos de radio 4 ---------- */
+
+/* Primario: relleno negro de marca con texto blanco (sobre la franja negra se invierte) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 48px;
+  padding: 0 var(--s-6);
+  font-size: var(--t-16);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--primario-texto);
+  text-align: center;
+  text-decoration: none;
+  background: var(--primario);
+  border: 1px solid var(--primario);
+  border-radius: var(--r-control);
+  box-shadow: var(--boton-filo);
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+
+  &:hover:not(:disabled),
+  &:active:not(:disabled) {
+    background: var(--primario-hover);
+    border-color: var(--primario-hover);
+  }
+
+  /* Pressed: los cantos se invierten para que parezca hundido */
+  &:active:not(:disabled) {
+    box-shadow: var(--boton-filo-hundido);
+  }
+
+  &:disabled {
+    box-shadow: none;
+    color: var(--apagado);
+    background: var(--borde);
+    border-color: var(--borde);
+    cursor: not-allowed;
+  }
+}
+
+/* Secundario: borde de 1 px del color del texto y fondo transparente */
+.btn--sec,
+.btn--contorno-claro {
+  color: var(--texto);
+  background: transparent;
+  border-color: var(--texto);
+
+  &,
+  &:active:not(:disabled) {
+    box-shadow: none;
+  }
+
+  &:hover:not(:disabled),
+  &:active:not(:disabled) {
+    background: var(--hover);
+    border-color: var(--texto);
+  }
+
+  &:disabled {
+    color: var(--apagado);
+    background: transparent;
+    border-color: var(--borde);
+  }
+}
+
+/* Destructivo confirmado: rojo sólido con texto blanco, sin filo metálico */
+.btn--peligro {
+  color: #fff;
+  background: var(--peligro);
+  border-color: var(--peligro);
+
+  &,
+  &:active:not(:disabled) {
+    box-shadow: none;
+  }
+
+  &:hover:not(:disabled),
+  &:active:not(:disabled) {
+    background: var(--peligro-fuerte);
+    border-color: var(--peligro-fuerte);
+  }
+}
+
+.btn--bloque {
+  width: 100%;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+
+  @media (max-width: 37.49rem) {
+    flex-direction: column;
+
+    > .btn {
+      width: 100%;
+    }
+  }
+}
+
+/* Acciones como accesos circulares (comprobante) */
+.accesos-accion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-top: var(--s-5);
+}
+
+.acceso-accion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: center;
+  width: 88px;
+  padding: var(--s-1) 0;
+  color: var(--texto);
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: var(--r-control);
+  cursor: pointer;
+
+  &__circulo {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    color: var(--texto);
+    background: var(--circulo);
+    border: 1px solid var(--borde);
+    border-radius: 50%;
+    transition: background-color 0.12s;
+
+    app-icono {
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  &:hover &__circulo {
+    background: var(--hover);
+  }
+
+  &--principal &__circulo {
+    color: var(--primario-texto);
+    background: var(--primario);
+    border-color: var(--primario);
+  }
+
+  &--principal:hover &__circulo {
+    background: var(--primario-hover);
+  }
+
+  &:disabled {
+    color: var(--apagado);
+    cursor: not-allowed;
+  }
+}
+
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: girar 0.8s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- Superficies y mensajes ---------- */
+
+.tarjeta {
+  padding: var(--s-5);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-tarjeta);
+}
+
+.tarjeta__titulo {
+  margin-bottom: var(--s-4);
+}
+
+.seccion + .seccion {
+  margin-top: var(--s-5);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--borde);
+}
+
+.seccion > h2 {
+  margin-bottom: var(--s-3);
+}
+
+.mensaje {
+  max-width: 480px;
+  margin: 0;
+  padding: var(--s-5);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-tarjeta);
+
+  > p {
+    margin: var(--s-3) 0 var(--s-5);
+  }
+}
+
+.mensaje__icono {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--texto);
+  background: var(--hover);
+  border-radius: 50%;
+}
+
+.cargando {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  margin: 0;
+  padding: var(--s-5) 0;
+  color: var(--texto-2);
+}
+
+/* ---------- Campos rellenos con línea inferior y etiqueta flotante ---------- */
+
+.campo {
+  position: relative;
+  margin-bottom: var(--s-4);
+}
+
+.campo__etiqueta {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-4);
+  right: var(--s-4);
+  z-index: 1;
+  overflow: hidden;
+  color: var(--texto-2);
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transition:
+    top 0.12s,
+    font-size 0.12s,
+    color 0.12s;
+}
+
+/* Vacío y sin foco: la etiqueta ocupa el lugar del texto */
+.campo:has(.campo__input:placeholder-shown):not(:focus-within) > .campo__etiqueta {
+  top: var(--s-4);
+  font-size: var(--t-16);
+  font-weight: 400;
+}
+
+.campo:focus-within > .campo__etiqueta {
+  color: var(--texto);
+}
+
+.campo__input {
+  display: block;
+  width: 100%;
+  height: 56px;
+  padding: var(--s-5) var(--s-4) var(--s-1);
+  color: var(--texto);
+  background: var(--campo);
+  border: 0;
+  border-bottom: 1px solid var(--campo-linea);
+  border-radius: var(--r-control) var(--r-control) 0 0;
+  transition:
+    box-shadow 0.12s,
+    border-color 0.12s;
+
+  &::placeholder {
+    color: transparent;
+  }
+
+  &:hover {
+    border-bottom-color: var(--texto);
+  }
+
+  &:focus,
+  &:focus-visible {
+    border-bottom-color: var(--campo-foco);
+    outline: none;
+    box-shadow: inset 0 -1px 0 var(--campo-foco);
+  }
+
+  &[readonly] {
+    color: var(--texto-2);
+  }
+
+  &[aria-invalid='true'] {
+    border-bottom-color: var(--error);
+    box-shadow: inset 0 -1px 0 var(--error);
+  }
+
+  &:disabled {
+    color: var(--apagado);
+    background: var(--fondo);
+  }
+}
+
+/* Campo con botón interno (mostrar contraseña) */
+.campo--con-accion .campo__input {
+  padding-right: var(--s-7);
+}
+
+.campo__accion {
+  position: absolute;
+  top: var(--s-1);
+  right: var(--s-1);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--texto-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-control);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--texto);
+  }
+}
+
+/* Dentro de tarjetas y diálogos blancos el relleno es el gris claro de campo */
+.tarjeta .campo__input,
+[role='dialog'] .campo__input {
+  background: var(--campo);
+}
+
+select.campo__input {
+  padding-top: var(--s-5);
+}
+
+select.campo__input option {
+  color: var(--texto);
+  background: var(--hover);
+}
+
+.campo__input--grande {
+  height: 64px;
+  padding-top: var(--s-6);
+  padding-bottom: var(--s-1);
+  font-size: var(--t-20);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.campo:has(.campo__input--grande:placeholder-shown):not(:focus-within) > .campo__etiqueta {
+  top: var(--s-5);
+}
+
+.campo__ayuda,
+.campo__error {
+  margin: var(--s-2) 0 0;
+  padding: 0 var(--s-4);
+  font-size: var(--t-14);
+}
+
+.campo__ayuda {
+  color: var(--texto-2);
+}
+
+.campo__error {
+  min-height: var(--s-5);
+  color: var(--texto);
+  font-weight: 500;
+
+  /* Icono de error en rojo sólido; el texto va en el color normal */
+  &:not(:empty)::before {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: var(--s-2);
+    vertical-align: -3px;
+    content: '';
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23B3261E' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='8'/%3E%3Cpath d='M10 5.5v5.5M10 14.2v.1'/%3E%3C/svg%3E") no-repeat center / contain;
+  }
+
+  /* Sin error no reserva espacio: entre campos quedan 16 */
+  &:empty {
+    min-height: 0;
+    margin: 0;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+/* ---------- Avisos: fondo neutro, barra izquierda de 3 px e icono en el color del estado ---------- */
+
+.aviso {
+  --aviso-color: var(--texto-2);
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  margin: 0 0 var(--s-4);
+  padding: var(--s-4);
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 3px solid var(--aviso-color);
+  border-radius: var(--r-control);
+}
+
+.aviso__icono {
+  margin-top: 0;
+  color: var(--aviso-color);
+}
+
+.aviso__cuerpo {
+  min-width: 0;
+
+  > p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  > p + p {
+    margin-top: var(--s-1);
+  }
+
+  > .aviso__titulo {
+    font-weight: 600;
+  }
+
+  > .btn {
+    margin-top: var(--s-4);
+  }
+}
+
+.aviso--ok {
+  --aviso-color: var(--exito);
+}
+
+.aviso--error {
+  --aviso-color: var(--error);
+}
+
+.aviso--aviso {
+  --aviso-color: var(--pendiente);
+}
+
+.aviso--info {
+  --aviso-color: var(--texto-2);
+}
+
+/* Error de una sección: icono en círculo, mensaje y "Reintentar" a la izquierda, sin caja de fondo */
+.estado-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  align-items: flex-start;
+  max-width: 480px;
+  padding: var(--s-4) 0;
+}
+
+.estado-error__icono {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--error);
+  background: var(--circulo);
+  border: 1px solid var(--borde);
+  border-radius: 50%;
+
+  app-icono {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.estado-error__texto {
+  margin: 0;
+  color: var(--texto);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Ficha etiqueta–valor ---------- */
+
+.ficha {
+  display: grid;
+  grid-template-columns: minmax(max-content, 40%) 1fr;
+  margin: 0;
+
+  > dt,
+  > dd {
+    margin: 0;
+    padding: var(--s-3) 0;
+    border-bottom: 1px solid var(--borde);
+  }
+
+  > dt {
+    padding-right: var(--s-4);
+    color: var(--texto-2);
+  }
+
+  > dd {
+    font-weight: 500;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  > :nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+}
+
+/* ---------- Estados ---------- */
+
+.chip-estado {
+  --chip-color: var(--pendiente);
+  display: inline-flex;
+  gap: var(--s-1);
+  align-items: center;
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-control);
+
+  > app-icono {
+    width: 14px;
+    height: 14px;
+    color: var(--chip-color);
+  }
+}
+
+.chip-estado--exitoso {
+  --chip-color: var(--exito);
+}
+
+.chip-estado--rechazado {
+  --chip-color: var(--error);
+}
+
+.estado-icono {
+  --estado-color: var(--pendiente);
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  color: var(--estado-color);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 50%;
+
+  > app-icono {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Sobre el bloque negro del comprobante: icono blanco dentro de un círculo del color del estado */
+.franja .estado-icono {
+  color: #fff;
+  background: var(--estado-color);
+  border-color: var(--estado-color);
+}
+
+.estado-icono--exitoso {
+  --estado-color: var(--exito);
+}
+
+.estado-icono--rechazado {
+  --estado-color: var(--error);
+}
+
+/* ---------- Listas en renglones (catálogo e historial) ---------- */
+
+.lista {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--borde);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-tarjeta);
+}
+
+.lista--dos {
+  @media (min-width: 37.5rem) {
+    grid-template-columns: repeat(2, 1fr);
+
+    > :last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.renglon {
+  display: flex;
+  gap: var(--s-4);
+  align-items: center;
+  height: 100%;
+  min-height: 72px;
+  padding: var(--s-3) var(--s-4);
+  color: inherit;
+  text-decoration: none;
+  background: var(--superficie);
+  transition: background-color 0.12s;
+
+  &:is(a):hover {
+    background: var(--hover);
+  }
+
+  &:focus-visible {
+    outline-offset: -3px;
+  }
+}
+
+.renglon__texto {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.renglon__titulo {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.renglon__sub,
+.renglon__meta {
+  color: var(--texto-2);
+  font-size: var(--t-14);
+  overflow-wrap: anywhere;
+}
+
+.renglon__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-3);
+  font-size: var(--t-13);
+}
+
+.renglon__lado {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--s-1);
+  align-items: flex-end;
+  text-align: right;
+}
+
+.renglon__monto {
+  font-weight: 600;
+}
+
+.renglon__flecha {
+  color: var(--texto-2);
+}
+
+.esqueleto {
+  display: flex;
+  gap: var(--s-4);
+  align-items: center;
+  min-height: 72px;
+  padding: var(--s-3) var(--s-4);
+  background: var(--superficie);
+
+  &__logo {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+  }
+
+  &__lineas {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--s-2);
+
+    span {
+      height: 12px;
+      border-radius: 2px;
+
+      &:nth-child(1) {
+        width: 45%;
+      }
+      &:nth-child(2) {
+        width: 70%;
+      }
+    }
+  }
+
+  &__logo,
+  &__lineas span {
+    background: var(--borde);
+  }
+}
+
+/* ---------- Pestañas (barra de 2 px en la activa) ---------- */
+
+.pestanas {
+  display: flex;
+  gap: var(--s-4);
+  margin: var(--s-5) 0 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--borde-fuerte);
+  scrollbar-width: none;
+}
+
+.pestana {
+  flex: none;
+  min-height: 48px;
+  margin-bottom: -1px;
+  padding: 0;
+  color: var(--texto-2);
+  font-weight: 500;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.12s;
+
+  &:hover {
+    color: var(--texto);
+  }
+
+  &--activa {
+    color: var(--texto);
+    font-weight: 600;
+    border-bottom-color: var(--primario);
+  }
+}
+
+/* Flujo de pago en móvil: el botón primario va anclado abajo, a todo lo ancho */
+@media (max-width: 37.49rem) {
+  .accion-anclada {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 15;
+    margin: 0;
+    padding: var(--s-3) var(--margen) calc(var(--s-3) + env(safe-area-inset-bottom, 0px));
+    background: var(--fondo);
+    border-top: 1px solid var(--borde);
+
+    > .btn {
+      width: 100%;
+      margin: 0;
+    }
+  }
+
+  body:has(.accion-anclada) {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Espacio para la barra inferior móvil en las pantallas privadas */
+@media (max-width: 37.49rem) {
+  body:has(app-cabecera) {
+    padding-bottom: calc(var(--alto-barra) + env(safe-area-inset-bottom, 0px));
+  }
+}

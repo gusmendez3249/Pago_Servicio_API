@@ -1,0 +1,15 @@
+@if (estado() === 'respaldo') {
+  <span class="logo__avatar" role="img" [attr.aria-label]="alt()">{{ iniciales() }}</span>
+} @else {
+  <span class="logo__caja" [class.logo__caja--cargando]="estado() === 'cargando'">
+    <img
+      class="logo__img"
+      [src]="url()"
+      [alt]="alt()"
+      loading="lazy"
+      decoding="async"
+      (load)="alCargar()"
+      (error)="alFallar()"
+    />
+  </span>
+}

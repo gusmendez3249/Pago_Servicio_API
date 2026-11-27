@@ -15,8 +15,14 @@ public interface ProductoStorageMapper {
     @Mapping(target = "id", ignore = true)
     ProductoPostgresEntity toPostgres(ProductoResponse source);
 
+    @Mapping(target = "logoUrl", ignore = true)
+    @Mapping(target = "ayudaUrl", ignore = true)
+    @Mapping(target = "categoria", ignore = true)
     ProductoResponse fromRedis(ProductoRedis source);
 
+    @Mapping(target = "logoUrl", ignore = true)
+    @Mapping(target = "ayudaUrl", ignore = true)
+    @Mapping(target = "categoria", ignore = true)
     ProductoResponse fromPostgres(
             ProductoPostgresEntity source
     );

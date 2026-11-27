@@ -27,7 +27,8 @@ import java.util.Map;
         basePackages = {
                 "com.proyecto.servicios.repositorys.sf",
                 "com.proyecto.servicios.repositorys.gestopago",
-                "com.proyecto.servicios.repositorys.productos"
+                "com.proyecto.servicios.repositorys.productos",
+                "com.proyecto.servicios.repositorys.onboarding"
         },
         transactionManagerRef = "sfTransactionManager",
         entityManagerFactoryRef = "sfEntityManagerFactory"
@@ -42,31 +43,24 @@ public class ConfigDB {
 
     @Bean(name = "sfDatasource")
     public DataSource sfDatasource() {
-        String url =
-                env.getRequiredProperty("spring.datasource.url");
+        return new HikariDataSource(hikariConfig());
+    }
 
-        String username =
-                env.getRequiredProperty("spring.datasource.username");
-
-        String password =
-                env.getRequiredProperty("spring.datasource.password");
-
+    /** Parámetros del pool; los límites son configurables para ajustarlos en pruebas de carga (JMeter). */
+    HikariConfig hikariConfig() {
         HikariConfig config = new HikariConfig();
-
-        config.setJdbcUrl(url);
-        config.setUsername(username);
-        config.setPassword(password);
+        config.setJdbcUrl(env.getRequiredProperty("spring.datasource.url"));
+        config.setUsername(env.getRequiredProperty("spring.datasource.username"));
+        config.setPassword(env.getRequiredProperty("spring.datasource.password"));
         config.setDriverClassName("org.postgresql.Driver");
-
-        config.setMaximumPoolSize(10);
+        config.setMaximumPoolSize(env.getProperty("app.datasource.max-pool-size", Integer.class, 20));
         config.setMaxLifetime(1800000);
-        config.setConnectionTimeout(5000);
+        config.setConnectionTimeout(env.getProperty("app.datasource.connection-timeout-ms", Long.class, 3000L));
         config.setValidationTimeout(5000);
-        config.setMinimumIdle(2);
+        config.setMinimumIdle(env.getProperty("app.datasource.min-idle", Integer.class, 5));
         config.setConnectionTestQuery("SELECT 1");
         config.setPoolName("sfDatasource");
-
-        return new HikariDataSource(config);
+        return config;
     }
 
     @Bean(name = "sfEntityManagerFactory")
@@ -83,7 +77,8 @@ public class ConfigDB {
         entityManager.setPackagesToScan(
                 "com.proyecto.servicios.entity.sf",
                 "com.proyecto.servicios.entity.gestopago",
-                "com.proyecto.servicios.entity.productos"
+                "com.proyecto.servicios.entity.productos",
+                "com.proyecto.servicios.entity.onboarding"
         );
 
         entityManager.setPersistenceUnitName("sfDatasource");
@@ -94,9 +89,10 @@ public class ConfigDB {
 
         Map<String, Object> properties = new HashMap<>();
 
+        // El esquema lo crea y cambia SOLO Flyway; Hibernate únicamente comprueba que coincida con las entidades
         properties.put(
                 "hibernate.hbm2ddl.auto",
-                "none"
+                env.getProperty("spring.jpa.hibernate.ddl-auto", "validate")
         );
 
         properties.put(

@@ -1,0 +1,46 @@
+.catalogo {
+  &__encabezado {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1) var(--s-4);
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--s-3);
+  }
+
+  &__conteo {
+    margin: 0;
+    color: var(--texto-2);
+    font-size: var(--t-14);
+  }
+
+  &__lado {
+    @media (min-width: 64rem) {
+      position: sticky;
+      top: var(--s-5);
+    }
+
+    > .catalogo__encabezado {
+      margin-bottom: var(--s-3);
+    }
+
+    > app-banner {
+      margin-bottom: var(--s-4);
+    }
+  }
+
+  &__ayuda {
+    padding: var(--s-4);
+  }
+
+  &__ayuda-titulo {
+    margin: 0 0 var(--s-1);
+    font-weight: 600;
+  }
+
+  &__ayuda-texto {
+    margin: 0 0 var(--s-2);
+    color: var(--texto-2);
+    font-size: var(--t-14);
+  }
+}

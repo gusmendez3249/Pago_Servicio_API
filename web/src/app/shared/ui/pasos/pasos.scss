@@ -1,0 +1,45 @@
+:host {
+  display: block;
+  max-width: 480px;
+  margin-bottom: var(--s-5);
+}
+
+.pasos__texto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-2);
+  margin: 0 0 var(--s-2);
+  font-size: var(--t-14);
+}
+
+.pasos__numero {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.pasos__nombre {
+  color: var(--texto-2);
+}
+
+.pasos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paso {
+  height: 4px;
+  background: var(--borde-fuerte);
+  border-radius: 2px;
+}
+
+.paso--hecho {
+  background: var(--texto-2);
+}
+
+.paso--actual {
+  background: var(--primario);
+}

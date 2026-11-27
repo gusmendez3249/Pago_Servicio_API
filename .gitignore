@@ -41,3 +41,33 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+### Credenciales locales ###
+secretos.properties
+
+### Redis ###
+*.rdb
+
+### Variables de entorno (nunca versionar; solo .env.example) ###
+.env
+.env.*
+!.env.example
+env.json
+
+### Herramientas locales ###
+.kilo/
+
+### Redis local con contrasena ###
+redis-local.conf
+
+### Salidas de IDE y configuración local de herramientas ###
+/bin/
+.claude/
+
+### Firma de Android (nunca versionar) ###
+*.jks
+*.keystore
+key.properties
+
+### Python ###
+__pycache__/
+*.pyc

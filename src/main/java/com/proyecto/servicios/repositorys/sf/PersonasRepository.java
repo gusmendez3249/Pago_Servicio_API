@@ -10,5 +10,6 @@ import java.util.Optional;
 public interface PersonasRepository  extends JpaRepository<Personas, Integer> {
 
 
-    Optional<Personas> findByNombre(String nombre);
+    // findFirst evita IncorrectResultSizeDataAccessException (HTTP 500) cuando hay varios registros con el mismo nombre
+    Optional<Personas> findFirstByNombreOrderByIdAsc(String nombre);
 }
