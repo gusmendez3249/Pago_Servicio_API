@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 public class SesionService {
 
     public static final int INACTIVIDAD_MINUTOS = 5;
+    /** Tiempo mínimo entre dos renovaciones de la sesión en base de datos. */
+    static final long RENOVACION_MINIMA_SEGUNDOS = 60;
 
     private static final Pattern TOKEN_VALIDO = Pattern.compile("^[A-Za-z0-9_-]{20,100}$");
     private static final String MENSAJE_SIN_TOKEN =
@@ -52,9 +54,7 @@ public class SesionService {
             LocalDateTime ahora = LocalDateTime.now();
             if (!Boolean.TRUE.equals(usuario.getIsLoggedIn()) || usuario.getTokenExpira() == null
                     || !usuario.getTokenExpira().isAfter(ahora)) {
-                usuario.setTokenHash(null);
-                usuario.setTokenExpira(null);
-                usuario.setIsLoggedIn(false);
+                usuario.cerrarSesion();
                 usuarioLoginRepository.save(usuario);
                 return null;
             }
@@ -64,10 +64,14 @@ public class SesionService {
                 throw new ClienteInactivoException("El cliente asociado a este usuario se encuentra inactivo.");
             }
 
-            // Renovación de la sesión por actividad
-            usuario.setUltimaActividad(ahora);
-            usuario.setTokenExpira(ahora.plusMinutes(INACTIVIDAD_MINUTOS));
-            usuarioLoginRepository.save(usuario);
+            // Renovación de la sesión por actividad, como máximo una escritura por minuto: antes cada petición
+            // autenticada hacía un UPDATE de tb_usuario_login (la sesión vence entre 4 y 5 minutos sin actividad)
+            if (usuario.getUltimaActividad() == null
+                    || usuario.getUltimaActividad().plusSeconds(RENOVACION_MINIMA_SEGUNDOS).isBefore(ahora)) {
+                usuario.setUltimaActividad(ahora);
+                usuario.setTokenExpira(ahora.plusMinutes(INACTIVIDAD_MINUTOS));
+                usuarioLoginRepository.save(usuario);
+            }
 
             return new SesionUsuario(usuario.getId(), usuario.getUsername(), usuario.getRol(),
                     cliente != null ? cliente.getId() : null);

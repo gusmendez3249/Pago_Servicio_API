@@ -16,8 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
 import java.util.function.LongSupplier;
 
 /**
@@ -32,34 +31,31 @@ import java.util.function.LongSupplier;
  */
 @Slf4j
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 2)
+@Order(Ordered.HIGHEST_PRECEDENCE + 3)
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     static final String RUTA_LOGIN = "/api/v1/auth/login";
-    private static final long VENTANA_MS = 60_000;
-    /** Tope de IPs en memoria: al superarlo se descartan las ventanas vencidas. */
-    private static final int MAX_IPS = 10_000;
 
     private final int maxIntentos;
     private final String encabezadoIp;
     /** Delega la respuesta de error a GlobalExceptionHandler (el filtro corre fuera de los controladores). */
     private final HandlerExceptionResolver resolver;
-    private final LongSupplier reloj;
-    private final Map<String, Ventana> ventanas = new ConcurrentHashMap<>();
+    private final LimitadorTasa limitador;
 
     @Autowired
     public LoginRateLimitFilter(
-            @Value("${app.auth.login.max-intentos-por-minuto:10}") int maxIntentos,
+            @Value("${app.auth.login.max-intentos-por-minuto:30}") int maxIntentos,
             @Value("${app.http.client-ip-header:}") String encabezadoIp,
-            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
-        this(maxIntentos, encabezadoIp, resolver, System::currentTimeMillis);
-    }
-
-    LoginRateLimitFilter(int maxIntentos, String encabezadoIp, HandlerExceptionResolver resolver, LongSupplier reloj) {
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver,
+            LimitadorTasa limitador) {
         this.maxIntentos = maxIntentos;
         this.encabezadoIp = encabezadoIp == null ? "" : encabezadoIp.trim();
         this.resolver = resolver;
-        this.reloj = reloj;
+        this.limitador = limitador;
+    }
+
+    LoginRateLimitFilter(int maxIntentos, String encabezadoIp, HandlerExceptionResolver resolver, LongSupplier reloj) {
+        this(maxIntentos, encabezadoIp, resolver, LimitadorTasa.enMemoria(reloj));
     }
 
     @Override
@@ -70,15 +66,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        long ahora = reloj.getAsLong();
-        if (ventanas.size() > MAX_IPS) {
-            ventanas.values().removeIf(v -> v.vencida(ahora));
-        }
-        Ventana ventana = ventanas.compute(ipCliente(request),
-                (ip, v) -> v == null || v.vencida(ahora) ? new Ventana(ahora) : v.contar());
-
-        if (ventana.intentos > maxIntentos) {
-            long segundos = Math.max(1, (ventana.inicio + VENTANA_MS - ahora + 999) / 1000);
+        long segundos = limitador.registrar("login|" + ipCliente(request, encabezadoIp), maxIntentos, Duration.ofMinutes(1));
+        if (segundos > 0) {
             log.warn("Límite de intentos de login por IP alcanzado; se responde 429");
             resolver.resolveException(request, response, null, new DemasiadosIntentosException(segundos));
             return;
@@ -86,7 +75,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String ipCliente(HttpServletRequest request) {
+    /** IP del cliente: el encabezado del proxy de confianza si se configuró y llegó; si no, la de la conexión. */
+    public static String ipCliente(HttpServletRequest request, String encabezadoIp) {
         if (!encabezadoIp.isEmpty()) {
             String ip = request.getHeader(encabezadoIp);
             if (ip != null && !ip.isBlank()) {
@@ -94,27 +84,5 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
             }
         }
         return request.getRemoteAddr();
-    }
-
-    private static final class Ventana {
-        private final long inicio;
-        private final int intentos;
-
-        Ventana(long inicio) {
-            this(inicio, 1);
-        }
-
-        private Ventana(long inicio, int intentos) {
-            this.inicio = inicio;
-            this.intentos = intentos;
-        }
-
-        Ventana contar() {
-            return new Ventana(inicio, intentos + 1);
-        }
-
-        boolean vencida(long ahora) {
-            return ahora - inicio >= VENTANA_MS;
-        }
     }
 }

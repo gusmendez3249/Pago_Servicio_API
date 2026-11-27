@@ -34,13 +34,8 @@ public class CifradoServiceImpl implements CifradoService {
 
     @Override
     public String cifrar(String textoPlano) {
-        byte[] llave = decodificar(secretKeyBase64, "SECRET_KEY");
-        byte[] iv = decodificar(ivBase64, "IV");
-
-        if (llave.length != BYTES_LLAVE_AES_256 || iv.length != BYTES_IV) {
-            log.error("SECRET_KEY debe medir {} bytes (AES-256) e IV {} bytes", BYTES_LLAVE_AES_256, BYTES_IV);
-            throw new IntegrationException(ErrorCode.CONFIGURATION_ERROR);
-        }
+        byte[] llave = llaveValida();
+        byte[] iv = ivValido();
 
         try {
             Cipher cipher = Cipher.getInstance(TRANSFORMACION);
@@ -51,6 +46,39 @@ public class CifradoServiceImpl implements CifradoService {
             log.error("Error al cifrar la petición hacia GestoPago");
             throw new IntegrationException(ErrorCode.INTERNAL_ERROR, exception);
         }
+    }
+
+    @Override
+    public String descifrar(String textoCifradoBase64) {
+        byte[] llave = llaveValida();
+        byte[] iv = ivValido();
+        try {
+            Cipher cipher = Cipher.getInstance(TRANSFORMACION);
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(llave, "AES"), new IvParameterSpec(iv));
+            byte[] plano = cipher.doFinal(Base64.getDecoder().decode(textoCifradoBase64.trim()));
+            return new String(plano, StandardCharsets.UTF_8);
+        } catch (GeneralSecurityException | IllegalArgumentException exception) {
+            log.error("Error al descifrar un valor guardado");
+            throw new IntegrationException(ErrorCode.INTERNAL_ERROR, exception);
+        }
+    }
+
+    private byte[] llaveValida() {
+        byte[] llave = decodificar(secretKeyBase64, "SECRET_KEY");
+        if (llave.length != BYTES_LLAVE_AES_256) {
+            log.error("SECRET_KEY debe medir {} bytes (AES-256)", BYTES_LLAVE_AES_256);
+            throw new IntegrationException(ErrorCode.CONFIGURATION_ERROR);
+        }
+        return llave;
+    }
+
+    private byte[] ivValido() {
+        byte[] iv = decodificar(ivBase64, "IV");
+        if (iv.length != BYTES_IV) {
+            log.error("IV debe medir {} bytes", BYTES_IV);
+            throw new IntegrationException(ErrorCode.CONFIGURATION_ERROR);
+        }
+        return iv;
     }
 
     private byte[] decodificar(String valorBase64, String nombre) {

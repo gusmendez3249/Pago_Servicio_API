@@ -1,11 +1,15 @@
 package com.proyecto.servicios.exception;
 
+import com.proyecto.servicios.dto.onboarding.PagoServicioResponse;
 import org.springframework.http.HttpStatus;
 
-/** GestoPago respondió con un CODIGO distinto de "01": el pago no se realizó y el saldo se reintegró. Se responde 422. */
+/**
+ * El pago no se realizó (el proveedor lo rechazó) y el saldo se reintegró. Se responde 422 con el
+ * {@link PagoServicioResponse} completo (estatus RECHAZADA, motivo y upc) en {@code data}.
+ */
 public class PagoRechazadoException extends OnboardingException {
 
-    public PagoRechazadoException(String message) {
-        super(message, HttpStatus.UNPROCESSABLE_ENTITY);
+    public PagoRechazadoException(String message, PagoServicioResponse respuesta) {
+        super(message, HttpStatus.UNPROCESSABLE_ENTITY, respuesta);
     }
 }

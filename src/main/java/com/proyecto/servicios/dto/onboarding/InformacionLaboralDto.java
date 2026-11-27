@@ -1,6 +1,5 @@
 package com.proyecto.servicios.dto.onboarding;
 
-import com.proyecto.servicios.validation.DosDecimales;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -33,11 +32,10 @@ public class InformacionLaboralDto {
     @Pattern(regexp = DomicilioDto.TEXTO_SEGURO, message = "La empresa contiene caracteres no permitidos (control, < o >)")
     private String empresa;
 
-    @Schema(description = "Ingreso mensual estrictamente con dos decimales", example = "15000.00", type = "number", format = "double")
+    @Schema(description = "Ingreso mensual, hasta dos decimales (misma regla que el monto de un pago)", example = "15000.00", type = "number", format = "double")
     @NotNull(message = "El ingreso mensual es obligatorio")
     @DecimalMin(value = "0.01", message = "El ingreso mensual debe ser mayor a cero")
     @Digits(integer = 12, fraction = 2, message = "El ingreso mensual no puede tener más de 2 posiciones decimales")
-    @DosDecimales(message = "El ingreso mensual debe incluir obligatoriamente exactamente 2 decimales (ejemplo: 100.00, no 100 ni 100.0000)")
     private BigDecimal ingresoMensual;
 }
 

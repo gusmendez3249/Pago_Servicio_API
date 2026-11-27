@@ -1,0 +1,66 @@
+Flujo con sesión contra https://pago-servicios-api.onrender.com  (2026-11-02 16:48:57)
+
+[0] Catálogo (puede tardar si el servicio estaba dormido)
+OK  producto 2284/14302 existe en el catálogo
+    ABIB / ABIB 100  monto=100.0  destino={'esReferencia': False, 'telefono': '5512345678'}
+
+[1] Registro con PIN y login
+OK  registrar cliente A -> 201
+OK  registrar cliente B -> 201
+OK  la respuesta del registro no incluye PIN ni hash
+OK  saldo inicial 1000.00
+OK  registro duplicado (misma CURP) -> 409
+OK  registro sin PIN -> 400
+OK  login con contraseña incorrecta -> 401
+OK  login cliente A -> 200
+OK  login cliente B -> 200
+OK  login ejecutivo -> 200
+
+[2] Autorización por recurso
+OK  A consulta: solo ve su registro
+OK  A intenta modificar a B -> 404
+OK  cliente intenta dar de baja -> 403
+OK  ejecutivo consulta a B -> 200
+
+[3] Validaciones antes de enviar a GestoPago (ninguna cobra)
+OK  pago sin token -> 401
+OK  pago sin Idempotency-Key -> 400
+OK  monto distinto al precio del catálogo -> 400
+OK  producto inexistente -> 404
+OK  pagar con la cuenta de otro cliente -> 404
+OK  el ejecutivo no puede pagar por un cliente -> 403
+OK  saldo insuficiente -> 400
+OK  ninguna validación tocó el saldo de A
+
+[4] PIN 2FA y bloqueo por intentos (cliente B)
+OK  3 PIN incorrectos -> 403, 403, 423
+OK  PIN correcto durante el bloqueo -> 423
+OK  B cambia su PIN -> 200
+OK  con el PIN nuevo se levanta el bloqueo (llega a validar el producto)
+OK  el PIN anterior ya no sirve -> 403
+
+[5] Pago con GestoPago: 5 envíos simultáneos con la MISMA Idempotency-Key
+    códigos HTTP de los 5 envíos: [200, 409, 409, 409, 409]
+OK  las respuestas con datos comparten un solo upc
+    estatus=CONFIRMADA upc=W0F75HC9DV código=01 mensaje=Operacion realizada con exito
+OK  se cobró UNA sola vez (saldo 900.0, esperado 900.00)
+OK  la respuesta enmascara la cuenta
+OK  reenviar con la misma llave devuelve el mismo resultado
+OK  el reenvío no vuelve a cobrar
+OK  misma llave con otros datos -> 409
+OK  la llave de A usada por B -> 409
+
+[6] Conciliación
+OK  un cliente no puede conciliar -> 403
+OK  conciliar un upc inexistente -> 404
+OK  conciliar un pago CONFIRMADA (ya resuelto) -> 409
+
+[7] Sesión
+OK  cambiar la contraseña invalida el token anterior
+
+[8] Limpieza: el ejecutivo da de baja a los clientes de prueba
+OK  baja del cliente de prueba ****4465 -> 200
+OK  baja del cliente de prueba ****9733 -> 200
+OK  un cliente dado de baja ya no puede iniciar sesión
+
+==== 42/42 como se esperaba ====

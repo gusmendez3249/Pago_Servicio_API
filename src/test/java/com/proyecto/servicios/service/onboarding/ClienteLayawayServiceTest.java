@@ -149,7 +149,7 @@ class ClienteLayawayServiceTest {
         assertNotNull(response);
         assertEquals("INSERTAR", response.getOperacionRealizada());
         assertEquals("ACTIVA", response.getEstatusCuenta());
-        assertEquals(new BigDecimal("1000.00"), response.getSaldoInicial());
+        assertEquals(new BigDecimal("0.00"), response.getSaldoInicial(), "el registro público no regala saldo");
         verify(cuentaRepository, times(1)).save(any(CuentaEntity.class));
     }
 
@@ -430,7 +430,12 @@ class ClienteLayawayServiceTest {
             assertEquals(2, r.getClientes().size());
             assertEquals(2L, r.getTotalCoincidencias());
             assertFalse(r.getResultadosTruncados());
-            assertEquals("300123456789", r.getClientes().get(0).getCuentas().get(0).getNumeroCuenta());
+            assertEquals("********6789", r.getClientes().get(0).getCuentas().get(0).getNumeroCuenta(),
+                    "el listado general enmascara los datos personales");
+            assertTrue(r.getClientes().get(0).getCurp() == null || r.getClientes().get(0).getCurp().startsWith("*"),
+                    "la CURP también va enmascarada");
+            assertEquals(0, r.getPagina());
+            assertEquals(1, r.getTotalPaginas());
             assertTrue(r.getClientes().get(1).getCuentas().isEmpty());
         }
     }

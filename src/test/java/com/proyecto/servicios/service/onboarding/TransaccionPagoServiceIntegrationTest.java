@@ -52,12 +52,19 @@ class TransaccionPagoServiceIntegrationTest {
     @EnableJpaRepositories(basePackages = "com.proyecto.servicios.repositorys.onboarding")
     @Import(TransaccionPagoService.class)
     static class Configuracion {
+
+        /** Sin llave real: las pruebas de saldo y estatus no manejan PIN de tarjeta de regalo. */
+        @org.springframework.context.annotation.Bean
+        com.proyecto.servicios.service.CifradoService cifradoService() {
+            return org.mockito.Mockito.mock(com.proyecto.servicios.service.CifradoService.class);
+        }
     }
 
     @Autowired private TransaccionPagoService service;
     @Autowired private CuentaRepository cuentaRepository;
     @Autowired private ClienteRepository clienteRepository;
     @Autowired private TransaccionPagoRepository transaccionPagoRepository;
+    @Autowired private com.proyecto.servicios.service.CifradoService cifradoService;
 
     private Long cuentaId;
 
@@ -175,5 +182,89 @@ class TransaccionPagoServiceIntegrationTest {
         assertEquals(5, exitosas, "1000.00 alcanza exactamente para 5 pagos de 200.00");
         assertEquals(0, saldo().compareTo(BigDecimal.ZERO));
         assertEquals(5, transaccionPagoRepository.count());
+    }
+
+    // ---------------------------------------------------------------- Sprint 3: folio, motivo, confirmTx y cuentas
+
+    @Test
+    void confirmarConDatos_GuardaFolioIdTxComisionYElPinCifrado() {
+        org.mockito.Mockito.when(cifradoService.cifrar("GIFT-1234")).thenReturn("PIN-CIFRADO");
+        TransaccionPagoEntity tx = service.reservar(cuentaId, nueva("100.00", "ABCDE12345"));
+        com.proyecto.servicios.model.gestopago.DatosProveedor datos = new com.proyecto.servicios.model.gestopago.DatosProveedor(
+                "TX-1", "FOL-1", new BigDecimal("2.50"), new BigDecimal("100.00"), "20260101120500", "REF", "GIFT-1234", "Gracias");
+
+        assertTrue(service.confirmar(tx.getId(), "01", "OK", datos));
+
+        TransaccionPagoEntity guardada = transaccionPagoRepository.findById(tx.getId()).orElseThrow();
+        assertEquals(EstatusTransaccionPago.CONFIRMADA, guardada.getEstatus());
+        assertEquals("FOL-1", guardada.getFolio());
+        assertEquals("TX-1", guardada.getIdTx());
+        assertEquals(0, new BigDecimal("2.50").compareTo(guardada.getComision()));
+        assertEquals("Gracias", guardada.getLeyenda());
+        assertEquals("PIN-CIFRADO", guardada.getPinServicio(), "el PIN solo se guarda cifrado");
+        assertEquals(new BigDecimal("900.00"), saldo());
+        assertFalse(service.confirmar(tx.getId(), "01", "otra vez", datos), "no se confirma dos veces");
+    }
+
+    @Test
+    void confirmacionesReales_QuedanConOrigenGESTOPAGO() {
+        TransaccionPagoEntity conDatos = service.reservar(cuentaId, nueva("10.00", "AAAAA11111"));
+        TransaccionPagoEntity manual = service.reservar(cuentaId, nueva("10.00", "BBBBB22222"));
+
+        assertTrue(service.confirmar(conDatos.getId(), "01", "OK", new com.proyecto.servicios.model.gestopago.DatosProveedor(
+                "TX-1", "FOL-1", null, null, null, null, null, null)));
+        assertTrue(service.confirmar(manual.getId(), null, "conciliada"));
+
+        assertEquals(com.proyecto.servicios.enums.OrigenConfirmacion.GESTOPAGO,
+                transaccionPagoRepository.findById(conDatos.getId()).orElseThrow().getOrigenConfirmacion());
+        assertEquals(com.proyecto.servicios.enums.OrigenConfirmacion.GESTOPAGO,
+                transaccionPagoRepository.findById(manual.getId()).orElseThrow().getOrigenConfirmacion());
+    }
+
+    @Test
+    void rechazoConMotivo_ReintegraUnaSolaVezYGuardaElMotivo() {
+        TransaccionPagoEntity tx = service.reservar(cuentaId, nueva("300.00", "ABCDE12345"));
+
+        assertTrue(service.rechazarYReintegrar(tx.getId(), cuentaId, tx.getMonto(), "70", "no aplicada",
+                com.proyecto.servicios.enums.MotivoPago.RECHAZADO_PROVEEDOR));
+        assertFalse(service.rechazarYReintegrar(tx.getId(), cuentaId, tx.getMonto(), "70", "no aplicada",
+                com.proyecto.servicios.enums.MotivoPago.RECHAZADO_PROVEEDOR));
+
+        assertEquals(new BigDecimal("1000.00"), saldo());
+        assertEquals(com.proyecto.servicios.enums.MotivoPago.RECHAZADO_PROVEEDOR,
+                transaccionPagoRepository.findById(tx.getId()).orElseThrow().getMotivo());
+    }
+
+    @Test
+    void reclamoDeConsulta_SoloUnaIndeterminadaYConSeparacionMinima() {
+        TransaccionPagoEntity tx = service.reservar(cuentaId, nueva("100.00", "ABCDE12345"));
+        LocalDateTime ahora = LocalDateTime.now();
+
+        assertFalse(service.reclamarConsultaConfirmacion(tx.getId(), ahora, ahora.minusSeconds(30)), "una PENDIENTE no se consulta");
+
+        service.marcarIndeterminada(tx.getId(), null, "timeout");
+        assertTrue(service.reclamarConsultaConfirmacion(tx.getId(), ahora, ahora.minusSeconds(30)));
+        assertFalse(service.reclamarConsultaConfirmacion(tx.getId(), ahora.plusSeconds(10), ahora.minusSeconds(20)),
+                "10 s despues de la ultima consulta no se vuelve a reclamar");
+        assertTrue(service.reclamarConsultaConfirmacion(tx.getId(), ahora.plusSeconds(31), ahora.plusSeconds(1)));
+
+        TransaccionPagoEntity guardada = transaccionPagoRepository.findById(tx.getId()).orElseThrow();
+        assertEquals(2, guardada.getIntentosConfirmacion());
+        assertNotNull(guardada.getFechaUltimaConfirmacion());
+
+        service.confirmar(tx.getId(), "06", "ok");
+        assertFalse(service.reclamarConsultaConfirmacion(tx.getId(), ahora.plusSeconds(120), ahora.plusSeconds(90)),
+                "una operacion resuelta no se consulta");
+    }
+
+    @Test
+    void cuentasDelCliente_SoloLasActivas() {
+        ClienteEntity cliente = clienteRepository.findAll().get(0);
+        cuentaRepository.save(CuentaEntity.builder().numeroCuenta("111111111111").estatus("BLOQUEADA").cliente(cliente).build());
+
+        java.util.List<CuentaEntity> activas = cuentaRepository.findByClienteIdAndEstatusOrderByIdAsc(cliente.getId(), "ACTIVA");
+
+        assertEquals(1, activas.size());
+        assertEquals("695429041188", activas.get(0).getNumeroCuenta());
     }
 }

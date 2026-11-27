@@ -32,7 +32,7 @@ public class CuentaEntity {
 
     @Column(name = "saldo", nullable = false, precision = 15, scale = 2)
     @Builder.Default
-    private BigDecimal saldo = new BigDecimal("1000.00");
+    private BigDecimal saldo = new BigDecimal("0.00");
 
     @Column(name = "estatus", nullable = false, length = 10)
     @Builder.Default
@@ -54,7 +54,7 @@ public class CuentaEntity {
             this.estatus = "ACTIVA";
         }
         if (this.saldo == null) {
-            this.saldo = new BigDecimal("1000.00");
+            this.saldo = new BigDecimal("0.00");
         }
     }
 }

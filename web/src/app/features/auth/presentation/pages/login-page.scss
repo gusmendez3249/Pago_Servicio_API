@@ -1,0 +1,108 @@
+/*
+ * Móvil: barra negra sólida con el logotipo, debajo la foto (200 px, recorte limpio) y el formulario sobre blanco.
+ * Escritorio: dos mitades; a la izquierda la foto a sangre con una franja negra sólida abajo (logotipo y titular);
+ * a la derecha el formulario de 400 px centrado sobre blanco. Sin degradados: el texto nunca va sobre la foto.
+ */
+.login {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--superficie);
+
+  &__visual {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* La foto crece con el ancho (2:1) en vez de quedar en una franja fija que corta las cabezas */
+  &__foto {
+    aspect-ratio: 2 / 1;
+    max-height: 480px;
+  }
+
+  &__marca {
+    order: -1;
+    padding: var(--s-4) var(--s-5);
+    background: var(--marca);
+    box-shadow: var(--metal-filo);
+  }
+
+  /* Titular en letra de texto delgada para no competir con el nombre de la marca (serif) */
+  &__titular {
+    display: none;
+    max-width: 22ch;
+    margin: var(--s-5) 0 0;
+    font-family: var(--fuente);
+    font-size: var(--t-28);
+    font-weight: 300;
+    line-height: 1.25;
+  }
+
+  &__zona {
+    flex: 1;
+    padding: var(--s-5) var(--s-5) var(--s-7);
+    background: var(--superficie);
+  }
+
+  &__formulario {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  &__ayuda {
+    margin: var(--s-2) 0 var(--s-5);
+    color: var(--texto-2);
+  }
+
+  &__avisos:empty {
+    display: none;
+  }
+
+  &__enviar {
+    width: 100%;
+    margin-top: var(--s-2);
+  }
+
+  &__registro {
+    margin: var(--s-5) 0 0;
+    color: var(--texto-2);
+  }
+
+  /* Tableta: la columna de 400 px se centra */
+  @media (min-width: 37.5rem) and (max-width: 63.99rem) {
+    &__formulario {
+      margin: 0 auto;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    &__visual {
+      min-height: 100dvh;
+    }
+
+    &__foto {
+      flex: 1;
+      aspect-ratio: auto;
+      max-height: none;
+    }
+
+    &__marca {
+      order: 0;
+      padding: var(--s-6);
+    }
+
+    &__titular {
+      display: block;
+    }
+
+    &__zona {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--s-7) var(--s-6);
+    }
+  }
+}

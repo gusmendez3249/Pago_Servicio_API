@@ -31,6 +31,10 @@ public class OperacionClienteValidaValidator implements ConstraintValidator<Oper
                     : "El clienteId ya no se utiliza. Para la operación " + operacion + " identifique al cliente con el objeto 'filtros' (curp, rfc o numeroCuenta).");
         }
 
+        if (request.getPagina() != null && bandera != 4) {
+            errores.agregar("pagina", "El campo 'pagina' solo se usa en la operación CONSULTAR (bandera = 4).");
+        }
+
         switch (bandera) {
             case 1 -> {
                 if (request.getFiltros() != null) {
@@ -45,6 +49,7 @@ public class OperacionClienteValidaValidator implements ConstraintValidator<Oper
                 obligatoria(errores, login == null ? null : login.getPin(), "loginCredenciales.pin",
                         "El PIN de seguridad (loginCredenciales.pin, 4 dígitos) es obligatorio para el registro (bandera = 1): autoriza los pagos de servicios.");
                 validarPin(errores, login);
+                validarIdentidad(errores, request.getDatosPersonales());
             }
             case 2 -> {
                 validarLlaves(errores, request.getFiltros(), operacion);
@@ -129,6 +134,32 @@ public class OperacionClienteValidaValidator implements ConstraintValidator<Oper
 
         boolean ninguno() {
             return !hay;
+        }
+    }
+
+    /**
+     * Registro: la CURP debe tener dígito verificador válido y coincidir con la fecha de nacimiento, el sexo y el RFC
+     * capturados (antes se aceptaban datos de identidad contradictorios o un RFC genérico).
+     */
+    private static void validarIdentidad(Errores errores, com.proyecto.servicios.dto.onboarding.DatosPersonalesDto dp) {
+        if (dp == null || dp.getCurp() == null) {
+            return;
+        }
+        String curp = dp.getCurp().trim().toUpperCase(java.util.Locale.ROOT);
+        if (curp.length() == 18 && !IdentidadCurp.digitoVerificadorValido(curp)) {
+            errores.agregar("datosPersonales.curp", "El dígito verificador de la CURP no es válido.");
+        }
+        String fecha = IdentidadCurp.fechaCongruente(curp, dp.getFechaNacimiento());
+        if (fecha != null) {
+            errores.agregar("datosPersonales.fechaNacimiento", fecha);
+        }
+        String sexo = IdentidadCurp.sexoCongruente(curp, dp.getSexo());
+        if (sexo != null) {
+            errores.agregar("datosPersonales.sexo", sexo);
+        }
+        String rfc = IdentidadCurp.rfcCongruente(curp, dp.getRfc() == null ? null : dp.getRfc().trim().toUpperCase(java.util.Locale.ROOT));
+        if (rfc != null) {
+            errores.agregar("datosPersonales.rfc", rfc);
         }
     }
 }

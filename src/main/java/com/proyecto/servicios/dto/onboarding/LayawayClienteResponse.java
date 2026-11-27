@@ -35,4 +35,8 @@ public class LayawayClienteResponse {
     private List<ClienteConsultaDto> clientes;
     private Long totalCoincidencias;
     private Boolean resultadosTruncados;
+    /** Bandera 4: página devuelta, tamaño de página y total de páginas. */
+    private Integer pagina;
+    private Integer tamanioPagina;
+    private Integer totalPaginas;
 }

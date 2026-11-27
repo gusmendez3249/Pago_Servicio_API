@@ -1,0 +1,24 @@
+@let p = producto();
+<ng-template #contenido>
+  <app-logo-servicio [url]="p.logoUrl" [nombre]="p.servicio" />
+  <span class="renglon__texto">
+    <strong class="renglon__titulo">{{ p.servicio || 'Servicio' }}</strong>
+    <span class="renglon__sub">{{ p.producto }}</span>
+    <span class="renglon__meta">{{ categoria() }}</span>
+  </span>
+  @if (importe(); as i) {
+    <span class="renglon__lado">
+      <span class="renglon__meta">{{ i.etiqueta }}</span>
+      <span class="renglon__monto">{{ i.texto }}</span>
+    </span>
+  }
+  @if (enlace()) {
+    <app-icono class="renglon__flecha" nombre="derecha" />
+  }
+</ng-template>
+
+@if (enlace(); as ruta) {
+  <a class="renglon" [routerLink]="ruta"><ng-container [ngTemplateOutlet]="contenido" /></a>
+} @else {
+  <div class="renglon renglon--inactivo"><ng-container [ngTemplateOutlet]="contenido" /></div>
+}

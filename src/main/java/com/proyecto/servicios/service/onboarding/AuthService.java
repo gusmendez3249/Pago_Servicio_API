@@ -21,6 +21,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -31,9 +32,19 @@ public class AuthService {
     private final UsuarioLoginRepository usuarioLoginRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
     private final TransactionTemplate transactionTemplate;
+    private final SesionService sesionService;
+
+    /** Bloqueo por usuario + IP. Sin Spring (pruebas) se usa uno en memoria. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProteccionLogin proteccionLogin = new ProteccionLogin(
+            com.proyecto.servicios.config.LimitadorTasa.enMemoria(System::currentTimeMillis), "");
 
     private static final int INACTIVIDAD_MINUTOS_MAX = 5;
-    private static final short MAX_INTENTOS_FALLIDOS = 5;
+    /**
+     * Bloqueo GLOBAL de la cuenta (desde cualquier IP): umbral alto, solo para la fuerza bruta distribuida. El bloqueo
+     * habitual es por usuario + IP ({@link ProteccionLogin}): un tercero ya no puede bloquear la cuenta de otra persona.
+     */
+    static final short MAX_INTENTOS_FALLIDOS = 20;
     private static final int BLOQUEO_MINUTOS = 15;
     // Mismo mensaje para usuario inexistente y credencial incorrecta: no revela qué usuarios existen
     private static final String CREDENCIALES_INVALIDAS = "Credenciales inválidas.";
@@ -43,15 +54,17 @@ public class AuthService {
         Integer bandera = request.getBandera();
 
         LocalDateTime ahora = LocalDateTime.now();
+        String username = request.getUsername().trim();
+        proteccionLogin.verificar(username);
 
         // Fase 1 (transacción corta): leer usuario, verificar bloqueo y expirar sesión inactiva
         UsuarioLoginEntity usuario = transactionTemplate.execute(status -> cargarUsuario(request.getUsername().trim(), ahora));
         if (usuario == null) {
             // Usuario inexistente: se ejecuta igualmente una verificación PBKDF2 contra un hash ficticio para que
             // el tiempo de respuesta sea el mismo que con una contraseña incorrecta y no revele qué usuarios existen
-            if (bandera == 1) {
-                passwordEncoderUtil.simularVerificacion(request.getPassword());
-            }
+            proteccionLogin.registrarFallo(username);
+            passwordEncoderUtil.simularVerificacion(bandera == 1 ? request.getPassword()
+                    : String.valueOf(request.getFaceIdBiometrico()));
             throw new NoAutenticadoException(CREDENCIALES_INVALIDAS);
         }
 
@@ -59,13 +72,16 @@ public class AuthService {
         // una conexión del pool mientras se calcula
         boolean credencialValida = bandera == 1
                 ? passwordEncoderUtil.matches(request.getPassword(), usuario.getPasswordHash())
-                : request.getFaceIdBiometrico().equals(usuario.getFaceIdBiometrico());
+                : passwordEncoderUtil.matchesBiometrico(request.getFaceIdBiometrico(), usuario.getFaceIdHash());
 
         if (!credencialValida) {
+            proteccionLogin.registrarFallo(username);
             transactionTemplate.executeWithoutResult(status -> usuarioLoginRepository.registrarIntentoFallido(
                     usuario.getId(), MAX_INTENTOS_FALLIDOS, ahora.plusMinutes(BLOQUEO_MINUTOS)));
             throw new NoAutenticadoException(CREDENCIALES_INVALIDAS);
         }
+
+        proteccionLogin.limpiar(username);
 
         // Solo tras validar la credencial se informa que el cliente está inactivo (evita revelar el estado a terceros)
         ClienteEntity cliente = usuario.getCliente();
@@ -104,6 +120,20 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Cierra la sesión del dueño del token: queda sin sesión ni token, por lo que deja de servir de inmediato.
+     *
+     * @throws NoAutenticadoException 401 si el token falta, es inválido o ya venció
+     */
+    public void logout(String authorization) {
+        SesionUsuario sesion = sesionService.autenticar(authorization);
+        transactionTemplate.executeWithoutResult(status -> usuarioLoginRepository.findById(sesion.usuarioId()).ifPresent(usuario -> {
+            usuario.cerrarSesion();
+            usuarioLoginRepository.save(usuario);
+        }));
+        log.info("Sesión cerrada por logout para usuario: {}", sesion.username());
+    }
+
     /** Devuelve el usuario (o null si no existe) con su cliente ya cargado para usarlo fuera de la transacción. */
     private UsuarioLoginEntity cargarUsuario(String username, LocalDateTime ahora) {
         UsuarioLoginEntity usuario = usuarioLoginRepository.findByUsername(username).orElse(null);
@@ -112,15 +142,15 @@ public class AuthService {
         }
 
         if (usuario.getBloqueadoHasta() != null && usuario.getBloqueadoHasta().isAfter(ahora)) {
-            long minutos = Math.max(1, Duration.between(ahora, usuario.getBloqueadoHasta()).toMinutes());
+            long minutos = Math.max(1, minutosEntre(ahora, usuario.getBloqueadoHasta()));
             throw new CuentaBloqueadaException("Cuenta bloqueada temporalmente por exceso de intentos fallidos. Intente de nuevo en " + minutos + " minuto(s).");
         }
 
         // Verificar inactividad previa de 5 minutos si ya estaba logueado
         if (Boolean.TRUE.equals(usuario.getIsLoggedIn()) && usuario.getUltimaActividad() != null) {
-            long minutosInactivo = Duration.between(usuario.getUltimaActividad(), ahora).toMinutes();
+            long minutosInactivo = minutosEntre(usuario.getUltimaActividad(), ahora);
             if (minutosInactivo >= INACTIVIDAD_MINUTOS_MAX) {
-                usuario.setIsLoggedIn(false);
+                usuario.cerrarSesion();
                 usuarioLoginRepository.save(usuario);
                 log.info("Sesión expirada automáticamente para usuario {} por inactividad de {} min", username, minutosInactivo);
             }
@@ -138,13 +168,22 @@ public class AuthService {
         LocalDateTime ahora = LocalDateTime.now();
         for (UsuarioLoginEntity u : usuariosActivos) {
             if (u.getUltimaActividad() != null) {
-                long minutos = Duration.between(u.getUltimaActividad(), ahora).toMinutes();
+                long minutos = minutosEntre(u.getUltimaActividad(), ahora);
                 if (minutos >= INACTIVIDAD_MINUTOS_MAX) {
-                    u.setIsLoggedIn(false);
+                    u.cerrarSesion();
                     usuarioLoginRepository.save(u);
                     log.info("Sesión inactiva cerrada automáticamente en segundo plano para usuario: {} (Inactivo {} min)", u.getUsername(), minutos);
                 }
             }
         }
+    }
+
+    /**
+     * Minutos entre dos fechas locales. Se convierten a la zona del servidor antes de restar para que
+     * un cambio de horario (DST) no altere el cálculo de bloqueo e inactividad.
+     */
+    private static long minutosEntre(LocalDateTime desde, LocalDateTime hasta) {
+        ZoneId zona = ZoneId.systemDefault();
+        return Duration.between(desde.atZone(zona), hasta.atZone(zona)).toMinutes();
     }
 }

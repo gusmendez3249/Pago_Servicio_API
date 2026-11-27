@@ -16,13 +16,16 @@ public class ProductosSyncServiceImpl
 
     private final ProductosService productosService;
     private final ProductosStorageService storageService;
+    private final com.proyecto.servicios.service.CatalogoCacheService catalogoCache;
 
     public ProductosSyncServiceImpl(
             ProductosService productosService,
-            ProductosStorageService storageService) {
+            ProductosStorageService storageService,
+            com.proyecto.servicios.service.CatalogoCacheService catalogoCache) {
 
         this.productosService = productosService;
         this.storageService = storageService;
+        this.catalogoCache = catalogoCache;
     }
 
     @Override
@@ -32,28 +35,19 @@ public class ProductosSyncServiceImpl
         List<ProductoResponse> productos =
                 productosService.obtenerProductos();
 
+        // PostgreSQL es la fuente que valida los pagos: siempre se actualiza (antes solo se escribía si Redis fallaba)
+        storageService.reemplazarEnPostgres(productos);
+        log.info("Productos guardados en PostgreSQL. Total={}", productos.size());
+
         try {
             storageService.reemplazarEnRedis(productos);
-
-            log.info(
-                    "Productos guardados en Redis. Total={}",
-                    productos.size()
-            );
-
+            log.info("Productos guardados en Redis. Total={}", productos.size());
         } catch (Exception redisException) {
-            log.error(
-                    "Error al guardar productos en Redis"
-            );
-
-            storageService.reemplazarEnPostgres(productos);
-
-            log.info(
-                    "Productos guardados en PostgreSQL. Total={}",
-                    productos.size()
-            );
+            // Redis es solo caché: el catálogo se sigue sirviendo desde PostgreSQL
+            log.error("Error al guardar productos en Redis. causa={}", redisException.getClass().getSimpleName());
         }
+        catalogoCache.invalidar();
 
         log.info("Fin de sincronización de productos");
     }
 }
-

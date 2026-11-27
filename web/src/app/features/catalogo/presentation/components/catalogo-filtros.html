@@ -1,0 +1,47 @@
+@if (seccion() === 'busqueda') {
+  <div class="buscador" role="search">
+    <label class="solo-lectores" for="catalogo-busqueda">Buscar servicio o producto</label>
+    <div class="buscador__caja">
+      <app-icono class="buscador__lupa" nombre="buscar" />
+      <input
+        id="catalogo-busqueda"
+        class="campo__input buscador__input"
+        type="search"
+        autocomplete="off"
+        placeholder="Buscar servicio o producto"
+        [value]="busqueda()"
+        (input)="alEscribir($event)"
+      />
+      @if (busqueda()) {
+        <button type="button" class="buscador__limpiar" aria-label="Limpiar búsqueda" (click)="busquedaCambia.emit('')">
+          <app-icono nombre="cerrar" />
+        </button>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="accesos" role="group" aria-label="Filtrar por categoría">
+    <button
+      type="button"
+      class="acceso"
+      [class.acceso--activo]="seleccionada() === null"
+      [attr.aria-pressed]="seleccionada() === null"
+      (click)="categoriaCambia.emit(null)"
+    >
+      <span class="acceso__circulo"><app-icono nombre="servicios" /></span>
+      <span class="acceso__nombre">Todas</span>
+    </button>
+    @for (c of categorias(); track c.nombre) {
+      <button
+        type="button"
+        class="acceso"
+        [class.acceso--activo]="seleccionada() === c.nombre"
+        [attr.aria-pressed]="seleccionada() === c.nombre"
+        (click)="categoriaCambia.emit(c.nombre)"
+      >
+        <span class="acceso__circulo"><app-icono [nombre]="visual(c.nombre).icono" /></span>
+        <span class="acceso__nombre">{{ c.nombre }}</span>
+      </button>
+    }
+  </div>
+}

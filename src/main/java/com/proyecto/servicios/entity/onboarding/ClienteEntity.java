@@ -75,8 +75,10 @@ public class ClienteEntity {
     @Column(name = "ingreso_mensual", nullable = false, precision = 14, scale = 2)
     private BigDecimal ingresoMensual;
 
-    @Column(name = "datos_biometricos")
-    private Long datosBiometricos;
+    /** Hash PBKDF2 de los datos biométricos (dato personal sensible): nunca se guarda en claro. */
+    @Column(name = "datos_biometricos_hash", length = 255)
+    @ToString.Exclude
+    private String datosBiometricosHash;
 
     /** Hash PBKDF2 del PIN de seguridad del cliente, usado como segundo factor (2FA) para autorizar pagos. */
     @Column(name = "pin", length = 100)

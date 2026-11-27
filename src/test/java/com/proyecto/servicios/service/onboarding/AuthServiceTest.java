@@ -56,7 +56,7 @@ class AuthServiceTest {
                 .id(1L)
                 .username("juan_perez")
                 .passwordHash("encoded_hash")
-                .faceIdBiometrico(9876543210L)
+                .faceIdHash("pbkdf2$hash_face")
                 .isLoggedIn(false)
                 .cliente(clienteMock)
                 .build();
@@ -105,6 +105,7 @@ class AuthServiceTest {
     @Test
     void login_DosVeces_CadaSesionTieneUnTokenDistintoYElAnteriorDejaDeServir() {
         LoginRequest request = LoginRequest.builder().bandera(2).username("juan_perez").faceIdBiometrico(9876543210L).build();
+        when(passwordEncoderUtil.matchesBiometrico(9876543210L, "pbkdf2$hash_face")).thenReturn(true);
         when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
         when(usuarioLoginRepository.save(any(UsuarioLoginEntity.class))).thenReturn(usuarioMock);
 
@@ -124,6 +125,7 @@ class AuthServiceTest {
                 .faceIdBiometrico(9876543210L)
                 .build();
 
+        when(passwordEncoderUtil.matchesBiometrico(9876543210L, "pbkdf2$hash_face")).thenReturn(true);
         when(usuarioLoginRepository.findByUsername("juan_perez")).thenReturn(Optional.of(usuarioMock));
         when(usuarioLoginRepository.save(any(UsuarioLoginEntity.class))).thenReturn(usuarioMock);
 
@@ -162,7 +164,7 @@ class AuthServiceTest {
 
         assertEquals(401, ex.getCodigo());
         assertEquals("Credenciales inválidas.", ex.getMessage());
-        verify(usuarioLoginRepository).registrarIntentoFallido(eq(1L), eq((short) 5), any());
+        verify(usuarioLoginRepository).registrarIntentoFallido(eq(1L), eq(AuthService.MAX_INTENTOS_FALLIDOS), any());
     }
 
     @Test

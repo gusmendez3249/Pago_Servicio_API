@@ -21,19 +21,40 @@ public class TlsEstrictoSocketFactory extends SSLSocketFactory {
     private final SSLSocketFactory delegado;
     private final String[] protocolos;
 
+    /** Contexto TLS por defecto de la JVM (cacerts) y solo TLS 1.3 / 1.2. */
     public TlsEstrictoSocketFactory() {
-        SSLContext contexto;
-        try {
-            contexto = SSLContext.getDefault();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("No se pudo inicializar el contexto TLS", exception);
-        }
+        this(contextoJvm(), PROTOCOLOS_PERMITIDOS);
+    }
+
+    /**
+     * Contexto TLS propio (p. ej. el SSL bundle con el truststore de GestoPago) y los protocolos configurados.
+     * Solo se conservan los que estén permitidos (TLS 1.3 / 1.2) y la JVM soporte.
+     */
+    public TlsEstrictoSocketFactory(SSLContext contexto, String[] protocolosSolicitados) {
         this.delegado = contexto.getSocketFactory();
         java.util.List<String> soportados = Arrays.asList(contexto.getSupportedSSLParameters().getProtocols());
-        this.protocolos = Arrays.stream(PROTOCOLOS_PERMITIDOS).filter(soportados::contains).toArray(String[]::new);
+        java.util.List<String> permitidos = Arrays.asList(PROTOCOLOS_PERMITIDOS);
+        String[] pedidos = protocolosSolicitados == null || protocolosSolicitados.length == 0
+                ? PROTOCOLOS_PERMITIDOS : protocolosSolicitados;
+        this.protocolos = Arrays.stream(pedidos)
+                .filter(permitidos::contains)
+                .filter(soportados::contains)
+                .toArray(String[]::new);
         if (this.protocolos.length == 0) {
             throw new IllegalStateException("La JVM no soporta TLS 1.2 ni TLS 1.3");
         }
+    }
+
+    public static SSLContext contextoJvm() {
+        try {
+            return SSLContext.getDefault();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("No se pudo inicializar el contexto TLS", exception);
+        }
+    }
+
+    public String[] getProtocolos() {
+        return protocolos.clone();
     }
 
     private Socket restringir(Socket socket) {

@@ -18,4 +18,9 @@ public class ProductoResponse {
     private Boolean showAyuda;
     private String tipoReferencia;
     private String legend;
+
+    // Calculados al responder (no se almacenan): ver CatalogoPresentacionService
+    private String logoUrl;
+    private String ayudaUrl;
+    private String categoria;
 }

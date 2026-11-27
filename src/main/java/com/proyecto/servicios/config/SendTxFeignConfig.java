@@ -35,8 +35,8 @@ public class SendTxFeignConfig {
     }
 
     @Bean
-    public Client sendTxFeignClient() {
-        // hostnameVerifier nulo = verificador por defecto de la JVM (no se desactiva la validación del nombre)
-        return new Client.Default(new TlsEstrictoSocketFactory(), null);
+    public Client sendTxFeignClient(TlsEstrictoSocketFactory gestoPagoSocketFactory) {
+        // Fábrica TLS de GestoPagoSslConfig (truststore propio + TLS 1.3/1.2); hostnameVerifier nulo = el de la JVM
+        return new Client.Default(gestoPagoSocketFactory, null);
     }
 }

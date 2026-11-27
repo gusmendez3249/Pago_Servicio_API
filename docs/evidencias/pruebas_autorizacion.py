@@ -11,7 +11,7 @@ Comprueba que:
 
 Uso (la API debe arrancar con APP_EJECUTIVO_USUARIO y APP_EJECUTIVO_PASSWORD definidos):
     set EJECUTIVO_USUARIO=ejecutivo.admin
-    set EJECUTIVO_PASSWORD=Ejecutivo#2026
+    set EJECUTIVO_PASSWORD=<la contraseña definida en APP_EJECUTIVO_PASSWORD>
     python -X utf8 pruebas_autorizacion.py http://localhost:8081
 
 ADVERTENCIA: inserta clientes de prueba. Ejecutar contra una base de datos de pruebas.
@@ -28,7 +28,7 @@ import urllib.request
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8081").rstrip("/")
 CLI, LOGIN = "/api/v1/layaway/cliente", "/api/v1/auth/login"
 USUARIO_EJ = os.environ.get("EJECUTIVO_USUARIO", "ejecutivo.admin")
-PASSWORD_EJ = os.environ.get("EJECUTIVO_PASSWORD", "Ejecutivo#2026")
+PASSWORD_EJ = os.environ.get("EJECUTIVO_PASSWORD") or sys.exit("Defina EJECUTIVO_PASSWORD (la contraseña del ejecutivo) antes de ejecutar.")
 resultados = []
 
 
@@ -202,8 +202,8 @@ check("Beto ya no puede iniciar sesión (cliente inactivo) -> 403", 403, estado,
 
 print("\n===== ERRORES CON FORMATO CONSISTENTE =====")
 estado, j, _ = llamar(CLI, {"bandera": 1, "datosPersonales": {"nombre": "Li"}})
-check("validación (@Valid): codigo = 1, mensaje 'Datos no validos{...}' y detalle por campo en data", 400, estado, j,
-      lambda c: c["codigo"] == 1 and c["mensaje"].startswith("Datos no validos{")
+check("validación (@Valid): codigo = 1, mensaje genérico y detalle por campo en data", 400, estado, j,
+      lambda c: c["codigo"] == 1 and c["mensaje"].startswith("Datos no válidos")
       and isinstance(c["data"], list) and {"campo", "mensaje"} <= set(c["data"][0]))
 estado, j, _ = llamar(CLI, {"bandera": 3, **clave(curp=A["curp"][:6])}, token=T_EJ)
 check("regla de la bandera (llave incompleta) -> codigo 1 en el campo 'filtros'", 400, estado, j,

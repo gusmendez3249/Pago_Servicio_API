@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <!-- connect-src: misma URL que apiBaseUrl de environment.ts (reemplazar antes de desplegar) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://gestopago.portalventas.net; font-src 'self'; connect-src 'self' https://bangus-api.onrender.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <title>BanGus</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="marca/icono.svg" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#121417" />
+    <meta name="color-scheme" content="light" />
+  </head>
+  <body>
+    <app-root></app-root>
+    <noscript>Activa JavaScript para usar BanGus.</noscript>
+  </body>
+</html>

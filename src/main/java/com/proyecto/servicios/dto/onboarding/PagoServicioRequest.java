@@ -36,6 +36,8 @@ public class PagoServicioRequest extends SolicitudEstricta {
     public static final String PATRON_TELEFONO = "^\\d{10}$";
     public static final String PATRON_REFERENCIA = "^[A-Za-z0-9]{1,100}$";
     public static final String PATRON_PIN = "^\\d{4}$";
+    public static final String PATRON_UUID_V4 =
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$";
     public static final int MAX_ID_CATALOGO = 999_999;
 
     @Schema(description = "Número de cuenta del cliente: exactamente 12 dígitos", example = "695429041188")
@@ -73,6 +75,12 @@ public class PagoServicioRequest extends SolicitudEstricta {
     @Schema(description = "Referencia: 1 a 100 caracteres alfanuméricos sin espacios (solo si esReferencia = true)", example = "0012345678")
     @Pattern(regexp = PATRON_REFERENCIA, message = "La referencia debe tener de 1 a 100 caracteres alfanuméricos, sin espacios ni símbolos")
     private String reference;
+
+    @Schema(description = "Comprobante (UUID v4) devuelto por POST /api/v1/pagos/referencia/validar. Obligatorio si "
+            + "esReferencia = true (salvo que el candado esté deshabilitado); no se envía si es false. De un solo uso", example = "3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c")
+    @Pattern(regexp = PATRON_UUID_V4, message = "El comprobante de validación (idValidacion) debe ser un UUID v4")
+    @ToString.Exclude
+    private String idValidacion;
 
     @Schema(description = "PIN del cliente (segundo factor 2FA): exactamente 4 dígitos", example = "1234")
     @JsonProperty("twoFA")

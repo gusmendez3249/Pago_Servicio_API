@@ -209,4 +209,76 @@ class SendTxServiceImplTest {
         assertEquals(Desenlace.NO_ENVIADA, service.enviar(payload).desenlace());
         verifyNoInteractions(sendTxClient);
     }
+
+    // ---------------------------------------------------------------- Sprint 3: folio, datos del proveedor y CODIGO 06
+
+    @Test
+    void codigo01_LeeFolioIdTxComisionPinYLeyendaSinImportarMayusculas_NuncaElSaldo() {
+        tokenYCifradoOk();
+        String xml = "<RESPONSE><CODIGO>01</CODIGO><TEXTO>Texto del proveedor</TEXTO><ID_TX>TX-778899</ID_TX>"
+                + "<NUM_AUTORIZACION>FOL-0098765</NUM_AUTORIZACION><COMISION>2.50</COMISION><MONTO>100.00</MONTO>"
+                + "<FECHA>20260101120500</FECHA><REFERENCIA>REF1</REFERENCIA><PIN>GIFT-1234</PIN>"
+                + "<legend>Gracias por tu pago</legend><SALDO>987654.32</SALDO></RESPONSE>";
+        when(sendTxClient.enviarTransaccion(any(), any(), any())).thenReturn(xml.getBytes(StandardCharsets.UTF_8));
+
+        ResultadoSendTx r = service.enviar(payload);
+
+        assertEquals(Desenlace.APROBADA, r.desenlace());
+        assertEquals("TX-778899", r.datos().idTx());
+        assertEquals("FOL-0098765", r.datos().numAutorizacion());
+        assertEquals(new BigDecimal("2.50"), r.datos().comision());
+        assertEquals(new BigDecimal("100.00"), r.datos().monto());
+        assertEquals("20260101120500", r.datos().fecha());
+        assertEquals("REF1", r.datos().referencia());
+        assertEquals("GIFT-1234", r.datos().pin());
+        assertEquals("Gracias por tu pago", r.datos().leyenda());
+        assertFalse(r.toString().contains("987654"), "el SALDO del distribuidor nunca se lee");
+        assertFalse(r.toString().contains("GIFT-1234"), "el PIN no debe salir en un toString/log");
+    }
+
+    @Test
+    void codigo01SinNodosOpcionales_AprobadaConDatosNulos() {
+        tokenYCifradoOk();
+        when(sendTxClient.enviarTransaccion(any(), any(), any())).thenReturn(xml("01"));
+
+        ResultadoSendTx r = service.enviar(payload);
+
+        assertEquals(Desenlace.APROBADA, r.desenlace());
+        assertNull(r.datos().numAutorizacion());
+        assertNull(r.datos().idTx());
+        assertNull(r.datos().comision());
+        assertNull(r.datos().pin());
+    }
+
+    @Test
+    void codigo06_PorDefectoEsIndeterminada_NoRechazada() {
+        service = new SendTxServiceImpl(sendTxClient, tokenService, cifradoService, 83, "DISPOSITIVO", "", "82,06");
+        tokenYCifradoOk();
+        when(sendTxClient.enviarTransaccion(any(), any(), any())).thenReturn(xml("06"));
+
+        ResultadoSendTx r = service.enviar(payload);
+
+        assertEquals(Desenlace.INDETERMINADA, r.desenlace());
+        assertEquals("06", r.codigo());
+    }
+
+    @Test
+    void codigo05_SeRechaza() {
+        service = new SendTxServiceImpl(sendTxClient, tokenService, cifradoService, 83, "DISPOSITIVO", "", "82,06");
+        tokenYCifradoOk();
+        when(sendTxClient.enviarTransaccion(any(), any(), any())).thenReturn(xml("05"));
+
+        assertEquals(Desenlace.RECHAZADA, service.enviar(payload).desenlace());
+    }
+
+    @Test
+    void textoDelProveedorParaElLog_SeRecortaYQuedaEnUnaLinea() {
+        String largo = "linea1\nlinea2\t" + "x".repeat(500);
+
+        String log = SendTxServiceImpl.paraLog(largo);
+
+        assertEquals(200, log.length());
+        assertFalse(log.contains("\n"));
+        assertNull(SendTxServiceImpl.paraLog(null));
+    }
 }

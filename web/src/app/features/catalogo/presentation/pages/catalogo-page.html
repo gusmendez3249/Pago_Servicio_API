@@ -1,0 +1,92 @@
+<app-cabecera />
+<main>
+  <section class="franja oscuro" aria-labelledby="catalogo-titulo">
+    <div class="franja__contenido">
+      <h1 id="catalogo-titulo">{{ saludo() ?? 'Hola' }}</h1>
+      @if (store.estado() === 'listo') {
+        <app-catalogo-filtros seccion="busqueda" [busqueda]="store.busqueda()" (busquedaCambia)="store.buscar($event)" />
+        <app-catalogo-filtros
+          [categorias]="store.categorias()"
+          [total]="store.productos().length"
+          [seleccionada]="store.categoriaSeleccionada()"
+          (categoriaCambia)="store.seleccionarCategoria($event)"
+        />
+      }
+    </div>
+  </section>
+
+  <div class="hoja">
+    <div class="hoja__contenido">
+      @switch (store.estado()) {
+        @case ('cargando') {
+          <ul class="lista lista--dos" role="status" aria-live="polite" aria-label="Cargando servicios">
+            @for (n of esqueletos; track n) {
+              <li class="esqueleto" aria-hidden="true">
+                <span class="esqueleto__logo"></span>
+                <span class="esqueleto__lineas"><span></span><span></span></span>
+              </li>
+            }
+          </ul>
+        }
+        @case ('error') {
+          <section class="estado-error" role="alert">
+            <span class="estado-error__icono"><app-icono nombre="alerta" /></span>
+            <p class="estado-error__texto">{{ store.mensajeError() }}</p>
+            <button type="button" class="btn" (click)="store.recargar()">Reintentar</button>
+          </section>
+        }
+        @case ('vacio') {
+          <section class="mensaje" role="status">
+            <span class="mensaje__icono"><app-icono nombre="servicios" /></span>
+            <p>Por ahora no hay servicios disponibles.</p>
+            <button type="button" class="btn btn--sec" (click)="store.recargar()">Actualizar</button>
+          </section>
+        }
+        @default {
+          <div class="rejilla-8-4">
+            <section aria-labelledby="catalogo-lista">
+              <div class="catalogo__encabezado">
+                <h2 id="catalogo-lista">{{ store.categoriaSeleccionada() ?? 'Todos los servicios' }}</h2>
+                <p class="catalogo__conteo" role="status" aria-live="polite">
+                  {{ store.filtrados().length }}
+                  {{ store.filtrados().length === 1 ? 'servicio encontrado' : 'servicios encontrados' }}
+                </p>
+              </div>
+
+              @if (store.filtrados().length === 0) {
+                <section class="mensaje">
+                  <span class="mensaje__icono"><app-icono nombre="buscar" /></span>
+                  <p>No encontramos servicios con esos filtros.</p>
+                  <button type="button" class="btn" (click)="store.limpiarFiltros()">Quitar filtros</button>
+                </section>
+              } @else {
+                <ul class="lista lista--dos">
+                  @for (p of store.filtrados(); track clave(p)) {
+                    <li><app-servicio-card [producto]="p" /></li>
+                  }
+                </ul>
+              }
+            </section>
+
+            <aside class="rejilla__lado catalogo__lado" aria-labelledby="catalogo-novedades">
+              <div class="catalogo__encabezado">
+                <h2 id="catalogo-novedades">Para ti</h2>
+              </div>
+              <app-banner
+                imagen="banners/inicio.jpg"
+                alt="Dos personas sonríen en un sillón mientras usan una laptop"
+                enfoque="50% 30%"
+                pieTitulo="Paga tus servicios sin filas"
+              />
+              <div class="tarjeta catalogo__ayuda">
+                <p class="catalogo__ayuda-titulo">Comprobante al momento</p>
+                <p class="catalogo__ayuda-texto">Cada pago genera un folio que puedes consultar cuando lo necesites.</p>
+                <a class="enlace" routerLink="/historial">Ver mis pagos</a>
+              </div>
+            </aside>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</main>
