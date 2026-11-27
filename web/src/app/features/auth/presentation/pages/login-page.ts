@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -11,7 +12,7 @@ import { AuthStore } from '../store/auth.store';
 
 @Component({
   selector: 'app-login-page',
-  imports: [Banner, ReactiveFormsModule, Icono, Logotipo, RouterLink],
+  imports: [Banner, ReactiveFormsModule, Icono, Logotipo, RouterLink, Entrada],
   templateUrl: './login-page.html',
   styleUrl: './login-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

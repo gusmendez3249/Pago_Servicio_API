@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +6,7 @@ import '../../../core/config/app_theme.dart';
 import '../../../core/error/mensajes_error.dart';
 import '../../../core/http/result.dart';
 import '../../../core/router/app_router.dart';
+import '../../../shared/entrada/entrada.dart';
 import '../../../shared/widgets/banner_mensaje.dart';
 import '../../../shared/widgets/enlace.dart';
 import '../../../shared/widgets/ficha_datos.dart';
@@ -222,8 +222,9 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
     final elegida = await showDatePicker(
       context: context,
       initialDate: _nacimiento ?? DateTime(hoy.year - 25, hoy.month, hoy.day),
-      firstDate: DateTime(hoy.year - 120),
-      lastDate: hoy,
+      // Solo fechas de personas de 18 a 100 años
+      firstDate: DateTime(hoy.year - 100, hoy.month, hoy.day),
+      lastDate: DateTime(hoy.year - 18, hoy.month, hoy.day),
       helpText: 'Fecha de nacimiento',
       cancelText: 'Cancelar',
       confirmText: 'Aceptar',
@@ -232,8 +233,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
     if (elegida == null || !mounted) return;
     setState(() {
       _nacimiento = elegida;
-      _c['fechaNacimiento']!.text =
-          '${elegida.day.toString().padLeft(2, '0')}/'
+      _c['fechaNacimiento']!.text = '${elegida.day.toString().padLeft(2, '0')}/'
           '${elegida.month.toString().padLeft(2, '0')}/${elegida.year}';
     });
     _limpiar('fechaNacimiento');
@@ -251,7 +251,12 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
     setState(() => _enviando = false);
     switch (r) {
       case Ok<CuentaCreada>(:final data):
-        for (final k in ['password', 'confirmacion', 'pin', 'confirmacionPin']) {
+        for (final k in [
+          'password',
+          'confirmacion',
+          'pin',
+          'confirmacionPin'
+        ]) {
           _c[k]!.clear();
         }
         setState(() => _creada = data);
@@ -289,7 +294,8 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
       'bandera': 1,
       'datosPersonales': {
         'nombre': _t('nombre'),
-        if (_t('segundoNombre').isNotEmpty) 'segundoNombre': _t('segundoNombre'),
+        if (_t('segundoNombre').isNotEmpty)
+          'segundoNombre': _t('segundoNombre'),
         'apellidoPaterno': _t('apellidoPaterno'),
         'apellidoMaterno': _t('apellidoMaterno'),
         'fechaNacimiento': fecha,
@@ -335,9 +341,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
     final colores = ColoresApp.de(context);
     final contenido = ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
-      child: _creada == null
-          ? _formulario(context)
-          : _exito(context, _creada!),
+      child: _creada == null ? _formulario(context) : _exito(context, _creada!),
     );
     // Misma marca y foto que el inicio de sesión.
     return AnnotatedRegion(
@@ -491,9 +495,10 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
   Widget _campo(
     String k,
     String etiqueta, {
+    required Entrada entrada,
     String? Function(String?)? validador,
     TextInputType? teclado,
-    List<TextInputFormatter> formatos = const [],
+    int? enteros,
     List<String>? autofill,
     bool mayusculas = false,
     String? ayuda,
@@ -504,12 +509,10 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
       controller: _c[k],
       enabled: !_enviando,
       keyboardType: teclado,
-      textCapitalization:
-          mayusculas ? TextCapitalization.characters : TextCapitalization.none,
-      inputFormatters: [
-        if (maximo != null) LengthLimitingTextInputFormatter(maximo),
-        ...formatos,
-      ],
+      textCapitalization: mayusculas || entrada.mayusculas
+          ? TextCapitalization.characters
+          : TextCapitalization.none,
+      inputFormatters: entrada.formatos(maximo: maximo, enteros: enteros),
       autofillHints: autofill,
       autocorrect: false,
       textInputAction: TextInputAction.next,
@@ -554,13 +557,19 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
 
   List<Widget> _pasoDatos() => [
         _campo('nombre', 'Nombre',
-            validador: _nombre(), autofill: const [AutofillHints.givenName]),
+            entrada: Entrada.nombre,
+            validador: _nombre(),
+            autofill: const [AutofillHints.givenName]),
         _campo('segundoNombre', 'Segundo nombre (opcional)',
+            entrada: Entrada.nombre,
             validador: _nombre(requerido: false),
             autofill: const [AutofillHints.middleName]),
         _campo('apellidoPaterno', 'Apellido paterno',
-            validador: _nombre(), autofill: const [AutofillHints.familyName]),
-        _campo('apellidoMaterno', 'Apellido materno', validador: _nombre()),
+            entrada: Entrada.nombre,
+            validador: _nombre(),
+            autofill: const [AutofillHints.familyName]),
+        _campo('apellidoMaterno', 'Apellido materno',
+            entrada: Entrada.nombre, validador: _nombre()),
         TextFormField(
           key: const ValueKey('registro-fechaNacimiento'),
           controller: _c['fechaNacimiento'],
@@ -578,7 +587,11 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
           'sexo',
           'Sexo',
           _sexo,
-          const {'FEMENINO': 'Femenino', 'MASCULINO': 'Masculino', 'OTRO': 'Otro'},
+          const {
+            'FEMENINO': 'Femenino',
+            'MASCULINO': 'Masculino',
+            'OTRO': 'Otro'
+          },
           (v) => setState(() => _sexo = v),
         ),
         _lista(
@@ -602,16 +615,21 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
           (v) => setState(() => _nacionalidad = v ?? 'MEXICANA'),
         ),
         _campo('curp', 'CURP',
+            entrada: Entrada.curp,
             validador: _validarCurp,
             mayusculas: true,
             maximo: 18,
             ayuda: 'La encuentras en tu acta de nacimiento o en tu INE.'),
         _campo('rfc', 'RFC con homoclave',
-            validador: _validarRfc, mayusculas: true, maximo: 13),
+            entrada: Entrada.rfc,
+            validador: _validarRfc,
+            mayusculas: true,
+            maximo: 13),
       ];
 
   List<Widget> _pasoContacto() => [
         _campo('correo', 'Correo electrónico',
+            entrada: Entrada.correo,
             teclado: TextInputType.emailAddress,
             autofill: const [AutofillHints.email], validador: (v) {
           final t = (v ?? '').trim();
@@ -621,9 +639,9 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
               : 'Revisa tu correo (ejemplo: nombre@dominio.com).';
         }),
         _campo('telefono', 'Celular (10 dígitos)',
+            entrada: Entrada.digitos,
             teclado: TextInputType.phone,
             maximo: 10,
-            formatos: [FilteringTextInputFormatter.digitsOnly],
             autofill: const [AutofillHints.telephoneNumberNational],
             validador: (v) {
           final t = (v ?? '').trim();
@@ -633,16 +651,20 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
               : 'El celular tiene 10 dígitos.';
         }),
         _campo('calle', 'Calle',
+            entrada: Entrada.domicilio,
             validador: _texto(100),
             autofill: const [AutofillHints.streetAddressLine1]),
-        _campo('numeroExterior', 'Número exterior', validador: _texto(20)),
+        _campo('numeroExterior', 'Número exterior',
+            entrada: Entrada.numeroDomicilio, validador: _texto(20)),
         _campo('numeroInterior', 'Número interior (opcional)',
+            entrada: Entrada.numeroDomicilio,
             validador: _texto(20, requerido: false)),
-        _campo('colonia', 'Colonia', validador: _texto(100)),
+        _campo('colonia', 'Colonia',
+            entrada: Entrada.domicilio, validador: _texto(100)),
         _campo('codigoPostal', 'Código postal',
+            entrada: Entrada.digitos,
             teclado: TextInputType.number,
             maximo: 5,
-            formatos: [FilteringTextInputFormatter.digitsOnly],
             autofill: const [AutofillHints.postalCode], validador: (v) {
           final t = (v ?? '').trim();
           if (t.isEmpty) return 'Escribe tu código postal.';
@@ -651,28 +673,36 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
               : 'El código postal tiene 5 dígitos.';
         }),
         _campo('municipio', 'Municipio o alcaldía',
-            validador: _texto(100), autofill: const [AutofillHints.addressCity]),
+            entrada: Entrada.lugar,
+            validador: _texto(100),
+            autofill: const [AutofillHints.addressCity]),
         _campo('estado', 'Estado',
+            entrada: Entrada.lugar,
             validador: _texto(100),
             autofill: const [AutofillHints.addressState]),
       ];
 
   List<Widget> _pasoTrabajo() => [
         _campo('ocupacion', 'Ocupación',
-            validador: _texto(100), autofill: const [AutofillHints.jobTitle]),
+            entrada: Entrada.texto,
+            validador: _texto(100),
+            autofill: const [AutofillHints.jobTitle]),
         _campo('empresa', 'Empresa donde trabajas',
+            entrada: Entrada.texto,
             validador: _texto(100),
             autofill: const [AutofillHints.organizationName]),
         _campo('ingresoMensual', 'Ingreso mensual (MXN)',
+            entrada: Entrada.importe,
             teclado: const TextInputType.numberWithOptions(decimal: true),
-            formatos: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-            validador: (v) {
+            enteros: 12, validador: (v) {
           final t = (v ?? '').trim();
           if (t.isEmpty) return 'Indica tu ingreso mensual.';
           if (!RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(t)) {
             return 'Escribe solo números, con hasta 2 decimales.';
           }
-          return double.parse(t) <= 0 ? 'El ingreso debe ser mayor a cero.' : null;
+          return double.parse(t) <= 0
+              ? 'El ingreso debe ser mayor a cero.'
+              : null;
         }),
       ];
 
@@ -690,6 +720,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
         enableSuggestions: false,
         autocorrect: false,
         autofillHints: const [AutofillHints.newPassword],
+        inputFormatters: Entrada.password.formatos(),
         decoration: InputDecoration(
           labelText: etiqueta,
           errorMaxLines: 3,
@@ -716,10 +747,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
         enabled: !_enviando,
         obscureText: true,
         keyboardType: TextInputType.number,
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(4),
-        ],
+        inputFormatters: Entrada.digitos.formatos(maximo: 4),
         decoration: InputDecoration(labelText: etiqueta),
         validator: validador,
         forceErrorText: _rechazo(k),
@@ -729,6 +757,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
 
     return [
       _campo('username', 'Usuario',
+          entrada: Entrada.usuario,
           autofill: const [AutofillHints.newUsername],
           ayuda: 'Con él iniciarás sesión.', validador: (v) {
         final t = (v ?? '').trim();
@@ -746,7 +775,9 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
       }),
       contrasena('confirmacion', 'Confirma la contraseña', (v) {
         if ((v ?? '').isEmpty) return 'Escribe otra vez tu contraseña.';
-        return v != _c['password']!.text ? 'Las contraseñas no coinciden.' : null;
+        return v != _c['password']!.text
+            ? 'Las contraseñas no coinciden.'
+            : null;
       }),
       pin('pin', 'PIN de 4 dígitos', (v) {
         final t = v ?? '';
@@ -793,7 +824,8 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
         const SizedBox(height: Esp.x6),
         BannerMensaje(
           tipo: TipoBanner.info,
-          mensaje: 'Tu cuenta inicia con saldo de $saldo. Para pagar servicios, '
+          mensaje:
+              'Tu cuenta inicia con saldo de $saldo. Para pagar servicios, '
               'pide una recarga en tu sucursal BanGus con tu número de cuenta.',
         ),
         const SizedBox(height: Esp.x6),

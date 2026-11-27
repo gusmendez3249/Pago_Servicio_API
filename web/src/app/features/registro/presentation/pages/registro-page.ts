@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -23,6 +24,13 @@ import {
 const PASOS = ['Tus datos', 'Contacto y domicilio', 'Trabajo', 'Acceso'] as const;
 
 /** Campos de cada paso: al continuar solo se valida el paso actual. */
+/** 'yyyy-mm-dd' de hoy menos n años (hora local). */
+function fechaHaceAnios(anios: number, hoy = new Date()): string {
+  const f = new Date(hoy.getFullYear() - anios, hoy.getMonth(), hoy.getDate());
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}`;
+}
+
 const CAMPOS_POR_PASO: readonly (readonly string[])[] = [
   ['nombre', 'segundoNombre', 'apellidoPaterno', 'apellidoMaterno', 'fechaNacimiento', 'sexo', 'estadoCivil', 'nacionalidad', 'curp', 'rfc'],
   ['correo', 'telefono', 'calle', 'numeroExterior', 'numeroInterior', 'colonia', 'municipio', 'estado', 'codigoPostal'],
@@ -73,7 +81,7 @@ const nombre = (requerido = true) => (c: AbstractControl): ValidationErrors | nu
 
 @Component({
   selector: 'app-registro-page',
-  imports: [Banner, Icono, Logotipo, Pasos, ReactiveFormsModule, RouterLink],
+  imports: [Banner, Icono, Logotipo, Pasos, ReactiveFormsModule, RouterLink, Entrada],
   templateUrl: './registro-page.html',
   styleUrls: ['../../../auth/presentation/pages/login-page.scss', './registro-page.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -89,6 +97,9 @@ export class RegistroPage {
   protected readonly creada = signal<CuentaCreada | null>(null);
   protected readonly nacionalidades = signal<Nacionalidad[]>([]);
   protected readonly verPassword = signal(false);
+  /** El selector de fecha solo ofrece fechas de personas de 18 a 100 años. */
+  protected readonly fechaMaxima = fechaHaceAnios(18);
+  protected readonly fechaMinima = fechaHaceAnios(100);
   /** Errores que devolvió el servidor por control (texto amigable fijo). */
   protected readonly rechazados = signal<Record<string, string>>({});
 

@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { Icono } from '../../../../shared/ui/icono/icono';
 import { CategoriaConteo } from '../store/catalogo.store';
@@ -9,7 +10,7 @@ import { VisualCategoria, visualDeCategoria } from './categoria-visual';
  */
 @Component({
   selector: 'app-catalogo-filtros',
-  imports: [Icono],
+  imports: [Icono, Entrada],
   templateUrl: './catalogo-filtros.html',
   styleUrl: './catalogo-filtros.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

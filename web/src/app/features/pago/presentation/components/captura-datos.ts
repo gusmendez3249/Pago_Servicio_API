@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { textoErrorImporte, textoErrorTelefono } from '../../domain/models/mensajes-pago';
 import { PagoStore } from '../store/pago.store';
@@ -5,6 +6,7 @@ import { PagoStore } from '../store/pago.store';
 /** Formulario de captura: teléfono (dos veces) para tipoFront 1 o importe del recibo para SOLO_FORMATO. */
 @Component({
   selector: 'app-captura-datos',
+  imports: [Entrada],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <form (submit)="continuar($event)" novalidate>
@@ -12,7 +14,7 @@ import { PagoStore } from '../store/pago.store';
         <div class="campo">
           <label class="campo__etiqueta" for="pago-telefono">Número de teléfono</label>
           <input
-            id="pago-telefono"
+            id="pago-telefono" appEntrada="digitos"
             placeholder=" "
             class="campo__input campo__input--grande"
             type="tel"
@@ -28,7 +30,7 @@ import { PagoStore } from '../store/pago.store';
         <div class="campo">
           <label class="campo__etiqueta" for="pago-telefono-confirmacion">Confirma el número de teléfono</label>
           <input
-            id="pago-telefono-confirmacion"
+            id="pago-telefono-confirmacion" appEntrada="digitos"
             placeholder=" "
             class="campo__input campo__input--grande"
             type="tel"
@@ -48,7 +50,7 @@ import { PagoStore } from '../store/pago.store';
         <div class="campo">
           <label class="campo__etiqueta" for="pago-importe">Importe de tu recibo</label>
           <input
-            id="pago-importe"
+            id="pago-importe" appEntrada="importe" [enteros]="5" [valorMaximo]="99999.99"
             placeholder=" "
             class="campo__input campo__input--grande"
             type="text"

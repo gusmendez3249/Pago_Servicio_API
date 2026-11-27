@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -23,6 +24,7 @@ const FOCALIZABLES = 'button:not([disabled]), input:not([disabled]), [href], sel
  */
 @Component({
   selector: 'app-modal-confirmacion',
+  imports: [Entrada],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host {
@@ -113,7 +115,7 @@ const FOCALIZABLES = 'button:not([disabled]), input:not([disabled]), [href], sel
           <label class="campo__etiqueta" for="pago-pin">PIN de 4 dígitos</label>
           <input
             #campo
-            id="pago-pin"
+            id="pago-pin" appEntrada="digitos"
             placeholder=" "
             class="campo__input modal__pin"
             type="password"

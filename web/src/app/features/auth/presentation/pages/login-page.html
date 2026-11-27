@@ -42,7 +42,7 @@
         <div class="campo">
           <label class="campo__etiqueta" for="username">Usuario</label>
           <input
-            id="username"
+            id="username" appEntrada="usuario"
             class="campo__input"
             type="text"
             formControlName="username"
@@ -60,7 +60,7 @@
         <div class="campo campo--con-accion">
           <label class="campo__etiqueta" for="password">Contraseña</label>
           <input
-            id="password"
+            id="password" appEntrada="password"
             class="campo__input"
             [type]="verPassword() ? 'text' : 'password'"
             formControlName="password"
