@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/config/app_theme.dart';
 import '../../../catalogo/domain/utils/formato_catalogo.dart';
 import '../../domain/utils/reglas_pago.dart';
 import '../textos_pago.dart';
+import '../../../../shared/entrada/entrada.dart';
 
 /// Muestra la hoja inferior de confirmación con el PIN. Devuelve el PIN de 4
 /// dígitos, o null si se cancela. El PIN solo existe en el campo y en este
@@ -110,7 +110,7 @@ class _DialogoPinState extends State<DialogoPin> {
                 obscureText: true,
                 keyboardType: TextInputType.number,
                 maxLength: 4,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: Entrada.digitos.formatos(maximo: 4),
                 autocorrect: false,
                 enableSuggestions: false,
                 textAlign: TextAlign.center,

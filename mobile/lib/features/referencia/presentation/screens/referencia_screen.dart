@@ -18,6 +18,7 @@ import '../../domain/utils/guard_pago.dart';
 import '../providers/referencia_providers.dart';
 import '../textos_referencia.dart';
 import '../widgets/tarjeta_resultado_referencia.dart';
+import '../../../../shared/entrada/entrada.dart';
 
 /// Captura y resultado de la validación de referencia (una sola pantalla que
 /// cambia según el estado).
@@ -271,6 +272,8 @@ class _FormularioState extends ConsumerState<_Formulario> {
                 controller: widget.controlador,
                 readOnly: validando,
                 maxLength: kLongitudMaximaReferencia,
+                inputFormatters: Entrada.alfanumerico
+                    .formatos(maximo: kLongitudMaximaReferencia),
                 autocorrect: false,
                 enableSuggestions: false,
                 textInputAction: TextInputAction.done,

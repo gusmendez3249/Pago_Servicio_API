@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/config/app_theme.dart';
 import '../../../../shared/widgets/ficha_datos.dart';
 import '../../../../shared/widgets/pagina_flujo.dart';
 import '../../domain/utils/reglas_pago.dart';
 import '../textos_pago.dart';
+import '../../../../shared/entrada/entrada.dart';
 
 /// Captura del teléfono dos veces (productos con tipoFront 1).
 class CapturaTelefono extends StatefulWidget {
@@ -66,7 +66,7 @@ class _CapturaTelefonoState extends State<CapturaTelefono> {
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
                 maxLength: 10,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: Entrada.digitos.formatos(maximo: 10),
                 style: estiloCampoCifras(),
                 decoration: const InputDecoration(
                   labelText: TextosPago.telefonoEtiqueta,
@@ -80,7 +80,7 @@ class _CapturaTelefonoState extends State<CapturaTelefono> {
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.done,
                 maxLength: 10,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: Entrada.digitos.formatos(maximo: 10),
                 onSubmitted: (_) => _enviar(),
                 style: estiloCampoCifras(),
                 decoration: InputDecoration(
@@ -156,10 +156,8 @@ class _CapturaImporteState extends State<CapturaImporte> {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 textInputAction: TextInputAction.done,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                  LengthLimitingTextInputFormatter(10),
-                ],
+                inputFormatters:
+                    Entrada.importe.formatos(enteros: 5, valorMaximo: 99999.99),
                 onSubmitted: (_) => _enviar(),
                 style: estiloCampoCifras(),
                 decoration: InputDecoration(

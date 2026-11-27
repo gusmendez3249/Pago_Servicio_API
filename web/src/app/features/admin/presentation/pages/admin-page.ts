@@ -1,3 +1,4 @@
+import { Entrada } from '../../../../shared/entrada/entrada.directive';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -41,7 +42,7 @@ export function mensajeAdmin(falla: Failure): string {
  */
 @Component({
   selector: 'app-admin-page',
-  imports: [Cabecera, DialogoConfirmacion, Icono, ReactiveFormsModule],
+  imports: [Cabecera, DialogoConfirmacion, Icono, ReactiveFormsModule, Entrada],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     .admin__seccion + .admin__seccion {
@@ -105,7 +106,7 @@ export function mensajeAdmin(falla: Failure): string {
                   <div class="campo">
                     <label class="campo__etiqueta" for="numeroCuenta">Número de cuenta (12 dígitos)</label>
                     <input
-                      id="numeroCuenta"
+                      id="numeroCuenta" appEntrada="digitos"
                       class="campo__input"
                       [formControl]="numeroCuenta"
                       placeholder=" "
@@ -161,7 +162,7 @@ export function mensajeAdmin(falla: Failure): string {
                       <div class="campo">
                         <label class="campo__etiqueta" for="monto">Monto a recargar (MXN)</label>
                         <input
-                          id="monto"
+                          id="monto" appEntrada="importe" [enteros]="5" [valorMaximo]="50000"
                           class="campo__input campo__input--grande"
                           [formControl]="monto"
                           placeholder=" "
