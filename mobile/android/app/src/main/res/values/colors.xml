@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo de arranque de BanGus: blanco, como el fondo de la app. -->
+    <color name="fondo_arranque">#FFFFFF</color>
+</resources>
