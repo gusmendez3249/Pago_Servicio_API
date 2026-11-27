@@ -1,0 +1,9 @@
+<div #cuerpo [class]="'aviso aviso--' + resultado().tono" tabindex="-1">
+  <app-icono class="aviso__icono" [nombre]="icono()" />
+  <div class="aviso__cuerpo">
+    <p class="aviso__titulo">{{ resultado().texto }}</p>
+    @if (resultado().detalle; as detalle) {
+      <p>{{ detalle }}</p>
+    }
+  </div>
+</div>

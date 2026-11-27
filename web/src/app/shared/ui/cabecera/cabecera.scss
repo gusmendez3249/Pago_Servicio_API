@@ -1,0 +1,143 @@
+/* La cabecera se monta sobre la franja negra de cada pantalla: ambas comparten el mismo negro sólido de marca. */
+:host {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 10;
+  display: block;
+}
+
+.cabecera {
+  color: var(--texto);
+  background: var(--marca);
+  /* Pieza con la franja: filo de luz arriba; el de sombra lo pone la franja abajo */
+  box-shadow: inset 0 1px 0 var(--filo-luz);
+  border-bottom: 1px solid var(--marca-divisor);
+
+  &__fila {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    max-width: calc(var(--ancho-pagina) + 2 * var(--margen));
+    height: var(--alto-cabecera);
+    margin: 0 auto;
+    padding: 0 var(--margen);
+  }
+
+  &__marca {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    margin-right: auto;
+    color: inherit;
+    text-decoration: none;
+    border-radius: var(--r-control);
+
+    @media (min-width: 37.5rem) {
+      margin-right: 0;
+    }
+  }
+
+  &__nav {
+    display: none;
+    gap: var(--s-5);
+    margin-right: auto;
+  }
+
+  &__enlace,
+  &__cliente {
+    display: inline-flex;
+    gap: var(--s-2);
+    align-items: center;
+    min-height: 48px;
+    color: var(--texto-2);
+    font-weight: 500;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.12s;
+
+    &:hover {
+      color: var(--texto);
+    }
+
+    &.activo {
+      color: var(--texto);
+      font-weight: 600;
+      border-bottom-color: var(--primario);
+    }
+  }
+
+  &__cliente {
+    display: none;
+    min-width: 0;
+    font-size: var(--t-14);
+
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  @media (min-width: 37.5rem) {
+    &__nav,
+    &__cliente {
+      display: inline-flex;
+    }
+  }
+}
+
+/* Barra inferior: solo por debajo de 600 px */
+.barra {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-2);
+  height: calc(var(--alto-barra) + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--s-2) env(safe-area-inset-bottom, 0px);
+  background: var(--superficie);
+  border-top: 1px solid var(--borde);
+
+  @media (min-width: 37.5rem) {
+    display: none;
+  }
+
+  &__item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    color: var(--texto-2);
+    font-size: var(--t-13);
+    font-weight: 500;
+    text-decoration: none;
+
+    &::before {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 32px;
+      height: 2px;
+      content: '';
+      background: transparent;
+      transform: translateX(-50%);
+    }
+
+    &.activo {
+      color: var(--texto);
+      font-weight: 600;
+
+      &::before {
+        background: var(--primario);
+      }
+    }
+
+    &:focus-visible {
+      outline-offset: -4px;
+    }
+  }
+}

@@ -1,0 +1,138 @@
+:host {
+  display: block;
+}
+
+.buscador {
+  max-width: 640px;
+  margin-top: var(--s-3);
+
+  &__caja {
+    position: relative;
+  }
+
+  &__lupa {
+    position: absolute;
+    top: var(--s-4);
+    left: var(--s-4);
+    color: var(--texto-2);
+    pointer-events: none;
+  }
+
+  &__input {
+    height: 56px;
+    padding: 0 var(--s-7) 0 var(--s-7);
+    /* Mismo estilo que los campos: relleno, línea inferior, sin caja con borde */
+    background: var(--campo);
+    border: 0;
+    border-bottom: 1px solid var(--campo-linea);
+    border-radius: var(--r-control) var(--r-control) 0 0;
+
+    &::placeholder {
+      color: var(--texto-2);
+    }
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  &__limpiar {
+    position: absolute;
+    top: var(--s-1);
+    right: var(--s-1);
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    color: var(--texto);
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-control);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--borde);
+    }
+  }
+}
+
+/* Accesos rápidos circulares sobre la franja negra; el seleccionado se invierte */
+.accesos {
+  display: flex;
+  gap: var(--s-2);
+  margin: var(--s-5) calc(-1 * var(--margen)) 0;
+  padding: var(--s-1) var(--margen);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.acceso {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--s-1);
+  align-items: center;
+  width: 88px;
+  padding: var(--s-1) 0 var(--s-2);
+  color: var(--texto-2);
+  font-size: var(--t-13);
+  text-align: center;
+  background: none;
+  border: 0;
+  border-radius: var(--r-control);
+  cursor: pointer;
+
+  &__circulo {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    color: var(--texto);
+    background: var(--circulo);
+    border: 1px solid var(--borde);
+    border-radius: 50%;
+    transition:
+      background-color 0.12s,
+      border-color 0.12s;
+
+    app-icono {
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  &:hover &__circulo {
+    background: var(--hover);
+  }
+
+  &:hover {
+    color: var(--texto);
+  }
+
+  &__nombre {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    font-weight: 500;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  &--activo {
+    color: var(--texto);
+  }
+
+  /* Seleccionado: círculo invertido (blanco con icono negro sobre la franja) */
+  &--activo &__circulo,
+  &--activo:hover &__circulo {
+    color: var(--primario-texto);
+    background: var(--primario);
+    border-color: var(--primario);
+  }
+
+  &--activo &__nombre {
+    font-weight: 600;
+  }
+}

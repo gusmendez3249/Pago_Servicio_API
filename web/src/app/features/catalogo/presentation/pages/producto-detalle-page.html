@@ -1,0 +1,109 @@
+<app-cabecera-flujo titulo="Detalle del servicio" volver="/catalogo" textoVolver="Volver al inicio" />
+<main>
+  <section class="franja oscuro" aria-labelledby="flujo-titulo">
+    <div class="franja__contenido">
+      <app-pasos [actual]="1" [directo]="pagoDirecto()" />
+      @if (store.estado() !== 'cargando' && store.estado() !== 'error' && producto(); as p) {
+        <div class="franja__servicio">
+          <app-logo-servicio [url]="p.logoUrl" [nombre]="p.servicio" tamano="grande" />
+          <div>
+            <p class="franja__nombre">{{ p.servicio || 'Servicio' }}</p>
+            <p class="franja__sub">{{ p.producto }}</p>
+          </div>
+        </div>
+        @if (importe(); as i) {
+          <p class="franja__dato">
+            <span class="franja__etiqueta">{{ i.etiqueta }}</span>
+            <span class="cifra cifra--40">{{ i.texto }}</span>
+          </p>
+        }
+      }
+    </div>
+  </section>
+
+  <div class="hoja">
+    <div class="hoja__contenido">
+      @switch (store.estado()) {
+        @case ('cargando') {
+          <p class="cargando" role="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span> Cargando información del servicio…
+          </p>
+        }
+        @case ('error') {
+          <section class="estado-error" role="alert">
+            <span class="estado-error__icono"><app-icono nombre="alerta" /></span>
+            <p class="estado-error__texto">{{ store.mensajeError() }}</p>
+            <button type="button" class="btn" (click)="store.recargar()">Reintentar</button>
+          </section>
+        }
+        @default {
+          @if (producto(); as p) {
+            <div class="flujo">
+              <article class="tarjeta" aria-label="Información del servicio">
+                @if (p.legend) {
+                  <section class="seccion">
+                    <h2>Descripción</h2>
+                    <p class="detalle__legend">{{ p.legend }}</p>
+                  </section>
+                }
+
+                <section class="seccion">
+                  <h2>Datos del servicio</h2>
+                  <dl class="ficha">
+                    <dt>Categoría</dt>
+                    <dd>{{ categoria() }}</dd>
+                    <dt>Dígito verificador</dt>
+                    <dd>{{ p.hasDigitoVerificador ? 'Sí' : 'No' }}</dd>
+                  </dl>
+                </section>
+
+                @if (p.ayudaUrl) {
+                  <section class="seccion">
+                    <h2>Dónde encontrar tu referencia</h2>
+                    @if (ayudaEstado() === 'fallo') {
+                      <p class="detalle__nota">No pudimos cargar la imagen de ayuda.</p>
+                    } @else {
+                      <div class="ayuda" [class.ayuda--cargando]="ayudaEstado() === 'cargando'">
+                        <img
+                          [src]="p.ayudaUrl"
+                          [alt]="'Imagen de ayuda para ' + (p.servicio || 'el servicio')"
+                          loading="lazy"
+                          decoding="async"
+                          (load)="ayudaCargo()"
+                          (error)="ayudaFallo()"
+                        />
+                      </div>
+                    }
+                  </section>
+                }
+              </article>
+
+              <aside class="flujo__lado tarjeta detalle__accion" aria-label="Siguiente paso">
+                @if (admiteReferencia()) {
+                  <p class="detalle__siguiente">Ten a la mano tu recibo: en el siguiente paso validamos tu referencia.</p>
+                  <div class="accion-anclada">
+                    <a class="btn btn--bloque" [routerLink]="['/catalogo', p.idServicio, p.idProducto, 'referencia']">Continuar</a>
+                  </div>
+                } @else if (pagoDirecto()) {
+                  <p class="detalle__siguiente">En el siguiente paso capturas el número de teléfono.</p>
+                  <div class="accion-anclada">
+                    <a class="btn btn--bloque" [routerLink]="['/catalogo', p.idServicio, p.idProducto, 'pago']">Continuar</a>
+                  </div>
+                } @else {
+                  <button type="button" class="btn btn--bloque" disabled aria-describedby="detalle-nota">Continuar</button>
+                  <p id="detalle-nota" class="detalle__nota">El pago de este producto estará disponible próximamente</p>
+                }
+              </aside>
+            </div>
+          } @else {
+            <section class="mensaje" role="status">
+              <span class="mensaje__icono"><app-icono nombre="buscar" /></span>
+              <p>No encontramos este servicio. Puede que ya no esté disponible.</p>
+              <a class="btn" routerLink="/catalogo">Ir al inicio</a>
+            </section>
+          }
+        }
+      }
+    </div>
+  </div>
+</main>
