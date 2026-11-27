@@ -1,6 +1,17 @@
-# Proyecto Integrador: Onboarding de Clientes Personas Físicas
+# BanGus · Pago de servicios
 
-API REST en Java / Spring Boot para registrar clientes personas físicas, validar su información, crear automáticamente una cuenta bancaria asociada con saldo inicial y autenticar a los usuarios (contraseña o Face ID).
+[![CI](https://github.com/gusmendez3249/Pago_Servicio_API/actions/workflows/ci.yml/badge.svg)](https://github.com/gusmendez3249/Pago_Servicio_API/actions/workflows/ci.yml)
+[![Web](https://github.com/gusmendez3249/Pago_Servicio_API/actions/workflows/web-pages.yml/badge.svg)](https://github.com/gusmendez3249/Pago_Servicio_API/actions/workflows/web-pages.yml)
+
+Plataforma para registrar clientes personas físicas, abrirles una cuenta y pagar servicios (luz, agua, telefonía, recargas) a través de Gesto Pago. Está formada por tres proyectos en este repositorio:
+
+| Proyecto | Tecnología | Carpeta | En línea |
+|---|---|---|---|
+| API REST | Java 17, Spring Boot 3.5, PostgreSQL, Redis | [`src/`](src) | [pago-servicios-api.onrender.com](https://pago-servicios-api.onrender.com/api/v1/cat/nacionalidades) |
+| Aplicación web | Angular (PWA) | [`web/`](web) | [gusmendez3249.github.io/Pago_Servicio_API](https://gusmendez3249.github.io/Pago_Servicio_API/) |
+| Aplicación móvil | Flutter (Android) | [`mobile/`](mobile) | APK en [Releases](https://github.com/gusmendez3249/Pago_Servicio_API/releases) |
+
+> El API corre en el plan gratuito de Render: tras 15 minutos sin uso se suspende y la primera petición puede tardar cerca de un minuto.
 
 > **Historia de usuario.** Como ejecutivo de una institución financiera, necesito registrar clientes personas físicas en el sistema para asignarles una cuenta bancaria y permitirles realizar operaciones financieras.
 
@@ -22,7 +33,7 @@ API REST en Java / Spring Boot para registrar clientes personas físicas, valida
 | Tecnología | Versión / uso |
 |---|---|
 | Java | 17 (compila también con 21) |
-| Spring Boot | 3.3.6 (Web, Validation, Data JPA) |
+| Spring Boot | 3.5.16 (Web, Validation, Data JPA) |
 | Hibernate / JPA | 6.5 |
 | PostgreSQL | 14 o superior |
 | Flyway | Migraciones versionadas del esquema |
