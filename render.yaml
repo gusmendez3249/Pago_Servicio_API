@@ -1,4 +1,5 @@
 # Blueprint de Render: API (Docker), PostgreSQL y Key Value (Redis).
+# El servicio pago-servicios-api ya existe en Render; este archivo documenta su configuración y permite recrearlo.
 # Los secretos (sync: false) se capturan en el panel de Render al crear el Blueprint; nunca van en el repositorio.
 databases:
   - name: bangus-db
@@ -17,7 +18,7 @@ services:
     ipAllowList: []
 
   - type: web
-    name: bangus-api
+    name: pago-servicios-api
     runtime: docker
     plan: free
     region: oregon
@@ -45,7 +46,7 @@ services:
       - key: CLIENT_IP_HEADER
         value: CF-Connecting-IP
       - key: APP_EJECUTIVO_USUARIO
-        sync: false
+        value: ejecutivo.admin
       - key: APP_EJECUTIVO_PASSWORD
         sync: false
       - key: GESTOPAGO_ID_DISTRIBUIDOR
