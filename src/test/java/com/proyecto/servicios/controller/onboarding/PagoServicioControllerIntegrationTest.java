@@ -14,6 +14,7 @@ import com.proyecto.servicios.exception.OperacionDuplicadaException;
 import com.proyecto.servicios.exception.PagoRechazadoException;
 import com.proyecto.servicios.exception.ProveedorNoDisponibleException;
 import com.proyecto.servicios.service.onboarding.ConciliacionPagoService;
+import com.proyecto.servicios.service.onboarding.EstadoPagoService;
 import com.proyecto.servicios.service.onboarding.PagoServicioService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ class PagoServicioControllerIntegrationTest {
 
     private final PagoServicioService pagoServicioService = mock(PagoServicioService.class);
     private final ConciliacionPagoService conciliacionPagoService = mock(ConciliacionPagoService.class);
+    private final EstadoPagoService estadoPagoService = mock(EstadoPagoService.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -61,7 +63,7 @@ class PagoServicioControllerIntegrationTest {
         ObjectMapper mapper = builder.build();
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new PagoServicioController(pagoServicioService, conciliacionPagoService))
+                .standaloneSetup(new PagoServicioController(pagoServicioService, conciliacionPagoService, estadoPagoService, org.mockito.Mockito.mock(com.proyecto.servicios.service.onboarding.HistorialPagoService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .build();
@@ -158,11 +160,11 @@ class PagoServicioControllerIntegrationTest {
             {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":false,"telefono":"4181234567","reference":"ABC","twoFA":"1234"}""",
             // referencia: con espacios, vacía, con símbolos
             """
-            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,"reference":"001 234","twoFA":"1234"}""",
+            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,"reference":"001 234","idValidacion":"3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c","twoFA":"1234"}""",
             """
-            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,"reference":"","twoFA":"1234"}""",
+            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,"reference":"","idValidacion":"3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c","twoFA":"1234"}""",
             """
-            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,"reference":"0012'--","twoFA":"1234"}""",
+            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,"reference":"0012'--","idValidacion":"3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c","twoFA":"1234"}""",
             // PIN: 5 dígitos, letras, número, ausente
             """
             {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":false,"telefono":"4181234567","twoFA":"12345"}""",
@@ -184,7 +186,7 @@ class PagoServicioControllerIntegrationTest {
     void campoNoPermitido_SeNombraEnLaRespuesta() throws Exception {
         pagar(VALIDO.replace("}", ",\"montoReal\":1}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensaje").value(containsString("montoReal")));
+                .andExpect(jsonPath("$.data[*].mensaje", org.hamcrest.Matchers.hasItem(containsString("montoReal"))));
     }
 
     @Test
@@ -211,9 +213,12 @@ class PagoServicioControllerIntegrationTest {
 
     @Test
     void rechazoDelProveedor_422() throws Exception {
-        when(pagoServicioService.procesarPago(any(), any(), any())).thenThrow(new PagoRechazadoException("rechazo"));
+        when(pagoServicioService.procesarPago(any(), any(), any())).thenThrow(new PagoRechazadoException("rechazo", respuesta(EstatusTransaccionPago.RECHAZADA)));
 
-        pagar(VALIDO).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.codigo").value(422));
+        // Contrato Sprint 3: el 422 trae el PagoServicioResponse completo en data (antes data era null)
+        pagar(VALIDO).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.codigo").value(422))
+                .andExpect(jsonPath("$.data.estatus").value("RECHAZADA"))
+                .andExpect(jsonPath("$.data.upc").value("ABCDE12345"));
     }
 
     @Test
@@ -257,5 +262,53 @@ class PagoServicioControllerIntegrationTest {
                         .header("Authorization", "Bearer token").content(cuerpo))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(conciliacionPagoService);
+    }
+
+    // ---------------------------------------------------------------- idValidacion (candado de referencia)
+
+    private static final String ID_VALIDACION = "3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c";
+    private static final String POR_REFERENCIA = """
+            {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,
+             "reference":"0012345678","idValidacion":"%s","twoFA":"1234"}""";
+
+    @Test
+    void referenciaSinIdValidacion_400Codigo1SinLlegarAlServicio() throws Exception {
+        pagar("""
+                {"numCuenta":"695429041188","idSer":1,"idProd":2,"monto":100.50,"esReferencia":true,
+                 "reference":"0012345678","twoFA":"1234"}""")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value(1))
+                .andExpect(jsonPath("$.data[0].campo").value("idValidacion"));
+        verifyNoInteractions(pagoServicioService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"no-es-uuid", "3f1c2a9e-7b4d-1c1e-9a2b-5d6e7f8a9b0c", "", "3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0cX"})
+    void idValidacionMalFormado_400(String idValidacion) throws Exception {
+        pagar(POR_REFERENCIA.formatted(idValidacion)).andExpect(status().isBadRequest());
+        verifyNoInteractions(pagoServicioService);
+    }
+
+    @Test
+    void idValidacionConTelefono_400() throws Exception {
+        pagar(VALIDO.replace("}", ",\"idValidacion\":\"" + ID_VALIDACION + "\"}")).andExpect(status().isBadRequest());
+        verifyNoInteractions(pagoServicioService);
+    }
+
+    @Test
+    void referenciaConIdValidacion_PasaAlServicio() throws Exception {
+        when(pagoServicioService.procesarPago(any(), any(), any())).thenReturn(respuesta(EstatusTransaccionPago.CONFIRMADA));
+
+        pagar(POR_REFERENCIA.formatted(ID_VALIDACION)).andExpect(status().isOk());
+    }
+
+    @Test
+    void sinComprobanteValido_428() throws Exception {
+        when(pagoServicioService.procesarPago(any(), any(), any()))
+                .thenThrow(new com.proyecto.servicios.exception.ValidacionReferenciaRequeridaException("valide"));
+
+        pagar(POR_REFERENCIA.formatted(ID_VALIDACION))
+                .andExpect(status().isPreconditionRequired())
+                .andExpect(jsonPath("$.codigo").value(428));
     }
 }

@@ -1,5 +1,6 @@
 package com.proyecto.servicios.service.onboarding;
 
+import com.proyecto.servicios.exception.ValidacionReferenciaRequeridaException;
 import com.proyecto.servicios.dto.onboarding.PagoServicioRequest;
 import com.proyecto.servicios.dto.onboarding.PagoServicioResponse;
 import com.proyecto.servicios.entity.onboarding.ClienteEntity;
@@ -8,6 +9,7 @@ import com.proyecto.servicios.entity.onboarding.TransaccionPagoEntity;
 import com.proyecto.servicios.entity.productos.ProductoPostgresEntity;
 import com.proyecto.servicios.enums.ErrorCode;
 import com.proyecto.servicios.enums.EstatusTransaccionPago;
+import com.proyecto.servicios.enums.MotivoPago;
 import com.proyecto.servicios.exception.AccesoDenegadoException;
 import com.proyecto.servicios.exception.ClienteInactivoException;
 import com.proyecto.servicios.exception.ClienteNoEncontradoException;
@@ -18,6 +20,8 @@ import com.proyecto.servicios.exception.ReglaNegocioException;
 import com.proyecto.servicios.model.gestopago.ResultadoSendTx;
 import com.proyecto.servicios.model.gestopago.SendTxPayload;
 import com.proyecto.servicios.repositorys.onboarding.CuentaRepository;
+import com.proyecto.servicios.mapper.PagoServicioMapper;
+import com.proyecto.servicios.service.CifradoService;
 import com.proyecto.servicios.service.SendTxService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +56,9 @@ class PagoServicioServiceTest {
     @Mock private TransaccionPagoService transaccionPagoService;
     @Mock private PinClienteService pinClienteService;
     @Mock private CatalogoPagoService catalogoPagoService;
+    @Mock private ComprobanteReferenciaService comprobanteReferenciaService;
     @Mock private SendTxService sendTxService;
+    @Mock private CifradoService cifradoService;
 
     private PagoServicioService service;
     private final SesionUsuario cliente = new SesionUsuario(7L, "cliente1", SesionUsuario.ROL_CLIENTE, 10L);
@@ -62,7 +68,8 @@ class PagoServicioServiceTest {
     @BeforeEach
     void setUp() {
         service = new PagoServicioService(sesionService, cuentaRepository, transaccionPagoService,
-                pinClienteService, catalogoPagoService, sendTxService, "", "America/Mexico_City");
+                pinClienteService, catalogoPagoService, comprobanteReferenciaService, sendTxService,
+                new PagoServicioMapper(cifradoService, new com.proyecto.servicios.service.CatalogoPresentacionService("http://img", new com.proyecto.servicios.config.CatalogoProperties())), new MotivoRechazoProveedor("05", "02"), "", "America/Mexico_City");
         cuenta = CuentaEntity.builder().id(5L).numeroCuenta("695429041188").estatus("ACTIVA")
                 .saldo(new BigDecimal("1000.00"))
                 .cliente(ClienteEntity.builder().id(10L).activo(true).build())
@@ -87,12 +94,31 @@ class PagoServicioServiceTest {
         }
     }
 
+    @Test
+    void proveedorSinCupoOConCircuitoAbierto_503SinTocarElSaldo() {
+        ProteccionGestoPago cerrada = new ProteccionGestoPago(0, 5, 30, () -> 0L);
+        service = new PagoServicioService(sesionService, cuentaRepository, transaccionPagoService,
+                pinClienteService, catalogoPagoService, comprobanteReferenciaService, sendTxService,
+                new PagoServicioMapper(cifradoService, new com.proyecto.servicios.service.CatalogoPresentacionService("http://img", new com.proyecto.servicios.config.CatalogoProperties())),
+                new MotivoRechazoProveedor("05", "02"), cerrada, "", "America/Mexico_City");
+        when(sesionService.autenticar(AUTH)).thenReturn(cliente);
+        when(transaccionPagoService.buscarPorLlave(LLAVE)).thenReturn(Optional.empty());
+        when(cuentaRepository.findConClienteByNumeroCuenta("695429041188")).thenReturn(Optional.of(cuenta));
+        when(catalogoPagoService.validar(request)).thenReturn(new ProductoPostgresEntity());
+
+        ProveedorNoDisponibleException ex = assertThrows(ProveedorNoDisponibleException.class,
+                () -> service.procesarPago(AUTH, LLAVE, request));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatus());
+        verify(transaccionPagoService, never()).reservar(any(), any());
+        verifyNoInteractions(sendTxService);
+    }
+
     // ---------------------------------------------------------------- desenlaces
 
     @Test
     void aprobada_ConfirmaYDevuelveCONFIRMADA() {
         flujoHastaEnvio(ResultadoSendTx.aprobada("01", "Transacción exitosa"));
-        when(transaccionPagoService.confirmar(eq(99L), eq("01"), any())).thenReturn(true);
+        when(transaccionPagoService.confirmar(eq(99L), eq("01"), any(), any())).thenReturn(true);
         when(transaccionPagoService.saldo(5L)).thenReturn(new BigDecimal("899.50"));
 
         PagoServicioResponse r = service.procesarPago(AUTH, LLAVE, request);
@@ -102,7 +128,7 @@ class PagoServicioServiceTest {
         assertEquals(new BigDecimal("899.50"), r.getSaldoRestante());
         assertTrue(r.getUpc().matches("^[A-Z0-9]{10}$"));
         verify(pinClienteService).verificar(10L, "1234");
-        verify(transaccionPagoService, never()).rechazarYReintegrar(any(), any(), any(), any(), any());
+        verify(transaccionPagoService, never()).rechazarYReintegrar(any(), any(), any(), any(), any(), any());
 
         ArgumentCaptor<SendTxPayload> payload = ArgumentCaptor.forClass(SendTxPayload.class);
         verify(sendTxService).enviar(payload.capture());
@@ -114,7 +140,7 @@ class PagoServicioServiceTest {
     @Test
     void reservaAntesDeEnviar_ConLlaveYHuellaNormalizadas() {
         flujoHastaEnvio(ResultadoSendTx.aprobada("01", null));
-        when(transaccionPagoService.confirmar(anyLong(), any(), any())).thenReturn(true);
+        when(transaccionPagoService.confirmar(anyLong(), any(), any(), any())).thenReturn(true);
 
         service.procesarPago(AUTH, LLAVE.toUpperCase(), request);
 
@@ -128,6 +154,23 @@ class PagoServicioServiceTest {
     }
 
     @Test
+    void codigo55OrigenValido_RechazaConERROR_GESTOPAGOYReintegra() {
+        service = new PagoServicioService(sesionService, cuentaRepository, transaccionPagoService,
+                pinClienteService, catalogoPagoService, comprobanteReferenciaService, sendTxService,
+                new PagoServicioMapper(cifradoService, new com.proyecto.servicios.service.CatalogoPresentacionService("http://img", new com.proyecto.servicios.config.CatalogoProperties())),
+                new MotivoRechazoProveedor("05,55", "", "02"), "", "America/Mexico_City");
+        flujoHastaEnvio(ResultadoSendTx.rechazada("55", "Origen Valido"));
+
+        PagoRechazadoException ex = assertThrows(PagoRechazadoException.class, () -> service.procesarPago(AUTH, LLAVE, request));
+
+        verify(transaccionPagoService).rechazarYReintegrar(eq(99L), eq(5L), any(), eq("55"), any(), eq(MotivoPago.ERROR_GESTOPAGO));
+        verify(transaccionPagoService, never()).confirmar(any(), any(), any(), any());
+        PagoServicioResponse respuesta = (PagoServicioResponse) ex.getDetalle();
+        assertEquals(MotivoPago.ERROR_GESTOPAGO, respuesta.getMotivo());
+        assertEquals(EstatusTransaccionPago.RECHAZADA, respuesta.getEstatus());
+    }
+
+    @Test
     void rechazada_ReintegraYResponde422() {
         flujoHastaEnvio(ResultadoSendTx.rechazada("05", "Referencia inválida"));
 
@@ -135,7 +178,8 @@ class PagoServicioServiceTest {
                 () -> service.procesarPago(AUTH, LLAVE, request));
         assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, ex.getStatus());
         assertFalse(ex.getMessage().contains("Referencia inválida"), "no se expone el texto crudo del proveedor");
-        verify(transaccionPagoService).rechazarYReintegrar(99L, 5L, MONTO, "05", "Referencia inválida");
+        verify(transaccionPagoService).rechazarYReintegrar(99L, 5L, MONTO, "05", "Referencia inválida",
+                MotivoPago.REFERENCIA_INVALIDA);
     }
 
     @Test
@@ -145,7 +189,8 @@ class PagoServicioServiceTest {
         ProveedorNoDisponibleException ex = assertThrows(ProveedorNoDisponibleException.class,
                 () -> service.procesarPago(AUTH, LLAVE, request));
         assertEquals(HttpStatus.BAD_GATEWAY, ex.getStatus());
-        verify(transaccionPagoService).rechazarYReintegrar(eq(99L), eq(5L), eq(MONTO), isNull(), any());
+        verify(transaccionPagoService).rechazarYReintegrar(eq(99L), eq(5L), eq(MONTO), isNull(), any(),
+                eq(MotivoPago.PROVEEDOR_NO_DISPONIBLE));
     }
 
     @Test
@@ -165,8 +210,8 @@ class PagoServicioServiceTest {
 
         assertEquals(EstatusTransaccionPago.INDETERMINADA, r.getEstatus());
         verify(transaccionPagoService).marcarIndeterminada(eq(99L), isNull(), any());
-        verify(transaccionPagoService, never()).rechazarYReintegrar(any(), any(), any(), any(), any());
-        verify(transaccionPagoService, never()).confirmar(any(), any(), any());
+        verify(transaccionPagoService, never()).rechazarYReintegrar(any(), any(), any(), any(), any(), any());
+        verify(transaccionPagoService, never()).confirmar(any(), any(), any(), any());
     }
 
     @Test
@@ -177,7 +222,7 @@ class PagoServicioServiceTest {
         PagoServicioResponse r = service.procesarPago(AUTH, LLAVE, request);
 
         assertEquals(EstatusTransaccionPago.INDETERMINADA, r.getEstatus());
-        verify(transaccionPagoService, never()).rechazarYReintegrar(any(), any(), any(), any(), any());
+        verify(transaccionPagoService, never()).rechazarYReintegrar(any(), any(), any(), any(), any(), any());
     }
 
     // ---------------------------------------------------------------- autorización y validaciones previas
@@ -240,6 +285,7 @@ class PagoServicioServiceTest {
         when(sesionService.autenticar(AUTH)).thenReturn(cliente);
         when(transaccionPagoService.buscarPorLlave(LLAVE)).thenReturn(Optional.empty());
         when(cuentaRepository.findConClienteByNumeroCuenta(any())).thenReturn(Optional.of(cuenta));
+        when(catalogoPagoService.validar(request)).thenReturn(new ProductoPostgresEntity());
         when(transaccionPagoService.reservar(eq(5L), any())).thenThrow(new ReglaNegocioException("Saldo insuficiente"));
 
         assertThrows(ReglaNegocioException.class, () -> service.procesarPago(AUTH, LLAVE, request));
@@ -251,6 +297,7 @@ class PagoServicioServiceTest {
         when(sesionService.autenticar(AUTH)).thenReturn(cliente);
         when(transaccionPagoService.buscarPorLlave(LLAVE)).thenReturn(Optional.empty());
         when(cuentaRepository.findConClienteByNumeroCuenta(any())).thenReturn(Optional.of(cuenta));
+        when(catalogoPagoService.validar(request)).thenReturn(new ProductoPostgresEntity());
         when(transaccionPagoService.reservar(eq(5L), any())).thenThrow(new DataIntegrityViolationException("uq"));
 
         assertThrows(OperacionDuplicadaException.class, () -> service.procesarPago(AUTH, LLAVE, request));
@@ -326,5 +373,61 @@ class PagoServicioServiceTest {
         for (int i = 0; i < 5_000; i++) {
             assertTrue(PagoServicioService.generarUpc().matches("^[A-Z0-9]{10}$"));
         }
+    }
+
+    // ---------------------------------------------------------------- candado de referencia
+
+    @Test
+    void sinComprobanteValido_428SinReservarSaldoNiLlamarASendTx() {
+        when(sesionService.autenticar(AUTH)).thenReturn(cliente);
+        when(transaccionPagoService.buscarPorLlave(LLAVE)).thenReturn(Optional.empty());
+        when(cuentaRepository.findConClienteByNumeroCuenta("695429041188")).thenReturn(Optional.of(cuenta));
+        when(catalogoPagoService.validar(request)).thenReturn(new ProductoPostgresEntity());
+        doThrow(new ValidacionReferenciaRequeridaException("falta")).when(comprobanteReferenciaService)
+                .consumir(any(), any(), any());
+
+        ValidacionReferenciaRequeridaException ex = assertThrows(ValidacionReferenciaRequeridaException.class,
+                () -> service.procesarPago(AUTH, LLAVE, request));
+
+        assertEquals(HttpStatus.PRECONDITION_REQUIRED, ex.getStatus());
+        verify(transaccionPagoService, never()).reservar(any(), any());
+        verify(transaccionPagoService, never()).existeUpc(any());
+        verifyNoInteractions(sendTxService);
+    }
+
+    @Test
+    void elCatalogoSeValidaAntesDelPinYElComprobanteAntesDeReservar() {
+        flujoHastaEnvio(ResultadoSendTx.aprobada("01", null));
+        when(transaccionPagoService.confirmar(anyLong(), any(), any(), any())).thenReturn(true);
+
+        service.procesarPago(AUTH, LLAVE, request);
+
+        var orden = inOrder(pinClienteService, catalogoPagoService, comprobanteReferenciaService, transaccionPagoService);
+        orden.verify(catalogoPagoService).validar(request);
+        orden.verify(pinClienteService).verificar(10L, "1234");
+        orden.verify(comprobanteReferenciaService).consumir(eq(cliente), eq(request), any());
+        orden.verify(transaccionPagoService).reservar(eq(5L), any());
+    }
+
+    @Test
+    void mismaLlaveTrasPagoExitoso_DevuelveElResultadoOriginalSinConsumirComprobante() {
+        when(sesionService.autenticar(AUTH)).thenReturn(cliente);
+        when(transaccionPagoService.buscarPorLlave(LLAVE))
+                .thenReturn(Optional.of(previa(EstatusTransaccionPago.CONFIRMADA, 7L, PagoServicioService.huella(request))));
+
+        PagoServicioResponse r = service.procesarPago(AUTH, LLAVE, request);
+
+        assertEquals(EstatusTransaccionPago.CONFIRMADA, r.getEstatus());
+        verifyNoInteractions(comprobanteReferenciaService);
+    }
+
+    @Test
+    void elIdValidacionNoEntraEnLaHuellaDeIdempotencia() {
+        PagoServicioRequest a = PagoServicioRequest.builder().numCuenta("695429041188").idSer(1).idProd(2).monto(MONTO)
+                .esReferencia(true).reference("REF1").idValidacion("3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c").twoFA("1234").build();
+        PagoServicioRequest b = PagoServicioRequest.builder().numCuenta("695429041188").idSer(1).idProd(2).monto(MONTO)
+                .esReferencia(true).reference("REF1").idValidacion("aaaaaaaa-7b4d-4c1e-9a2b-5d6e7f8a9b0c").twoFA("1234").build();
+
+        assertEquals(PagoServicioService.huella(a), PagoServicioService.huella(b));
     }
 }

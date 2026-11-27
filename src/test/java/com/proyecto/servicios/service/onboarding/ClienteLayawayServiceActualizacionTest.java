@@ -80,6 +80,8 @@ class ClienteLayawayServiceActualizacionTest {
         when(clienteRepository.existsByCorreo("nuevo@correo.com")).thenReturn(false);
         when(usuarioLoginRepository.findByClienteId(7L)).thenReturn(Optional.of(usuario));
         when(passwordEncoderUtil.encode("NuevaClave#1")).thenReturn("hash-nuevo");
+        when(passwordEncoderUtil.encodeBiometrico(555L)).thenReturn("pbkdf2$face");
+        when(passwordEncoderUtil.encodeBiometrico(123L)).thenReturn("pbkdf2$bio");
         when(cuentaRepository.findByClienteId(7L)).thenReturn(List.of(CuentaEntity.builder()
                 .numeroCuenta("695429041188").saldo(new BigDecimal("500.00")).estatus("ACTIVA").build()));
 
@@ -114,7 +116,8 @@ class ClienteLayawayServiceActualizacionTest {
         assertEquals("hash-nuevo", usuario.getPasswordHash());
         assertFalse(usuario.getIsLoggedIn(), "cambiar la contraseña cierra la sesión activa");
         assertNull(usuario.getTokenHash());
-        assertEquals(555L, usuario.getFaceIdBiometrico());
+        assertEquals("pbkdf2$face", usuario.getFaceIdHash(), "el Face ID solo se guarda como hash");
+        assertEquals("pbkdf2$bio", cliente.getDatosBiometricosHash(), "los datos biométricos solo se guardan como hash");
         verify(clienteRepository).save(cliente);
         assertNotNull(response);
     }

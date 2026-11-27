@@ -6,10 +6,13 @@ import com.proyecto.servicios.entity.onboarding.CuentaEntity;
 import com.proyecto.servicios.entity.onboarding.TransaccionPagoEntity;
 import com.proyecto.servicios.enums.ErrorCode;
 import com.proyecto.servicios.enums.EstatusTransaccionPago;
+import com.proyecto.servicios.enums.MotivoPago;
 import com.proyecto.servicios.exception.AccesoDenegadoException;
 import com.proyecto.servicios.exception.OperacionDuplicadaException;
 import com.proyecto.servicios.exception.RecursoNoEncontradoException;
+import com.proyecto.servicios.mapper.PagoServicioMapper;
 import com.proyecto.servicios.model.gestopago.ResultadoSendTx;
+import com.proyecto.servicios.service.CifradoService;
 import com.proyecto.servicios.service.ConsultaEstadoPagoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,13 +48,17 @@ class ConciliacionPagoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ConciliacionPagoService(transaccionPagoService, consultaEstadoPagoService, sesionService, 5);
+        service = new ConciliacionPagoService(transaccionPagoService, consultaEstadoPagoService, sesionService,
+                new PagoServicioMapper(mock(CifradoService.class), new com.proyecto.servicios.service.CatalogoPresentacionService("http://img", new com.proyecto.servicios.config.CatalogoProperties())), 5, "America/Mexico_City");
     }
 
     private TransaccionPagoEntity transaccion(EstatusTransaccionPago estatus) {
         CuentaEntity cuenta = CuentaEntity.builder().id(5L).numeroCuenta("695429041188").build();
         return TransaccionPagoEntity.builder().id(20L).upc(UPC).monto(MONTO).estatus(estatus).cuenta(cuenta)
-                .fechaTransaccion(LocalDateTime.now().minusMinutes(10)).build();
+                .fechaTransaccion(LocalDateTime.now(ZoneId.of("America/Mexico_City")).minusMinutes(10))
+                .payloadSendtx("{\"idProducto\":2,\"idServicio\":1,\"telefono\":\"4181234567\",\"montoPago\":100.00,"
+                        + "\"horaLocal\":\"20260101120000\",\"upc\":\"K3J9X0A7ZQ\"}")
+                .build();
     }
 
     private void sinPendientes() {
@@ -61,7 +69,8 @@ class ConciliacionPagoServiceTest {
         sinPendientes();
         when(transaccionPagoService.buscarAnteriores(eq(EstatusTransaccionPago.INDETERMINADA), any()))
                 .thenReturn(List.of(transaccion(EstatusTransaccionPago.INDETERMINADA)));
-        when(consultaEstadoPagoService.consultar(UPC)).thenReturn(Optional.ofNullable(resultado));
+        when(transaccionPagoService.reclamarConsultaConfirmacion(eq(20L), any(), any())).thenReturn(true);
+        when(consultaEstadoPagoService.consultar(any(TransaccionPagoEntity.class))).thenReturn(Optional.ofNullable(resultado));
     }
 
     // ---------- conciliar() ----------
@@ -95,8 +104,8 @@ class ConciliacionPagoServiceTest {
 
         service.conciliar();
 
-        verify(transaccionPagoService).confirmar(20L, "01", "OK");
-        verify(transaccionPagoService, never()).rechazarYReintegrar(anyLong(), anyLong(), any(), any(), any());
+        verify(transaccionPagoService).confirmar(eq(20L), eq("01"), eq("OK"), isNull());
+        verify(transaccionPagoService, never()).rechazarYReintegrar(anyLong(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -105,8 +114,8 @@ class ConciliacionPagoServiceTest {
 
         service.conciliar();
 
-        verify(transaccionPagoService).rechazarYReintegrar(20L, 5L, MONTO, "05", "Rechazada");
-        verify(transaccionPagoService, never()).confirmar(anyLong(), any(), any());
+        verify(transaccionPagoService).rechazarYReintegrar(20L, 5L, MONTO, "05", "Rechazada", MotivoPago.RECHAZADO_PROVEEDOR);
+        verify(transaccionPagoService, never()).confirmar(anyLong(), any(), any(), any());
     }
 
     @Test
@@ -115,8 +124,8 @@ class ConciliacionPagoServiceTest {
 
         service.conciliar();
 
-        verify(transaccionPagoService, never()).confirmar(anyLong(), any(), any());
-        verify(transaccionPagoService, never()).rechazarYReintegrar(anyLong(), anyLong(), any(), any(), any());
+        verify(transaccionPagoService, never()).confirmar(anyLong(), any(), any(), any());
+        verify(transaccionPagoService, never()).rechazarYReintegrar(anyLong(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -125,8 +134,8 @@ class ConciliacionPagoServiceTest {
 
         service.conciliar();
 
-        verify(transaccionPagoService, never()).confirmar(anyLong(), any(), any());
-        verify(transaccionPagoService, never()).rechazarYReintegrar(anyLong(), anyLong(), any(), any(), any());
+        verify(transaccionPagoService, never()).confirmar(anyLong(), any(), any(), any());
+        verify(transaccionPagoService, never()).rechazarYReintegrar(anyLong(), anyLong(), any(), any(), any(), any());
     }
 
     // ---------- resolverManual() ----------
@@ -186,7 +195,8 @@ class ConciliacionPagoServiceTest {
         when(sesionService.autenticar(AUTH)).thenReturn(ejecutivo);
         when(transaccionPagoService.buscarPorUpc(UPC))
                 .thenReturn(Optional.of(transaccion(EstatusTransaccionPago.INDETERMINADA)));
-        when(transaccionPagoService.rechazarYReintegrar(eq(20L), eq(5L), eq(MONTO), isNull(), anyString()))
+        when(transaccionPagoService.rechazarYReintegrar(eq(20L), eq(5L), eq(MONTO), isNull(), anyString(),
+                eq(MotivoPago.RECHAZADO_PROVEEDOR)))
                 .thenReturn(true);
         when(transaccionPagoService.saldo(5L)).thenReturn(new BigDecimal("1000.00"));
 

@@ -46,6 +46,6 @@ class RedisYFeignConfigTest {
         assertEquals(65000, options.readTimeoutMillis());
         assertFalse(options.isFollowRedirects(), "un POST financiero no debe redirigirse");
         assertSame(Retryer.NEVER_RETRY, config.sendTxRetryer());
-        assertInstanceOf(Client.Default.class, config.sendTxFeignClient());
+        assertInstanceOf(Client.Default.class, config.sendTxFeignClient(new TlsEstrictoSocketFactory()));
     }
 }

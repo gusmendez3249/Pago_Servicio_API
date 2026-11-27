@@ -112,8 +112,7 @@ class GestoPagoTokenServiceImplTest {
 
     @Test
     void obtenerTokenActivoSoloDevuelveTokensActivos() {
-        GestoPagoToken activo = new GestoPagoToken();
-        activo.setActivo(true);
+        GestoPagoToken activo = guardado(java.time.LocalDateTime.now().minusHours(2));
         GestoPagoToken inactivo = new GestoPagoToken();
         inactivo.setActivo(false);
         GestoPagoTokenServiceImpl servicio = servicio(null);
@@ -123,5 +122,71 @@ class GestoPagoTokenServiceImplTest {
 
         assertSame(activo, servicio.obtenerTokenActivo(1, "A").orElseThrow());
         assertTrue(servicio.obtenerTokenActivo(2, "B").isEmpty());
+    }
+
+    // ---------------------------------------------------------------- un token cada 24 h
+
+    private static GestoPagoToken guardado(java.time.LocalDateTime actualizado) {
+        GestoPagoToken token = new GestoPagoToken();
+        token.setActivo(true);
+        token.setToken("token-guardado");
+        token.setFechaActualizacion(actualizado);
+        return token;
+    }
+
+    @Test
+    void alArrancarConTokenVigenteNoSeSolicitaOtro() {
+        when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUIDOR, DISPOSITIVO))
+                .thenReturn(Optional.of(guardado(java.time.LocalDateTime.now().minusHours(5))));
+
+        servicio(null).renovarSiHaceFalta();
+
+        verifyNoInteractions(authClient);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void alArrancarSinTokenGuardadoSeSolicitaUno() {
+        when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUIDOR, DISPOSITIVO)).thenReturn(Optional.empty());
+        when(authClient.authenticate(DISTRIBUIDOR, DISPOSITIVO, CLAVE, null)).thenReturn(respuesta("nuevo"));
+        when(mapper.toEntity(any())).thenReturn(new GestoPagoToken());
+
+        servicio(null).renovarSiHaceFalta();
+
+        verify(authClient, times(1)).authenticate(DISTRIBUIDOR, DISPOSITIVO, CLAVE, null);
+    }
+
+    @Test
+    void conTokenVencidoSeSolicitaUnoYYaNoSeEntregaElViejo() {
+        GestoPagoToken vencido = guardado(java.time.LocalDateTime.now().minusHours(24));
+        when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUIDOR, DISPOSITIVO)).thenReturn(Optional.of(vencido));
+        when(authClient.authenticate(DISTRIBUIDOR, DISPOSITIVO, CLAVE, null)).thenReturn(respuesta("nuevo"));
+        GestoPagoTokenServiceImpl servicio = servicio(null);
+
+        assertTrue(servicio.obtenerTokenActivo(DISTRIBUIDOR, DISPOSITIVO).isEmpty());
+        servicio.renovarSiHaceFalta();
+
+        verify(authClient, times(1)).authenticate(DISTRIBUIDOR, DISPOSITIVO, CLAVE, null);
+    }
+
+    @Test
+    void renovacionForzadaSeOmiteSiSePidioUnTokenHaceMuyPoco() {
+        when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUIDOR, DISPOSITIVO))
+                .thenReturn(Optional.of(guardado(java.time.LocalDateTime.now().minusMinutes(2))));
+
+        servicio(null).renovarToken();
+
+        verifyNoInteractions(authClient);
+    }
+
+    @Test
+    void renovacionForzadaSiSePermiteCuandoElTokenNoEsReciente() {
+        when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUIDOR, DISPOSITIVO))
+                .thenReturn(Optional.of(guardado(java.time.LocalDateTime.now().minusHours(3))));
+        when(authClient.authenticate(DISTRIBUIDOR, DISPOSITIVO, CLAVE, null)).thenReturn(respuesta("nuevo"));
+
+        servicio(null).renovarToken();
+
+        verify(authClient, times(1)).authenticate(DISTRIBUIDOR, DISPOSITIVO, CLAVE, null);
     }
 }

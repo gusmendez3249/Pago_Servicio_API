@@ -36,7 +36,7 @@ class LayawayClienteRequestValidacionTest {
         alta = LayawayClienteRequest.builder()
                 .bandera(1)
                 .datosPersonales(DatosPersonalesDto.builder().nombre("Juan").apellidoPaterno("Pérez").apellidoMaterno("Gómez")
-                        .fechaNacimiento(LocalDate.of(1995, 5, 15)).curp("PERJ950515HDFRMN01").rfc("PERJ9505151A2")
+                        .fechaNacimiento(LocalDate.of(1995, 5, 15)).curp("PERJ950515HDFRMN06").rfc("PERJ9505151A2")
                         .sexo("MASCULINO").nacionalidad("MEXICANA").estadoCivil("SOLTERO").build())
                 .datosContacto(DatosContactoDto.builder().correo("juan.perez@email.com").telefonoMovil(5512345678L).build())
                 .domicilio(DomicilioDto.builder().calle("Av. Reforma").numeroExterior("100").colonia("Centro")
@@ -53,6 +53,20 @@ class LayawayClienteRequestValidacionTest {
         Map<String, String> m = new TreeMap<>();
         v.forEach(c -> m.put(c.getPropertyPath().toString(), c.getMessage()));
         return m;
+    }
+
+    @org.junit.jupiter.api.Test
+    void alta_ConIdentidadIncongruente_SeRechazaCampoPorCampo() {
+        alta.getDatosPersonales().setCurp("PERJ950515HDFRMN09"); // digito verificador incorrecto
+        alta.getDatosPersonales().setFechaNacimiento(LocalDate.of(1985, 6, 15));
+        alta.getDatosPersonales().setSexo("FEMENINO");
+        alta.getDatosPersonales().setRfc("XAXX850615AB1");
+
+        var e = errores(alta);
+        org.junit.jupiter.api.Assertions.assertTrue(e.containsKey("datosPersonales.curp"));
+        org.junit.jupiter.api.Assertions.assertTrue(e.containsKey("datosPersonales.fechaNacimiento"));
+        org.junit.jupiter.api.Assertions.assertTrue(e.containsKey("datosPersonales.sexo"));
+        org.junit.jupiter.api.Assertions.assertTrue(e.containsKey("datosPersonales.rfc"));
     }
 
     private static FiltrosClienteDto curp(String valor) {

@@ -10,6 +10,8 @@ import com.proyecto.servicios.exception.ClienteInactivoException;
 import com.proyecto.servicios.model.gestopago.ResultadoSendTx;
 import com.proyecto.servicios.model.gestopago.SendTxPayload;
 import com.proyecto.servicios.repositorys.onboarding.CuentaRepository;
+import com.proyecto.servicios.mapper.PagoServicioMapper;
+import com.proyecto.servicios.service.CifradoService;
 import com.proyecto.servicios.service.SendTxService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +41,9 @@ class PagoServicioServiceReferenciaTest {
     @Mock private TransaccionPagoService transaccionPagoService;
     @Mock private PinClienteService pinClienteService;
     @Mock private CatalogoPagoService catalogoPagoService;
+    @Mock private ComprobanteReferenciaService comprobanteReferenciaService;
     @Mock private SendTxService sendTxService;
+    @Mock private CifradoService cifradoService;
 
     private PagoServicioService service;
     private CuentaEntity cuenta;
@@ -48,11 +52,13 @@ class PagoServicioServiceReferenciaTest {
     @BeforeEach
     void setUp() {
         service = new PagoServicioService(sesionService, cuentaRepository, transaccionPagoService,
-                pinClienteService, catalogoPagoService, sendTxService, " UNIDAD ", "America/Mexico_City");
+                pinClienteService, catalogoPagoService, comprobanteReferenciaService, sendTxService,
+                new PagoServicioMapper(cifradoService, new com.proyecto.servicios.service.CatalogoPresentacionService("http://img", new com.proyecto.servicios.config.CatalogoProperties())), new MotivoRechazoProveedor("05", "02"), " UNIDAD ", "America/Mexico_City");
         cuenta = CuentaEntity.builder().id(5L).numeroCuenta("695429041188").estatus("ACTIVA")
+                .saldo(new BigDecimal("1000.00"))
                 .cliente(ClienteEntity.builder().id(10L).activo(true).build()).build();
         request = PagoServicioRequest.builder().numCuenta("695429041188").idSer(1).idProd(2)
-                .monto(new BigDecimal("150.00")).esReferencia(true).reference("123456789012").twoFA("1234").build();
+                .monto(new BigDecimal("150.00")).esReferencia(true).reference("123456789012").idValidacion("3f1c2a9e-7b4d-4c1e-9a2b-5d6e7f8a9b0c").twoFA("1234").build();
     }
 
     /** Cliente autenticado, sin pago previo con la misma llave y dueño de la cuenta. */
@@ -72,7 +78,7 @@ class PagoServicioServiceReferenciaTest {
             return tx;
         });
         when(sendTxService.enviar(any())).thenReturn(ResultadoSendTx.aprobada("01", "OK"));
-        when(transaccionPagoService.confirmar(anyLong(), any(), any())).thenReturn(true);
+        when(transaccionPagoService.confirmar(anyLong(), any(), any(), any())).thenReturn(true);
     }
 
     private static ProductoPostgresEntity producto(Integer tipoFront, Integer tipoServicio) {

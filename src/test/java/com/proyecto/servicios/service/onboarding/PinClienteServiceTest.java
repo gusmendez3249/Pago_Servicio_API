@@ -94,4 +94,53 @@ class PinClienteServiceTest {
 
         assertThrows(AccesoDenegadoException.class, () -> service.verificar(10L, "1234"));
     }
+
+    // ---------------------------------------------------------------- Sprint 3: intentos restantes y minutos de bloqueo en data
+
+    @Test
+    void pinIncorrecto_403ConLosIntentosRestantes() {
+        AccesoDenegadoException primero = assertThrows(AccesoDenegadoException.class, () -> service.verificar(10L, "0000"));
+        AccesoDenegadoException segundo = assertThrows(AccesoDenegadoException.class, () -> service.verificar(10L, "0000"));
+
+        com.proyecto.servicios.dto.onboarding.DetalleErrorPago d1 = (com.proyecto.servicios.dto.onboarding.DetalleErrorPago) primero.getDetalle();
+        com.proyecto.servicios.dto.onboarding.DetalleErrorPago d2 = (com.proyecto.servicios.dto.onboarding.DetalleErrorPago) segundo.getDetalle();
+        assertEquals(403, primero.getCodigo());
+        assertEquals(com.proyecto.servicios.enums.MotivoPago.PIN_INCORRECTO, d1.getMotivo());
+        assertEquals(2, d1.getIntentosRestantes());
+        assertEquals(1, d2.getIntentosRestantes());
+    }
+
+    @Test
+    void alLlegarAlLimite_423ConLosMinutosDeBloqueo() {
+        assertThrows(AccesoDenegadoException.class, () -> service.verificar(10L, "0000"));
+        assertThrows(AccesoDenegadoException.class, () -> service.verificar(10L, "0000"));
+
+        CuentaBloqueadaException ex = assertThrows(CuentaBloqueadaException.class, () -> service.verificar(10L, "0000"));
+
+        com.proyecto.servicios.dto.onboarding.DetalleErrorPago detalle = (com.proyecto.servicios.dto.onboarding.DetalleErrorPago) ex.getDetalle();
+        assertEquals(423, ex.getCodigo());
+        assertEquals(com.proyecto.servicios.enums.MotivoPago.PIN_BLOQUEADO, detalle.getMotivo());
+        assertEquals(15, detalle.getMinutosBloqueo());
+        assertNull(detalle.getIntentosRestantes());
+    }
+
+    @Test
+    void pinYaBloqueado_423TambienConElMotivo() {
+        cliente.setPinBloqueadoHasta(LocalDateTime.now().plusMinutes(5));
+
+        CuentaBloqueadaException ex = assertThrows(CuentaBloqueadaException.class, () -> service.verificar(10L, "1234"));
+
+        assertEquals(com.proyecto.servicios.enums.MotivoPago.PIN_BLOQUEADO,
+                ((com.proyecto.servicios.dto.onboarding.DetalleErrorPago) ex.getDetalle()).getMotivo());
+    }
+
+    @Test
+    void sinPin_403ConMotivoSinPin() {
+        cliente.setPin(null);
+
+        AccesoDenegadoException ex = assertThrows(AccesoDenegadoException.class, () -> service.verificar(10L, "1234"));
+
+        assertEquals(com.proyecto.servicios.enums.MotivoPago.SIN_PIN,
+                ((com.proyecto.servicios.dto.onboarding.DetalleErrorPago) ex.getDetalle()).getMotivo());
+    }
 }

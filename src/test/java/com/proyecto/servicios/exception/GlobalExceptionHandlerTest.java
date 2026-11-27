@@ -50,7 +50,7 @@ class GlobalExceptionHandlerTest {
         enviar("{\"bandera\":9}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value(1))
-                .andExpect(jsonPath("$.mensaje", startsWith("Datos no validos{bandera=")))
+                .andExpect(jsonPath("$.mensaje").value(GlobalExceptionHandler.MENSAJE_VALIDACION))
                 .andExpect(jsonPath("$.data[0].campo").value("bandera"))
                 .andExpect(jsonPath("$.data[0].mensaje", not(emptyString())));
         verifyNoInteractions(servicio);
@@ -69,7 +69,7 @@ class GlobalExceptionHandlerTest {
         enviar("{\"bandera\":2,\"filtros\":{\"curp\":\"PARA950515HDFRMN01\"},\"datosPersonales\":{\"nombre\":\"Li\",\"sexo\":\"masculino\"}}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value(1))
-                .andExpect(jsonPath("$.mensaje", containsString("datosPersonales.nombre=")))
+                .andExpect(jsonPath("$.mensaje").value(GlobalExceptionHandler.MENSAJE_VALIDACION))
                 .andExpect(jsonPath("$.data[*].campo", hasItems("datosPersonales.nombre", "datosPersonales.sexo")));
         verifyNoInteractions(servicio);
     }

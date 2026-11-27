@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,10 +68,42 @@ class EjecutivoInicialSeederTest {
         UsuarioLoginEntity existente = UsuarioLoginEntity.builder().username(USUARIO)
                 .rol(SesionUsuario.ROL_EJECUTIVO).build();
         when(repository.findByUsername(USUARIO)).thenReturn(Optional.of(existente));
+        when(encoder.matches(eq(PASSWORD_VALIDA), any())).thenReturn(true);
 
         seeder(USUARIO, PASSWORD_VALIDA).crearEjecutivoInicial();
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void contrasenaNuevaRotaElHashYCierraLaSesion() {
+        UsuarioLoginEntity existente = UsuarioLoginEntity.builder().username(USUARIO).passwordHash("viejo")
+                .tokenHash("token").isLoggedIn(true).rol(SesionUsuario.ROL_EJECUTIVO).build();
+        when(repository.findByUsername(USUARIO)).thenReturn(Optional.of(existente));
+        when(encoder.matches(PASSWORD_VALIDA, "viejo")).thenReturn(false);
+        when(encoder.encode(PASSWORD_VALIDA)).thenReturn("nuevo");
+
+        seeder(USUARIO, PASSWORD_VALIDA).crearEjecutivoInicial();
+
+        verify(repository).save(existente);
+        assertEquals("nuevo", existente.getPasswordHash());
+        assertNull(existente.getTokenHash());
+        assertFalse(existente.getIsLoggedIn());
+    }
+
+    @Test
+    void contrasenaPublicadaSeRechazaSinTocarNada() {
+        String publicada = "Publicada#2026";
+        new EjecutivoInicialSeeder(repository, encoder, USUARIO, publicada,
+                Set.of(EjecutivoInicialSeeder.sha256(publicada))).crearEjecutivoInicial();
+
+        verifyNoInteractions(repository, encoder);
+    }
+
+    @Test
+    void laListaDePublicadasSoloGuardaHashes() {
+        assertTrue(EjecutivoInicialSeeder.PASSWORDS_PUBLICADAS.stream().allMatch(h -> h.matches("^[0-9a-f]{64}$")));
+        assertEquals(64, EjecutivoInicialSeeder.sha256("x").length());
     }
 
     @Test
