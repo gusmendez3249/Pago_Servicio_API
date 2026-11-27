@@ -192,7 +192,7 @@ Todos los hallazgos se corrigieron. Las 796 pruebas del backend, las 200 de la w
 
 | ID | Corrección | Re-test |
 |---|---|---|
-| QA-01 | El saldo inicial es configurable (`APP_SALDO_INICIAL`) y vale **0.00 por defecto**. Solo el arranque local (`.claude/launch.json`) lo sube a 1000.00 para pruebas | Prueba unitaria: el registro da $0.00 |
+| QA-01 | El saldo inicial es configurable (`APP_SALDO_INICIAL`) y vale **0.00 por defecto**. En producción no debe definirse | Prueba unitaria: el registro da $0.00 |
 | QA-02 | El catálogo vive en **una sola llave** de Redis, en **caché en memoria** (10 min, se invalida al sincronizar), con **gzip**, **ETag** y `Cache-Control: public, max-age=300` | 20 → **208 req/s**; p50 con 100 concurrentes: 5,960 → **470 ms**; 580 KB → **43 KB**; segunda descarga → **304** |
 | QA-03 | Timeout de Redis de 5 s a **300 ms**; **circuit breaker** (30 s directo a PostgreSQL); se sirve la última copia buena si todo falla | Sin Redis: `/productos` p95 **117 ms** (antes 5,139 ms); historial durante 250 peticiones: máx **99 ms** (antes 4,468 ms) |
 | QA-04 | Los comprobantes de referencia tienen **respaldo en PostgreSQL** (`tb_comprobante_referencia`, V18), con consumo atómico `DELETE … RETURNING` | Sin Redis: `validar` → **200** (antes 503) |

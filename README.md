@@ -50,7 +50,7 @@ API REST en Java / Spring Boot para registrar clientes personas físicas, valida
    ```
    Variables opcionales de seguridad:
    - `CLIENT_IP_HEADER` (por defecto vacío): encabezado con la IP real del cliente, usado por los límites de peticiones por IP (`429`). Vacío = se usa la IP de la conexión, que el cliente no puede falsificar. **En Render debe configurarse `CLIENT_IP_HEADER=CF-Connecting-IP`** (Cloudflare siempre lo sobrescribe); sin eso todos los usuarios compartirían la IP del proxy y el límite sería global.
-   - `SWAGGER_ENABLED` (por defecto `false`): con `true` se publican `/swagger-ui.html` y `/api-docs` (el arranque local de `.claude/launch.json` lo enciende).
+   - `SWAGGER_ENABLED` (por defecto `false`): con `true` se publican `/swagger-ui.html` y `/api-docs` (en local puede encenderse con `--SWAGGER_ENABLED=true`).
    - `APP_SALDO_INICIAL` (por defecto `0.00`): saldo con el que nace cada cuenta. El registro es público, así que en producción debe ser 0. Las cuentas nuevas nacen en 0.00 y el saldo se abona desde el panel de administrador (sección 5.8).
    - `REDIS_PASSWORD`: contraseña de Redis. En local está en `redis-local.conf` (ignorado por git) y en `secretos.properties`.
    - Errores propios de Gesto Pago: si `sendTx` responde un código de `gestopago.sendtx.codigos-error-gestopago` (por defecto `05` y `55` "Origen Valido"), el pago queda `RECHAZADA` con motivo `ERROR_GESTOPAGO`, el saldo se reintegra y la web y el móvil muestran "Error de Gesto Pago". No existe modo de pago simulado; los registros antiguos con `origen_confirmacion = SIMULADO` se conservan como historial.
